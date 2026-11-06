@@ -2,13 +2,14 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import type { Database } from "./types";
+import { urlDoSupabase } from "./url";
 
 /** Cliente SSR — usa cookies do request, respeita permissões do anon key. */
 export async function createClient() {
   const cookieStore = await cookies();
 
   return createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    urlDoSupabase(),
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
@@ -33,7 +34,7 @@ export async function createClient() {
  *  Não precisa de cookies; use apenas em Route Handlers e Server Actions. */
 export function getSupabaseAdmin() {
   return createSupabaseClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    urlDoSupabase(),
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     {
       auth: {

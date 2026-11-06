@@ -25,7 +25,13 @@ function tipoDaChave(chave: string | undefined): string {
 export async function GET() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   const resultado: Record<string, unknown> = {
-    supabaseUrl: url ? new URL(url).host : "ausente",
+    supabaseUrl: (() => {
+      if (!url) return "ausente";
+      try {
+        const u = new URL(url.trim());
+        return u.pathname !== "/" ? `${u.host} (a variável tem o caminho "${u.pathname}"; o app ignora, mas o certo é só https://${u.host})` : u.host;
+      } catch { return "URL inválida"; }
+    })(),
     chaveServiceRole: tipoDaChave(process.env.SUPABASE_SERVICE_ROLE_KEY),
     chaveAnon: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? "presente" : "ausente",
     contaGoogle: (() => {
