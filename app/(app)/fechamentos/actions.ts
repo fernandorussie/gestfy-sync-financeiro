@@ -11,6 +11,7 @@ import { GRUPOS_DESPESA } from "@/lib/fechamentos/plano-contas";
 import { decidir, desfazer, type AcaoDecisao, type Decisao } from "@/lib/fechamentos/decisoes";
 import { calcularFechamento, concluirFechamento, lerDecisoes, limparCache, periodoDe, testarFonte, type ResultadoFechamento } from "@/lib/fechamentos/servidor";
 import type { Acao, Acompanhamento, TextoFechamento } from "@/lib/fechamentos/texto-fechamento";
+import { limparFicha, type FichaClinica } from "@/lib/fechamentos/ficha";
 
 type Resposta<T> = { ok: true; dados: T } | { ok: false; erro: string };
 
@@ -131,6 +132,20 @@ export async function testarLeitura(p: { nome: keyof FontesFechamento; cfg: NonN
   const limpo = limparFontes({ [p.nome]: p.cfg } as FontesFechamento)[p.nome];
   if (!limpo) return { leitura: null, erro: "Informe o link da planilha e o nome da aba." };
   try { return await testarFonte(p.nome, limpo); } catch (e) { return { leitura: null, erro: e instanceof Error ? e.message : "Erro inesperado." }; }
+}
+
+/** Ficha da clínica: contexto do cliente para a análise com o Claude. */
+export async function salvarFicha(p: { clinicaId: string; ficha: FichaClinica }): Promise<Resposta<FichaClinica>> {
+  const bloqueio = await limite(); if (bloqueio) return { ok: false, erro: bloqueio };
+  const ficha = { ...limparFicha(p.ficha), atualizadoEm: new Date().toISOString() };
+  const db = getSupabaseAdmin();
+  const { data: atual } = await db.from("fechamento_config").select("clinica_id").eq("clinica_id", p.clinicaId).maybeSingle();
+  const { error } = atual
+    ? await db.from("fechamento_config").update({ ficha: ficha as unknown as Json, atualizado_em: new Date().toISOString() }).eq("clinica_id", p.clinicaId)
+    : await db.from("fechamento_config").insert({ clinica_id: p.clinicaId, ficha: ficha as unknown as Json });
+  if (error) return { ok: false, erro: /ficha/.test(error.message) ? "Falta rodar a atualização do banco 007_ficha_clinica.sql no Supabase." : "Não foi possível salvar a ficha." };
+  revalidatePath(`/fechamentos/configurar/${p.clinicaId}`);
+  return { ok: true, dados: ficha };
 }
 
 /* ---------- análise e entrega ---------- */

@@ -7,6 +7,7 @@
  * reler tudo. No banco vão só decisões e totais.
  */
 import { calcularRitmo, type Ritmo } from "./ritmo";
+import { limparFicha, type FichaClinica } from "./ficha";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { readSheetValues } from "@/lib/google/sheets";
 import type { Fechamento, Json } from "@/lib/supabase/types";
@@ -53,6 +54,8 @@ export interface ResultadoFechamento {
   acompanhamento: Acompanhamento[];
   /** Nomes já usados como responsáveis na clínica. */
   equipe: string[];
+  /** Ficha da clínica (contexto para o Claude). Vazia até ser preenchida. */
+  ficha: FichaClinica;
 }
 
 /** O que fica gravado ao concluir: tudo que a tela e o PDF precisam, só totais. */
@@ -142,6 +145,7 @@ export async function calcularFechamento(id: string, opcoes: { releitura?: boole
     acoes: lista<Acao>(f.acoes),
     acompanhamento: salvoAcomp.length ? salvoAcomp : await acoesDoAnterior(f),
     equipe: lista<string>(config.equipe),
+    ficha: limparFicha((config.ficha ?? {}) as Partial<FichaClinica>),
   };
 
   const congelado = (f.status === "concluido" || f.status === "enviado") && !!f.snapshot;

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Plus, Sparkles, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ResultadoFechamento } from "@/lib/fechamentos/servidor";
+import { ClaudeAnalise } from "./claude-analise";
 import { rascunho, type Acao, type Acompanhamento, type SecoesTexto, type StatusAcompanhamento, type TextoFechamento } from "@/lib/fechamentos/texto-fechamento";
 
 export interface EstadoAnalise {
@@ -70,6 +71,7 @@ export function Analise({ r, estado, mudar, desabilitado }: { r: ResultadoFecham
 
   return (
     <div className="space-y-5">
+      {!desabilitado && <ClaudeAnalise r={r} estado={estado} mudar={mudar} />}
       <div className="grid gap-5 lg:grid-cols-2">
         <section className="space-y-2 rounded-lg border bg-card p-4">
           <h2 className="text-sm font-semibold">Contexto do período</h2>
@@ -106,7 +108,7 @@ export function Analise({ r, estado, mudar, desabilitado }: { r: ResultadoFecham
               <Button size="sm" onClick={gerar}>Substituir</Button><Button size="sm" variant="outline" onClick={() => setConfirmarRascunho(false)}>Cancelar</Button>
             </span>
           ) : (
-            <Button size="sm" variant="outline" onClick={() => (temTexto ? setConfirmarRascunho(true) : gerar())}><Sparkles />Gerar rascunho a partir dos números</Button>
+            <Button size="sm" variant="outline" onClick={() => (temTexto ? setConfirmarRascunho(true) : gerar())}><Sparkles />Rascunho automático (sem IA)</Button>
           ))}
         </div>
         {SECOES.map((s) => (
@@ -116,7 +118,7 @@ export function Analise({ r, estado, mudar, desabilitado }: { r: ResultadoFecham
               onChange={(e) => mudar({ ...estado, texto: { ...texto, [s.chave]: e.target.value } })} />
           </label>
         ))}
-        <p className="text-xs text-muted-foreground">O rascunho usa só os números do fechamento e as decisões da conferência. A análise com IA entra numa próxima etapa.</p>
+        <p className="text-xs text-muted-foreground">O rascunho automático usa só os números e as decisões da conferência. Para uma análise com o contexto do cliente, use “Análise com o Claude”, acima.</p>
       </section>
 
       <section className="space-y-4 rounded-lg border bg-card p-4">

@@ -81,7 +81,7 @@ function rotuloPeriodo(c: ContextoTexto): { A: Rotulo; P: Rotulo } {
 }
 
 /** Decisão "citar no texto" tomada num alerta da regra informada. */
-function citar(c: ContextoTexto, regra: string): Alerta | undefined {
+export function citar(c: Pick<ContextoTexto, "alertas" | "decisoes">, regra: string): Alerta | undefined {
   const aplicados = new Set(c.decisoes.registro.filter((d) => d.acao === "aplicar").map((d) => d.chave));
   return c.alertas.find((a) => a.regra === regra && aplicados.has(a.chave));
 }
@@ -93,7 +93,7 @@ const lista = (xs: string[]) => (xs.length <= 1 ? xs.join("") : `${xs.slice(0, -
 const capital = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 
 /** Do que eram os pagamentos pontuais, sem citar nomes de pessoas. */
-function naturezaPontuais(al: Alerta): string[] {
+export function naturezaPontuais(al: Alerta): string[] {
   const tipos: string[] = [];
   const add = (t: string) => { if (!tipos.includes(t)) tipos.push(t); };
   for (const e of al.evidencias) {

@@ -152,3 +152,23 @@ resultado anual em caixa e competência · análise e plano de ação.
   congelado, em andamento = último cálculo (marcado como "em andamento").
 - **Todos os fechamentos**: um item por período, com status, valores, PDF e versões anteriores.
 - **Último plano de ação** do fechamento concluído mais recente.
+
+## Etapa v2.1 — análise com o Claude, sem integração (06/11)
+
+Os projetos do claude.ai não podem ser lidos por API, então o app leva o fechamento até o projeto
+do cliente e lê a resposta de volta (proposta: https://claude.ai/artifact/79NGWVAuQJS36CE9XoPann).
+
+- **Ficha da clínica** (`lib/fechamentos/ficha.ts`, `fechamento_config.ficha`, migração 007): cidade,
+  UF, segmento, especialidades, modelo de negócio (estruturados, preparam o benchmarking), perfil,
+  prioridades, pessoas, como escrever, o que evitar. "Copiar pedido para o Claude" gera um pedido para
+  o próprio projeto do cliente escrever a ficha; "Colar ficha gerada" preenche os campos.
+- **Pacote** (`lib/fechamentos/pacote-ia.ts`, `montarPacote`): instruções no estilo Gestfy + formato
+  de resposta marcado + ficha + números do período e do anterior (sem comparação quando o anterior
+  não tem dados) + ritmo do quinzenal + receitas, profissionais, despesas, pontuais citados, funis,
+  NPS, evolução do ano, ações anteriores, contexto do consultor e texto já escrito. Só agregados: sem
+  pacientes e sem descrições de lançamentos. Opção de trocar nomes dos profissionais por apelidos.
+- **Resposta** (`lerResposta`): separa Observação, Destaques, Comercial, Atenção e Plano de ação
+  (títulos com ###, ##, ** ou "TÍTULO:", com ou sem acento); plano numerado com Responsável, Prazo,
+  Ação e Como medir. Sem títulos, tudo vai para a Observação com aviso.
+- Tela: card "Análise com o Claude" no topo da aba Análise (copiar, colar, revisar, aplicar;
+  substituir ou adicionar ao plano).
