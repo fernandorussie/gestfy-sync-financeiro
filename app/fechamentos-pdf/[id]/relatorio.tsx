@@ -132,6 +132,40 @@ export function Cabecalho({ colunas, cor = ROXO }: { colunas: { t: string; dir?:
 
 /* ---------- 1. resultado + funil + experiência ---------- */
 
+/** Linhas compactas: faturamento e despesas pagas, mês a mês no ano. */
+function GraficoLinhas({ r }: { r: ResultadoFechamento }) {
+  const meses = r.anual;
+  const max = Math.max(1, ...meses.map((l) => Math.max(l.entradas, l.saidasCaixa)));
+  const W = 640, H = 150, L = 22, R = 22, T = 18, B = 20, passo = (W - L - R) / Math.max(1, meses.length - 1);
+  const x = (n: number) => L + n * passo;
+  const y = (v: number) => T + (1 - v / max) * (H - T - B);
+  const mil = (v: number) => `${Math.round(v / 1000)} mil`;
+  const pontos = (k: "entradas" | "saidasCaixa") => meses.map((l, n) => `${x(n)},${y(l[k])}`).join(" ");
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label="Faturamento e despesas pagas por mês">
+      {[0.25, 0.5, 0.75, 1].map((f) => <line key={f} x1={L} x2={W - R} y1={y(max * f)} y2={y(max * f)} stroke={LINHA} strokeWidth={1} />)}
+      <polyline fill="none" stroke={LARANJA} strokeWidth={2} strokeLinejoin="round" points={pontos("saidasCaixa")} />
+      <polyline fill="none" stroke={ROXO} strokeWidth={2.5} strokeLinejoin="round" points={pontos("entradas")} />
+      {meses.map((l, n) => {
+        const ultimo = n === meses.length - 1;
+        // Rótulo de cada série do lado em que ela fica (a de cima por cima, a de baixo por baixo).
+        const fatEmCima = l.entradas >= l.saidasCaixa;
+        return (
+          <g key={l.mes}>
+            <circle cx={x(n)} cy={y(l.saidasCaixa)} r={2.5} fill={LARANJA} />
+            <circle cx={x(n)} cy={y(l.entradas)} r={ultimo ? 4 : 3} fill={ROXO} />
+            {l.entradas > 0 && <text x={x(n)} y={y(l.entradas) + (fatEmCima ? -7 : 13)} textAnchor="middle" fontSize={9.5} fontWeight={ultimo ? 700 : 500} fill={ROXO}>{mil(l.entradas)}</text>}
+            {l.saidasCaixa > 0 && <text x={x(n)} y={y(l.saidasCaixa) + (fatEmCima ? 13 : -7)} textAnchor="middle" fontSize={9} fill={LARANJA}>{mil(l.saidasCaixa)}</text>}
+            <text x={x(n)} y={H - 4} textAnchor="middle" fontSize={10.5} fill={ultimo ? "#1d1b22" : CINZA} fontWeight={ultimo ? 700 : 400}>{mesAbrev(l.mes)}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+
+
 function PaginaResultado({ r }: { r: ResultadoFechamento }) {
   const i = r.indicadores, a = r.anterior;
   const vs = r.fechamento.tipo === "mensal" ? `vs ${mesDe(a.periodo.inicio)}` : "vs anterior";
@@ -147,6 +181,11 @@ function PaginaResultado({ r }: { r: ResultadoFechamento }) {
         <Kpi rotulo="Ticket médio" valor={brl(i.pacientes?.ticketMedio)} nota={n(i.pacientes?.ticketMedio, a.pacientes?.ticketMedio)} />
         <Kpi rotulo="Pacientes novos" valor={num(i.pacientes?.novos)} nota={n(i.pacientes?.novos, a.pacientes?.novos)} />
         <Kpi rotulo="Ticket médio dos novos" valor={brl(i.pacientes?.ticketNovos)} nota={n(i.pacientes?.ticketNovos, a.pacientes?.ticketNovos)} />
+      </div>
+
+      <div className="pdf-bloco">
+        <Titulo extra={<><span className="mr-1 inline-block h-[3px] w-3 align-middle" style={{ background: ROXO }} />Faturamento<span className="ml-3 mr-1 inline-block h-[2px] w-3 align-middle" style={{ background: LARANJA }} />Despesas pagas</>}>Faturamento e despesas em {r.periodo.fim.slice(0, 4)}</Titulo>
+        <GraficoLinhas r={r} />
       </div>
 
       <div className="grid grid-cols-2 gap-8">
