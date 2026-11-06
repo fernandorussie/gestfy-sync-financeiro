@@ -100,7 +100,7 @@ export function FechamentoClient({ inicial }: { inicial: ResultadoFechamento }) 
     <div className="mx-auto max-w-6xl space-y-6 p-6 md:p-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-1">
-          <p className="text-sm text-muted-foreground"><Link href="/fechamentos" className="hover:underline">Fechamentos</Link> / {r.clinicaNome}</p>
+          <p className="text-sm text-muted-foreground"><Link href="/fechamentos" className="hover:underline">Fechamentos</Link> / <Link href={`/fechamentos/clinica/${f.clinica_id}`} className="hover:underline">{r.clinicaNome}</Link></p>
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-semibold">{r.clinicaNome} · {f.tipo === "mensal" ? "Mensal de " : "Quinzenal · "}{nomePeriodo(f.tipo, f.inicio, f.fim)}</h1>
             <StatusFechamento status={f.status} />

@@ -142,3 +142,13 @@ resultado anual em caixa e competência · análise e plano de ação.
   pago. Saldo projetado = projeção − max(média, já pago).
 - **Categorias zeradas:** receitas e despesas mantêm, com zero, toda categoria que teve lançamento nos
   últimos 12 meses (`catalogoDesde`). Receitas em ordem alfabética ("Outros" no fim).
+
+## Etapa 5 — histórico por clínica (06/11)
+
+`/fechamentos/clinica/[clinicaId]` (lógica em `lib/fechamentos/historico.ts`):
+- **Evolução mês a mês**: gráfico de faturamento com a meta (últimos 12 meses) e tabela com faturamento,
+  despesas, resultado, % da meta, pacientes, ticket, novos, conversão de leads e de orçamentos e NPS,
+  com variação contra o mês anterior. Usa a versão mais nova de cada mensal; concluído = retrato
+  congelado, em andamento = último cálculo (marcado como "em andamento").
+- **Todos os fechamentos**: um item por período, com status, valores, PDF e versões anteriores.
+- **Último plano de ação** do fechamento concluído mais recente.

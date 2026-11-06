@@ -1,7 +1,7 @@
 export const revalidate = 0;
 
 import Link from "next/link";
-import { Settings2 } from "lucide-react";
+import { History, Settings2 } from "lucide-react";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { NovoFechamento } from "./_components/novo-fechamento";
@@ -36,7 +36,7 @@ export default async function FechamentosPage() {
       <NovoFechamento clinicas={lista.filter((c) => configuradas.has(c.id))} />
 
       <Card>
-        <CardHeader className="pb-3"><CardTitle className="text-base">Fechamentos abertos e concluídos</CardTitle></CardHeader>
+        <CardHeader className="pb-3"><CardTitle className="text-base">Fechamentos recentes</CardTitle></CardHeader>
         <CardContent className="p-0">
           {(fechamentos ?? []).length === 0 ? (
             <p className="px-6 pb-6 text-sm text-muted-foreground">Nenhum fechamento ainda. Escolha a clínica e o mês acima para abrir o primeiro.</p>
@@ -67,15 +67,16 @@ export default async function FechamentosPage() {
       </Card>
 
       <Card>
-        <CardHeader className="pb-3"><CardTitle className="text-base">Planilhas das clínicas</CardTitle></CardHeader>
+        <CardHeader className="pb-3"><CardTitle className="text-base">Clínicas</CardTitle></CardHeader>
         <CardContent className="space-y-2">
-          <p className="text-sm text-muted-foreground">Cada clínica precisa ter as planilhas de vendas e despesas configuradas para abrir um fechamento.</p>
+          <p className="text-sm text-muted-foreground">Histórico e evolução de cada clínica. Para abrir um fechamento, a clínica precisa ter as planilhas de vendas e despesas configuradas.</p>
           <ul className="divide-y rounded-md border">
             {lista.map((c) => (
               <li key={c.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
-                <span className="font-medium">{c.nome}</span>
+                <Link href={`/fechamentos/clinica/${c.id}`} className="font-medium hover:underline">{c.nome}</Link>
                 <span className="flex items-center gap-3">
                   <span className={configuradas.has(c.id) ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}>{configuradas.has(c.id) ? "Configurada" : "Sem planilhas"}</span>
+                  <Link href={`/fechamentos/clinica/${c.id}`} className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium hover:bg-muted"><History className="h-3.5 w-3.5" />Histórico</Link>
                   <Link href={`/fechamentos/configurar/${c.id}`} className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium hover:bg-muted"><Settings2 className="h-3.5 w-3.5" />Configurar</Link>
                 </span>
               </li>
