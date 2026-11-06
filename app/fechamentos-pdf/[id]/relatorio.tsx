@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import type { GrupoDespesa, ItemContagem } from "@/lib/fechamentos/indicadores";
+import { ordemAlfabetica, type GrupoDespesa, type ItemContagem } from "@/lib/fechamentos/indicadores";
 import type { ResultadoFechamento } from "@/lib/fechamentos/servidor";
 import { brl, brl0, dataBR, mesAbrev, nomePeriodo, num, pct } from "../../(app)/fechamentos/_components/formato";
 
@@ -11,14 +11,14 @@ import { brl, brl0, dataBR, mesAbrev, nomePeriodo, num, pct } from "../../(app)/
  * Cores fixas (não seguem o tema escuro) para o PDF sair sempre igual.
  */
 
-const ROXO = "#7B099C";
-const LARANJA = "#FF5001";
+export const ROXO = "#7B099C";
+export const LARANJA = "#FF5001";
 const LILAS = "#C3A8E0";
 const FUNDO = "#F4EFF9";
-const CINZA = "#6B6577";
-const LINHA = "#E9E4EF";
-const VERMELHO = "#C0262D";
-const VERDE = "#0F7A4A";
+export const CINZA = "#6B6577";
+export const LINHA = "#E9E4EF";
+export const VERMELHO = "#C0262D";
+export const VERDE = "#0F7A4A";
 
 export const CSS = `
 @page { size: A4; margin: 12mm 12mm 14mm; }
@@ -34,20 +34,23 @@ html, body { background: #ECEAF0 !important; color: #1d1b22; }
 }
 `;
 
-const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
-const mesDe = (iso: string) => MESES[Number(iso.slice(5, 7)) - 1];
-const chave = (s: string) => s.trim().toLowerCase();
+export const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+export const mesDe = (iso: string) => MESES[Number(iso.slice(5, 7)) - 1];
+export const chave = (s: string) => s.trim().toLowerCase();
 
 /* ---------- peças ---------- */
 
-function Folha({ r, titulo, children, compacta }: { r: ResultadoFechamento; titulo: string; children: ReactNode; compacta?: boolean }) {
+export function Folha({ r, titulo, children, compacta, cor = ROXO, selo }: { r: ResultadoFechamento; titulo: string; children: ReactNode; compacta?: boolean; cor?: string; selo?: string }) {
   const f = r.fechamento;
   return (
     <section className="pdf-folha">
-      <header className="mb-5 flex items-end justify-between border-b-2 pb-3" style={{ borderColor: ROXO }}>
+      <header className="mb-5 flex items-end justify-between border-b-2 pb-3" style={{ borderColor: cor }}>
         <div>
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: LARANJA }}>{r.clinicaNome} · {f.tipo === "mensal" ? "Fechamento mensal" : "Fechamento quinzenal"} · {nomePeriodo(f.tipo, f.inicio, f.fim)}</p>
-          <h2 className="font-heading text-xl font-semibold" style={{ color: ROXO }}>{titulo}</h2>
+          <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: cor === ROXO ? LARANJA : CINZA }}>
+            {selo && <span className="rounded px-1.5 py-0.5 text-[9px] text-white" style={{ background: cor }}>{selo}</span>}
+            {r.clinicaNome} · {f.tipo === "mensal" ? "Fechamento mensal" : "Relatório quinzenal"} · {nomePeriodo(f.tipo, f.inicio, f.fim)}
+          </p>
+          <h2 className="font-heading text-xl font-semibold" style={{ color: cor }}>{titulo}</h2>
         </div>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/brand/gestfy-symbol.png" alt="Gestfy" className="h-7 w-auto" />
@@ -57,10 +60,10 @@ function Folha({ r, titulo, children, compacta }: { r: ResultadoFechamento; titu
   );
 }
 
-function Titulo({ children, extra }: { children: ReactNode; extra?: ReactNode }) {
+export function Titulo({ children, extra, cor = ROXO }: { children: ReactNode; extra?: ReactNode; cor?: string }) {
   return (
     <div className="mb-2 flex items-baseline justify-between gap-3">
-      <h3 className="font-heading text-[15px] font-semibold" style={{ color: ROXO }}>{children}</h3>
+      <h3 className="font-heading text-[15px] font-semibold" style={{ color: cor }}>{children}</h3>
       {extra ? <span className="text-[10px]" style={{ color: CINZA }}>{extra}</span> : null}
     </div>
   );
@@ -75,7 +78,7 @@ function variacaoDe(atual: number | null | undefined, antes: number | null | und
   if (!antes) return atual ? Infinity : null;
   return atual / antes - 1;
 }
-function Var({ atual, antes, custo, forte }: { atual?: number | null; antes?: number | null; custo?: boolean; forte?: boolean }) {
+export function Var({ atual, antes, custo, forte }: { atual?: number | null; antes?: number | null; custo?: boolean; forte?: boolean }) {
   const v = variacaoDe(atual, antes);
   if (v === null) return <span style={{ color: CINZA }}>—</span>;
   if (v === Infinity) return <span className="font-semibold" style={{ color: custo ? VERMELHO : VERDE }}>novo</span>;
@@ -85,9 +88,9 @@ function Var({ atual, antes, custo, forte }: { atual?: number | null; antes?: nu
   return <span className={forte || ruim ? "font-semibold" : ""} style={{ color: cor }}>{v > 0 ? "+" : "−"}{pct(Math.abs(v))}</span>;
 }
 
-function Kpi({ rotulo, valor, nota }: { rotulo: string; valor: string; nota?: ReactNode }) {
+export function Kpi({ rotulo, valor, nota, fundo = FUNDO }: { rotulo: string; valor: string; nota?: ReactNode; fundo?: string }) {
   return (
-    <div className="pdf-bloco rounded-lg p-3" style={{ background: FUNDO }}>
+    <div className="pdf-bloco rounded-lg p-3" style={{ background: fundo }}>
       <p className="text-[10px] font-medium" style={{ color: CINZA }}>{rotulo}</p>
       <p className="font-heading text-[19px] font-semibold tabular-nums leading-tight">{valor}</p>
       {nota ? <p className="mt-0.5 text-[10px]" style={{ color: CINZA }}>{nota}</p> : null}
@@ -96,7 +99,7 @@ function Kpi({ rotulo, valor, nota }: { rotulo: string; valor: string; nota?: Re
 }
 
 /** Linhas "rótulo ........ valor", como no relatório atual. */
-function Linhas({ itens }: { itens: { nome: string; valor: ReactNode; destaque?: boolean }[] }) {
+export function Linhas({ itens }: { itens: { nome: string; valor: ReactNode; destaque?: boolean }[] }) {
   if (!itens.length) return <p className="text-[11px]" style={{ color: CINZA }}>Sem dados.</p>;
   return (
     <table className="w-full text-[11.5px]">
@@ -111,17 +114,17 @@ function Linhas({ itens }: { itens: { nome: string; valor: ReactNode; destaque?:
     </table>
   );
 }
-const contagens = (xs: ItemContagem[], n: number, semNaoInformado = false) =>
+export const contagens = (xs: ItemContagem[], n: number, semNaoInformado = false) =>
   xs.filter((x) => !semNaoInformado || x.nome !== "Não informado").slice(0, n).map((x) => ({ nome: x.nome, valor: num(x.quantidade) }));
 
-const th = "py-1.5 text-[9.5px] font-semibold uppercase tracking-wide";
-const td = "py-[4px] tabular-nums";
+export const th = "py-1.5 text-[9.5px] font-semibold uppercase tracking-wide";
+export const td = "py-[4px] tabular-nums";
 
-function Cabecalho({ colunas }: { colunas: { t: string; dir?: boolean; cls?: string }[] }) {
+export function Cabecalho({ colunas, cor = ROXO }: { colunas: { t: string; dir?: boolean; cls?: string }[]; cor?: string }) {
   return (
     <thead>
-      <tr className="border-b-2" style={{ borderColor: ROXO }}>
-        {colunas.map((c) => <th key={c.t} className={`${th} ${c.dir ? "text-right" : "text-left"} ${c.cls ?? ""}`} style={{ color: ROXO }}>{c.t}</th>)}
+      <tr className="border-b-2" style={{ borderColor: cor }}>
+        {colunas.map((c, n) => <th key={c.t + n} className={`${th} ${c.dir ? "text-right" : "text-left"} ${c.cls ?? ""}`} style={{ color: cor }}>{c.t}</th>)}
       </tr>
     </thead>
   );
@@ -199,7 +202,8 @@ function PaginaReceitas({ r }: { r: ResultadoFechamento }) {
   const atuais = i.faturamento?.porGrupo ?? [];
   // Categorias que faturaram no mês anterior e zeraram agora também aparecem.
   const sumiram = (a.faturamento?.porGrupo ?? []).filter((g) => g.valor > 0 && !atuais.some((x) => chave(x.nome) === chave(g.nome)));
-  const linhas = [...atuais, ...sumiram.map((g) => ({ nome: g.nome, valor: 0, quantidade: 0, ticket: 0, pct: 0 }))].filter((g) => g.valor || g.quantidade || antes.get(chave(g.nome))?.valor);
+  // Todas as categorias do catálogo (inclusive zeradas), em ordem alfabética.
+  const linhas = [...atuais, ...sumiram.map((g) => ({ nome: g.nome, valor: 0, quantidade: 0, ticket: 0, pct: 0 }))].sort(ordemAlfabetica);
   const mesA = mesDe(a.periodo.inicio);
   return (
     <Folha r={r} titulo="Receitas detalhadas">
@@ -373,30 +377,29 @@ function PaginaAno({ r }: { r: ResultadoFechamento }) {
         <TabelaRegime r={r} regime="caixa" />
       </div>
       <div className="pdf-bloco">
-        <Titulo extra="despesas no mês a que se referem">Regime de competência</Titulo>
+        <Titulo extra="despesas no mês a que se referem · receita pela data de atendimento nos dois regimes">Regime de competência</Titulo>
         <TabelaRegime r={r} regime="competencia" />
       </div>
-      <p className="text-[10px]" style={{ color: CINZA }}>A receita segue a data de atendimento nos dois regimes. Variação em relação ao mês anterior.</p>
     </Folha>
   );
 }
 
 /* ---------- 5. análise (opcional) ---------- */
 
-function PaginaAnalise({ r }: { r: ResultadoFechamento }) {
+export function PaginaAnalise({ r, cor = ROXO }: { r: ResultadoFechamento; cor?: string }) {
   const secoes: [string, string][] = [["Observação", r.texto.observacao], ["Principais destaques", r.texto.destaques], ["Indicadores comerciais", r.texto.comercial], ["Pontos de atenção", r.texto.atencao]];
   return (
-    <Folha r={r} titulo="Análise e plano de ação">
+    <Folha r={r} titulo="Análise e plano de ação" cor={cor} selo={r.fechamento.tipo === "quinzenal" ? "Quinzenal" : undefined}>
       {secoes.filter(([, t]) => t.trim()).map(([t, corpo]) => (
-        <div key={t}><Titulo>{t}</Titulo><div className="whitespace-pre-wrap text-[12px] leading-relaxed">{corpo.trim()}</div></div>
+        <div key={t}><Titulo cor={cor}>{t}</Titulo><div className="whitespace-pre-wrap text-[12px] leading-relaxed">{corpo.trim()}</div></div>
       ))}
       {r.acoes.length > 0 && (
         <div>
-          <Titulo>Plano de ação</Titulo>
+          <Titulo cor={cor}>Plano de ação</Titulo>
           <ol className="space-y-2.5">
             {r.acoes.map((x, n) => (
-              <li key={x.id} className="pdf-bloco grid grid-cols-[22px_1fr] gap-2 rounded-lg p-3" style={{ background: FUNDO }}>
-                <span className="grid h-5 w-5 place-items-center rounded-full text-[10px] font-bold text-white" style={{ background: ROXO }}>{n + 1}</span>
+              <li key={x.id} className="pdf-bloco grid grid-cols-[22px_1fr] gap-2 rounded-lg border p-3" style={{ borderColor: LINHA }}>
+                <span className="grid h-5 w-5 place-items-center rounded-full text-[10px] font-bold text-white" style={{ background: cor }}>{n + 1}</span>
                 <div className="space-y-0.5 text-[11px]">
                   <p className="text-[12px] font-semibold">{x.titulo || "Ação sem título"}</p>
                   {x.descricao && <p>{x.descricao}</p>}

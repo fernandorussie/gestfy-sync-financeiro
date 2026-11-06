@@ -207,10 +207,27 @@ export function categoriaDaDespesa(d: Despesa, ajustes: Ajustes = {}): string {
   return ajustes.reclassificarDespesa?.[d.linha] ?? d.categoria;
 }
 
+/** Ordem alfabética (pt-BR), com "Outros", "Sem categoria" e "Não informado" no fim. */
+const FIM = new Set(["outros", "sem categoria", normalizar(NAO_INFORMADO)]);
+export function ordemAlfabetica(a: { nome: string }, b: { nome: string }): number {
+  const fa = FIM.has(normalizar(a.nome)), fb = FIM.has(normalizar(b.nome));
+  if (fa !== fb) return fa ? 1 : -1;
+  return a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" });
+}
+
 export function calcularIndicadores(
   dados: DadosFechamento,
   periodo: Periodo,
-  opcoes: { regras?: RegrasClinica; ajustes?: Ajustes; meta?: number | null } = {},
+  opcoes: {
+    regras?: RegrasClinica;
+    ajustes?: Ajustes;
+    meta?: number | null;
+    /**
+     * AAAA-MM-DD. Mantém nas tabelas, com valor zero, toda categoria de receita
+     * e de despesa que teve lançamento desde esta data até o fim do período.
+     */
+    catalogoDesde?: string;
+  } = {},
 ): Indicadores {
   const regras = opcoes.regras ?? {};
   const ajustes = opcoes.ajustes ?? {};
@@ -224,13 +241,20 @@ export function calcularIndicadores(
     const valor = (v: Venda) => v.valor ?? 0;
     const total = centavos(vs.reduce((s, v) => s + valor(v), 0));
     const grupos = agruparPorNome(vs, (v) => grupoDaVenda(v, regras), valor, un.grupoReceita, "Sem categoria");
+    if (opcoes.catalogoDesde) {
+      const janela = { inicio: opcoes.catalogoDesde, fim: periodo.fim };
+      const historico = agruparPorNome(dados.vendas.filter((v) => noPeriodo(v.data, janela)), (v) => grupoDaVenda(v, regras), valor, un.grupoReceita, "Sem categoria");
+      for (const h of historico) {
+        if (!grupos.some((g) => normalizar(g.nome) === normalizar(h.nome))) grupos.push({ ...h, valor: 0, quantidade: 0, variantes: [] });
+      }
+    }
     faturamento = {
       total,
       lancamentos: vs.length,
       semValor: vs.filter((v) => !v.valor).length,
       porGrupo: grupos
         .map((g) => ({ nome: g.nome, valor: g.valor, quantidade: g.quantidade, ticket: centavos(frac(g.valor, g.quantidade)), pct: frac(g.valor, total) }))
-        .sort((a, b) => b.valor - a.valor || b.quantidade - a.quantidade),
+        .sort(ordemAlfabetica),
       porProfissional: itensValor(agruparPorNome(vs, (v) => v.profissional, valor, un.profissional), total),
       porUnidade: itensValor(agruparPorNome(vs, (v) => v.unidade, valor, un.unidade), total),
       porPagamento: itensValor(agruparPorNome(vs.filter((v) => valor(v) > 0), (v) => meioDePagamento(v.pagamento), valor, un.pagamento), total),
@@ -257,6 +281,16 @@ export function calcularIndicadores(
     const ds = dados.despesas.filter((d) => noPeriodo(d.dataPagamento, periodo));
     const total = centavos(ds.reduce((s, d) => s + d.valor, 0));
     const porGrupo = new Map<string, Map<string, number>>();
+    if (opcoes.catalogoDesde) {
+      const janela = { inicio: opcoes.catalogoDesde, fim: periodo.fim };
+      for (const d of dados.despesas.filter((x) => noPeriodo(x.dataPagamento, janela))) {
+        const cat = categoriaDaDespesa(d, ajustes);
+        const grupo = plano.grupoDe(cat) ?? GRUPO_SEM_CLASSIFICACAO;
+        const cats = porGrupo.get(grupo) ?? new Map<string, number>();
+        cats.set(plano.nomeDe(cat) || NAO_INFORMADO, 0);
+        porGrupo.set(grupo, cats);
+      }
+    }
     for (const d of ds) {
       const cat = categoriaDaDespesa(d, ajustes);
       const grupo = plano.grupoDe(cat) ?? GRUPO_SEM_CLASSIFICACAO;

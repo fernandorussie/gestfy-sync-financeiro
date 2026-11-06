@@ -102,7 +102,7 @@ export function FechamentoClient({ inicial }: { inicial: ResultadoFechamento }) 
         <div className="space-y-1">
           <p className="text-sm text-muted-foreground"><Link href="/fechamentos" className="hover:underline">Fechamentos</Link> / {r.clinicaNome}</p>
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold">{r.clinicaNome} · {f.tipo === "mensal" ? "Mensal" : "Quinzenal"} de {nomePeriodo(f.tipo, f.inicio, f.fim)}</h1>
+            <h1 className="text-2xl font-semibold">{r.clinicaNome} · {f.tipo === "mensal" ? "Mensal de " : "Quinzenal · "}{nomePeriodo(f.tipo, f.inicio, f.fim)}</h1>
             <StatusFechamento status={f.status} />
             <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold">v{f.versao}</span>
           </div>

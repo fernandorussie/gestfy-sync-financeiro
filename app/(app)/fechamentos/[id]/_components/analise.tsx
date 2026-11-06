@@ -60,7 +60,7 @@ export function Analise({ r, estado, mudar, desabilitado }: { r: ResultadoFecham
   const equipe = [...new Set([...r.equipe, ...acoes.flatMap((a) => a.responsaveis), ...acompanhamento.flatMap((a) => a.responsaveis)])];
 
   const gerar = () => {
-    const novo = rascunho({ clinica: r.clinicaNome, tipo: r.fechamento.tipo, indicadores: r.indicadores, anterior: r.anterior, alertas: r.alertas, decisoes: r.decisoes });
+    const novo = rascunho({ clinica: r.clinicaNome, tipo: r.fechamento.tipo, indicadores: r.indicadores, anterior: r.anterior, alertas: r.alertas, decisoes: r.decisoes, ritmo: r.ritmo });
     mudar({ ...estado, texto: { ...texto, ...novo } });
     setConfirmarRascunho(false);
   };

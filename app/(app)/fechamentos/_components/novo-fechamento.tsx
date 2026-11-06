@@ -20,7 +20,6 @@ export function NovoFechamento({ clinicas }: { clinicas: { id: string; nome: str
   const [clinicaId, setClinicaId] = useState(clinicas[0]?.id ?? "");
   const [tipo, setTipo] = useState<"mensal" | "quinzenal">("mensal");
   const [mes, setMes] = useState(mesAnterior());
-  const [quinzena, setQuinzena] = useState<1 | 2>(1);
   const [pendente, iniciar] = useTransition();
 
   if (!clinicas.length) {
@@ -30,7 +29,7 @@ export function NovoFechamento({ clinicas }: { clinicas: { id: string; nome: str
   }
 
   const abrir = () => iniciar(async () => {
-    const r = await criarFechamento({ clinicaId, tipo, mes, quinzena });
+    const r = await criarFechamento({ clinicaId, tipo, mes });
     if (!r.ok) { toast.error(r.erro); return; }
     router.push(`/fechamentos/${r.dados.id}`);
   });
@@ -61,13 +60,7 @@ export function NovoFechamento({ clinicas }: { clinicas: { id: string; nome: str
           <input type="month" className={campo} value={mes} onChange={(e) => setMes(e.target.value)} />
         </label>
         {tipo === "quinzenal" && (
-          <label className="flex flex-col gap-1.5 text-sm font-medium">
-            Quinzena
-            <select className={campo} value={quinzena} onChange={(e) => setQuinzena(Number(e.target.value) as 1 | 2)}>
-              <option value={1}>1ª (dia 1 a 15)</option>
-              <option value={2}>2ª (dia 16 ao fim)</option>
-            </select>
-          </label>
+          <p className="text-xs text-muted-foreground">Parcial do dia 1 ao 15, com ritmo e projeção do mês. O fim do mês fica com o fechamento mensal.</p>
         )}
         <Button onClick={abrir} disabled={pendente || !mes}>
           {pendente ? <Loader2 className="animate-spin" /> : <Plus />}Abrir fechamento

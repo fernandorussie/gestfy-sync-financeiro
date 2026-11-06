@@ -24,10 +24,11 @@ function falha(e: unknown): { ok: false; erro: string } {
 }
 
 /** Abre o fechamento do período (ou o mais recente já existente) e devolve o id. */
-export async function criarFechamento(p: { clinicaId: string; tipo: "mensal" | "quinzenal"; mes: string; quinzena?: 1 | 2 }): Promise<Resposta<{ id: string }>> {
+export async function criarFechamento(p: { clinicaId: string; tipo: "mensal" | "quinzenal"; mes: string }): Promise<Resposta<{ id: string }>> {
   const bloqueio = await limite(); if (bloqueio) return { ok: false, erro: bloqueio };
   if (!/^\d{4}-\d{2}$/.test(p.mes)) return { ok: false, erro: "Escolha o mês." };
-  const periodo = periodoDe(p.mes, p.tipo, p.quinzena ?? 1);
+  // Quinzenal = parcial do dia 1 ao 15 (a 2ª metade do mês fica com o mensal).
+  const periodo = periodoDe(p.mes, p.tipo, 1);
   const db = getSupabaseAdmin();
   const { data: existente } = await db.from("fechamentos").select("id").eq("clinica_id", p.clinicaId).eq("tipo", p.tipo)
     .eq("inicio", periodo.inicio).eq("fim", periodo.fim).order("versao", { ascending: false }).limit(1).maybeSingle();

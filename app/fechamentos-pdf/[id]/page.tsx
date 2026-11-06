@@ -7,6 +7,7 @@ import Link from "next/link";
 import { calcularFechamento, type ResultadoFechamento } from "@/lib/fechamentos/servidor";
 import { nomePeriodo } from "../../(app)/fechamentos/_components/formato";
 import { CSS, Relatorio, temAnalise } from "./relatorio";
+import { RelatorioQuinzenal } from "./relatorio-quinzenal";
 import { BotaoImprimir } from "./imprimir";
 
 const carregar = cache((id: string) => calcularFechamento(id));
@@ -61,7 +62,7 @@ export default async function FechamentoPdfPage({ params, searchParams }: { para
           <BotaoImprimir />
         </div>
       </div>
-      <Relatorio r={r} comAnalise={comAnalise} />
+      {f.tipo === "quinzenal" ? <RelatorioQuinzenal r={r} comAnalise={comAnalise} /> : <Relatorio r={r} comAnalise={comAnalise} />}
     </div>
   );
 }

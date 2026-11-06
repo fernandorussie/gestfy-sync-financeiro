@@ -14,10 +14,11 @@ export const dataBR = (iso: string | null | undefined) => (iso ? iso.slice(0, 10
 const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
 const MESES_AB = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 
-/** Nome do período: "outubro/2026" ou "01 a 15/10/2026". */
+/** Nome do período: "outubro/2026" ou "1ª quinzena de outubro/2026". */
 export function nomePeriodo(tipo: "mensal" | "quinzenal", inicio: string, fim: string): string {
   const [a, m] = inicio.split("-").map(Number);
   if (tipo === "mensal") return `${MESES[m - 1]}/${a}`;
+  if (inicio.slice(8, 10) === "01" && fim.slice(8, 10) === "15") return `1ª quinzena de ${MESES[m - 1]}/${a}`;
   return `${inicio.slice(8, 10)} a ${fim.slice(8, 10)}/${String(m).padStart(2, "0")}/${a}`;
 }
 export const mesAbrev = (anoMes: string) => MESES_AB[Number(anoMes.slice(5, 7)) - 1];

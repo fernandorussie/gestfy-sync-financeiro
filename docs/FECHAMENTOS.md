@@ -129,3 +129,16 @@ Fluxo da tela do fechamento: **1. Conferência → 2. Indicadores → 3. Anális
 PDF, nesta ordem: resultado do período (8 indicadores, faturamento no ano, comparativo) ·
 funil comercial e experiência do paciente · receitas detalhadas · despesas por grupo e categoria ·
 resultado anual em caixa e competência · análise e plano de ação.
+
+## Etapa 4b — relatório quinzenal e ajustes do mensal (06/11)
+
+- **Quinzenal = parcial do dia 1 ao 15** (o fim do mês fica com o mensal). Variações contra o mesmo
+  período (1 a 15) do mês anterior. Relatório próprio, em laranja (mensal = roxo).
+- **Ritmo do mês** (`lib/fechamentos/ritmo.ts`): dias úteis = segunda a sexta sem os feriados do
+  GestfySync; faturamento por dia útil; projeção do mês; quanto falta para a meta e quanto é preciso
+  por dia útil restante.
+- **Despesas a pagar:** muitas clínicas só lançam despesas pagas, então o parâmetro é a **média das
+  despesas pagas nos 3 meses anteriores** (só meses com lançamento). Provisionado a pagar = média − já
+  pago. Saldo projetado = projeção − max(média, já pago).
+- **Categorias zeradas:** receitas e despesas mantêm, com zero, toda categoria que teve lançamento nos
+  últimos 12 meses (`catalogoDesde`). Receitas em ordem alfabética ("Outros" no fim).

@@ -16,7 +16,7 @@ export function Entrega({ r, estado, onConcluir, onEnviado, onReabrir, ocupado }
   const f = r.fechamento;
   const texto = textoWhatsApp({
     clinica: r.clinicaNome, tipo: f.tipo, periodoNome: nomePeriodo(f.tipo, f.inicio, f.fim),
-    indicadores: r.indicadores, anterior: r.anterior, texto: estado.texto, acoes: estado.acoes,
+    indicadores: r.indicadores, anterior: r.anterior, texto: estado.texto, acoes: estado.acoes, ritmo: r.ritmo,
   });
   const semTexto = !estado.texto.observacao.trim();
 

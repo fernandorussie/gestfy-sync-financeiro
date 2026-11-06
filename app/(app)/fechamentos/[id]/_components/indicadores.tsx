@@ -77,7 +77,8 @@ function GraficoAno({ r }: { r: ResultadoFechamento }) {
 
 export function PainelIndicadores({ r }: { r: ResultadoFechamento }) {
   const i = r.indicadores, a = r.anterior;
-  const rot = r.fechamento.tipo === "mensal" ? "mês anterior" : "quinzena anterior";
+  const rot = r.fechamento.tipo === "mensal" ? "mês anterior" : "mesmo período do mês anterior";
+  const ritmo = r.ritmo;
   const somaAno = (k: "entradas" | "saidasCaixa" | "saidasCompetencia") => r.anual.reduce((s, l) => s + l[k], 0);
 
   return (
@@ -86,12 +87,31 @@ export function PainelIndicadores({ r }: { r: ResultadoFechamento }) {
         <Kpi rotulo="Faturamento (entradas)" valor={brl0(i.faturamento?.total)}><Variacao atual={i.faturamento?.total} anterior={a.faturamento?.total} rotulo={rot} /></Kpi>
         <Kpi rotulo="Despesas (saídas)" valor={brl0(i.despesas?.total)}><Variacao atual={i.despesas?.total} anterior={a.despesas?.total} inverso rotulo={rot} /></Kpi>
         <Kpi rotulo="Resultado de caixa" valor={brl0(i.caixa?.resultado)}>{i.caixa?.margem != null ? `${pct(i.caixa.margem)} da receita` : ""}</Kpi>
-        <Kpi rotulo="Atingimento da meta" valor={i.meta ? pct(i.meta.atingimento) : "—"} destaque>{i.meta ? `meta ${brl0(i.meta.valor)} · faltam ${brl0(i.meta.falta)}` : "sem meta definida"}</Kpi>
+        {ritmo ? (
+          <Kpi rotulo="Meta: projeção do mês" valor={ritmo.atingimentoProjetado !== null ? pct(ritmo.atingimentoProjetado) : "—"} destaque>{ritmo.meta ? `realizado ${pct(ritmo.atingimento)} de ${brl0(ritmo.meta)}` : "sem meta definida"}</Kpi>
+        ) : (
+          <Kpi rotulo="Atingimento da meta" valor={i.meta ? pct(i.meta.atingimento) : "—"} destaque>{i.meta ? `meta ${brl0(i.meta.valor)} · faltam ${brl0(i.meta.falta)}` : "sem meta definida"}</Kpi>
+        )}
         <Kpi rotulo="Pacientes atendidos" valor={num(i.pacientes?.atendidos)}><Variacao atual={i.pacientes?.atendidos} anterior={a.pacientes?.atendidos} rotulo={rot} /></Kpi>
         <Kpi rotulo="Ticket médio" valor={brl(i.pacientes?.ticketMedio)}><Variacao atual={i.pacientes?.ticketMedio} anterior={a.pacientes?.ticketMedio} rotulo={rot} /></Kpi>
         <Kpi rotulo="Pacientes novos" valor={num(i.pacientes?.novos)}>{i.pacientes?.atendidos ? `${pct(i.pacientes.novos / i.pacientes.atendidos, 0)} dos atendidos` : ""}</Kpi>
         <Kpi rotulo="Ticket médio dos novos" valor={brl(i.pacientes?.ticketNovos)}>{brl0(i.pacientes?.faturamentoNovos)} com novos</Kpi>
       </div>
+
+      {ritmo && (
+        <Secao titulo="Ritmo do mês" extra={<span className="text-xs text-muted-foreground">{ritmo.diasUteisDecorridos} de {ritmo.diasUteisMes} dias úteis · feriados do GestfySync</span>}>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Kpi rotulo="Faturamento por dia útil" valor={brl0(ritmo.faturamentoPorDia)}>até o dia 15</Kpi>
+            <Kpi rotulo="Projeção do mês" valor={brl0(ritmo.projecaoMes)}>{ritmo.meta ? `meta ${brl0(ritmo.meta)}` : "sem meta"}</Kpi>
+            <Kpi rotulo="Necessário por dia útil" valor={ritmo.necessarioPorDia !== null ? brl0(ritmo.necessarioPorDia) : "—"}>{ritmo.faltaMeta ? `faltam ${brl0(ritmo.faltaMeta)} em ${ritmo.diasUteisRestantes} dias úteis` : ritmo.meta ? "meta atingida" : ""}</Kpi>
+            <Kpi rotulo="Saldo projetado do mês" valor={brl0(ritmo.saldoProjetado)}>projeção − despesas esperadas</Kpi>
+            <Kpi rotulo="Despesas pagas" valor={brl0(ritmo.despesasPagas)}>até o dia 15</Kpi>
+            <Kpi rotulo="Média de despesas" valor={brl0(ritmo.mediaDespesas)}>{ritmo.mesesMedia.length ? `últimos ${ritmo.mesesMedia.length} meses` : "sem histórico"}</Kpi>
+            <Kpi rotulo="Provisionado a pagar" valor={brl0(ritmo.provisionado)}>média − já pago</Kpi>
+            <Kpi rotulo="Saldo do período" valor={brl0(ritmo.saldoPeriodo)}>faturamento − pagas</Kpi>
+          </div>
+        </Secao>
+      )}
 
       <Secao titulo={`Faturamento em ${r.periodo.fim.slice(0, 4)}`} extra={<span className="text-xs text-muted-foreground"><span className="mr-1 inline-block h-2.5 w-2.5 rounded-sm bg-primary align-[-1px]" />Faturamento <span className="ml-3 mr-1 inline-block h-2.5 w-2.5 rounded-full bg-accent align-[-1px]" />Despesas pagas</span>}>
         <GraficoAno r={r} />

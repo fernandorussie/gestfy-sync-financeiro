@@ -6,6 +6,7 @@
  * cache curto por clínica, para que cada decisão da conferência não precise
  * reler tudo. No banco vão só decisões e totais.
  */
+import { calcularRitmo, type Ritmo } from "./ritmo";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { readSheetValues } from "@/lib/google/sheets";
 import type { Fechamento, Json } from "@/lib/supabase/types";
@@ -42,6 +43,8 @@ export interface ResultadoFechamento {
   fontes: ResumoFonte[];
   metaMensal: number | null;
   lidoEm: string;
+  /** Quinzenal: faturamento por dia útil, projeção, despesas a pagar. Null no mensal. */
+  ritmo: Ritmo | null;
   /** true = concluído: números do retrato congelado, sem reler planilhas. */
   congelado: boolean;
   texto: TextoFechamento;
@@ -61,6 +64,7 @@ interface Retrato {
   fontes: ResumoFonte[];
   metaMensal: number | null;
   lidoEm: string;
+  ritmo?: Ritmo | null;
 }
 
 /* ---------- leitura ---------- */
@@ -143,7 +147,7 @@ export async function calcularFechamento(id: string, opcoes: { releitura?: boole
   const congelado = (f.status === "concluido" || f.status === "enviado") && !!f.snapshot;
   if (congelado) {
     const r = f.snapshot as unknown as Retrato;
-    return { ...comuns, ...r, pendentesGraves: gravesPendentes(r.alertas, decisoes).length, congelado: true };
+    return { ...comuns, ...r, ritmo: r.ritmo ?? null, pendentesGraves: gravesPendentes(r.alertas, decisoes).length, congelado: true };
   }
   const retrato = await calcularRetrato(f, config, decisoes, !!opcoes.releitura);
   await db.from("fechamentos").update({
@@ -151,7 +155,7 @@ export async function calcularFechamento(id: string, opcoes: { releitura?: boole
     alertas: retrato.alertas as unknown as Json,
     calculado_em: new Date().toISOString(),
   }).eq("id", id);
-  return { ...comuns, ...retrato, pendentesGraves: gravesPendentes(retrato.alertas, decisoes).length, congelado: false };
+  return { ...comuns, ...retrato, ritmo: retrato.ritmo ?? null, pendentesGraves: gravesPendentes(retrato.alertas, decisoes).length, congelado: false };
 }
 
 /** Lê as planilhas (ou o cache) e calcula alertas, indicadores, período anterior e ano. */
@@ -180,13 +184,21 @@ async function calcularRetrato(
   const meta = escolhida ?? (valoresMeta.length === 1 ? valoresMeta[0] : null);
 
   const alertas = conferir({ dados: coleta.dados, periodo, regras, ajustes, metas, leituras: coleta.leituras });
-  const indicadores = calcularIndicadores(coleta.dados, periodo, { regras, ajustes, meta });
+  // Tabelas mantêm, zeradas, as categorias usadas nos últimos 12 meses.
+  const [aIni, mIni] = f.inicio.split("-").map(Number);
+  const catalogoDesde = `${aIni - 1}-${String(mIni).padStart(2, "0")}-01`;
+  const indicadores = calcularIndicadores(coleta.dados, periodo, { regras, ajustes, meta, catalogoDesde });
+  let ritmo: Ritmo | null = null;
+  if (f.tipo === "quinzenal") {
+    const { data: feriados } = await getSupabaseAdmin().from("feriados").select("data").gte("data", f.inicio.slice(0, 8) + "01").lte("data", new Date(Date.UTC(aIni, mIni, 0)).toISOString().slice(0, 10));
+    ritmo = calcularRitmo({ dados: coleta.dados, periodo, feriados: (feriados ?? []).map((x) => x.data.slice(0, 10)), meta, regras, ajustes });
+  }
   const anterior = calcularIndicadores(coleta.dados, periodoAnterior(periodo, f.tipo), { regras });
   const [ano, mes] = f.fim.split("-").map(Number);
   const anual = resumoAnual(coleta.dados, ano, mes);
   const nomes = ["vendas", "despesas", "orcamentos", "leads", "nps", "avaliacoes"] as const;
   return {
-    alertas, indicadores, anterior, anual, metaMensal,
+    alertas, indicadores, anterior, anual, metaMensal, ritmo,
     fontes: nomes
       .filter((n) => fontes[n] || coleta.erros[n])
       .map((n) => ({ fonte: n, linhas: coleta.leituras[n]?.linhas ?? 0, erro: coleta.erros[n], avisos: coleta.leituras[n]?.avisos.length ?? 0 })),
@@ -201,7 +213,7 @@ export async function concluirFechamento(id: string): Promise<void> {
   if (r.congelado) return;
   if (r.pendentesGraves) throw new Error("Ainda há alertas graves sem decisão na conferência.");
   if (r.fontes.some((x) => x.erro && (x.fonte === "vendas" || x.fonte === "despesas"))) throw new Error("Vendas ou despesas não foram lidas. Corrija antes de concluir.");
-  const retrato: Retrato = { alertas: r.alertas, indicadores: r.indicadores, anterior: r.anterior, anual: r.anual, fontes: r.fontes, metaMensal: r.metaMensal, lidoEm: r.lidoEm };
+  const retrato: Retrato = { alertas: r.alertas, indicadores: r.indicadores, anterior: r.anterior, anual: r.anual, fontes: r.fontes, metaMensal: r.metaMensal, lidoEm: r.lidoEm, ritmo: r.ritmo };
   const agora = new Date().toISOString();
   await db.from("fechamentos").update({ status: "concluido", snapshot: retrato as unknown as Json, acompanhamento: r.acompanhamento as unknown as Json, concluido_em: agora, atualizado_em: agora }).eq("id", id);
 }
