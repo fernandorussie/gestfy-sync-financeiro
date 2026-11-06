@@ -13,7 +13,6 @@ import { brl, brl0, dataBR, mesAbrev, nomePeriodo, num, pct } from "../../(app)/
 
 export const ROXO = "#7B099C";
 export const LARANJA = "#FF5001";
-const LILAS = "#C3A8E0";
 const FUNDO = "#F4EFF9";
 export const CINZA = "#6B6577";
 export const LINHA = "#E9E4EF";
@@ -352,27 +351,6 @@ function PaginaDespesas({ r }: { r: ResultadoFechamento }) {
 
 /* ---------- 4. ano: gráfico + caixa + competência ---------- */
 
-function Grafico({ r }: { r: ResultadoFechamento }) {
-  const linhas = r.anual;
-  const max = Math.max(1, ...linhas.map((l) => l.entradas));
-  const W = 640, H = 170, L = 4, B = 20, T = 16, passo = (W - 2 * L) / Math.max(1, linhas.length);
-  const y = (v: number) => T + (1 - v / max) * (H - T - B);
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label="Faturamento por mês">
-      {linhas.map((l, n) => {
-        const x = L + n * passo + passo * 0.14, w = passo * 0.72, ultimo = n === linhas.length - 1;
-        return (
-          <g key={l.mes}>
-            {l.entradas > 0 && <rect x={x} y={y(l.entradas)} width={w} height={H - B - y(l.entradas)} rx={3} fill={ultimo ? LARANJA : LILAS} />}
-            {l.entradas > 0 && <text x={x + w / 2} y={y(l.entradas) - 4} textAnchor="middle" fontSize={10} fill={CINZA}>{Math.round(l.entradas / 1000)} mil</text>}
-            <text x={x + w / 2} y={H - 5} textAnchor="middle" fontSize={11} fill={ultimo ? "#1d1b22" : CINZA} fontWeight={ultimo ? 700 : 400}>{mesAbrev(l.mes)}</text>
-          </g>
-        );
-      })}
-    </svg>
-  );
-}
-
 function TabelaRegime({ r, regime }: { r: ResultadoFechamento; regime: "caixa" | "competencia" }) {
   const k = regime === "caixa" ? "saidasCaixa" : "saidasCompetencia";
   const linhas = r.anual;
@@ -409,8 +387,7 @@ function TabelaRegime({ r, regime }: { r: ResultadoFechamento; regime: "caixa" |
 function PaginaAno({ r }: { r: ResultadoFechamento }) {
   const ano = r.periodo.fim.slice(0, 4);
   return (
-    <Folha r={r} titulo={`Faturamento em ${ano}`}>
-      <div className="pdf-bloco"><Grafico r={r} /></div>
+    <Folha r={r} titulo={`Resultado em ${ano}: caixa e competência`}>
       <div className="pdf-bloco">
         <Titulo extra="despesas no mês em que foram pagas">Regime de caixa</Titulo>
         <TabelaRegime r={r} regime="caixa" />
