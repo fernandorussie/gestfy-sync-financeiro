@@ -47,16 +47,33 @@ export const CATALOGO: DefSecao[] = [
   { id: "analise", titulo: "Análise e plano de ação", descricao: "Texto do fechamento e ações com responsáveis", tipos: ["mensal", "quinzenal"], grande: true, ativaPadrao: false },
 ];
 
-export const defSecao = (id: string) => CATALOGO.find((s) => s.id === id);
-export const catalogoDo = (tipo: TipoRelatorio) => CATALOGO.filter((s) => s.tipos.includes(tipo));
+/** Fonte personalizada cadastrada na clínica: vira uma seção "fonte:<id>". */
+export interface ExtraSecao { id: string; nome: string }
+export const idFonte = (id: string) => `fonte:${id}`;
+
+function defsExtras(extras: ExtraSecao[]): DefSecao[] {
+  return extras.map((x) => ({
+    id: idFonte(x.id), titulo: x.nome, descricao: "Fonte personalizada", tipos: ["mensal", "quinzenal"],
+    niveis: [{ id: "resumo", rotulo: "Só os totais" }, { id: "completo", rotulo: "Com quebras" }], nivelPadrao: { mensal: "completo", quinzenal: "resumo" },
+  }));
+}
+
+/** Catálogo com as fontes personalizadas antes da análise. */
+export function catalogoCom(extras: ExtraSecao[] = []): DefSecao[] {
+  const i = CATALOGO.findIndex((s) => s.id === "analise");
+  return [...CATALOGO.slice(0, i), ...defsExtras(extras), ...CATALOGO.slice(i)];
+}
+
+export const defSecao = (id: string, extras: ExtraSecao[] = []) => catalogoCom(extras).find((s) => s.id === id);
+export const catalogoDo = (tipo: TipoRelatorio, extras: ExtraSecao[] = []) => catalogoCom(extras).filter((s) => s.tipos.includes(tipo));
 
 function nivelValido(d: DefSecao, tipo: TipoRelatorio, nivel: unknown): string | undefined {
   if (!d.niveis) return undefined;
   return d.niveis.some((n) => n.id === nivel) ? (nivel as string) : d.nivelPadrao?.[tipo] ?? d.niveis.at(-1)!.id;
 }
 
-export function estruturaPadrao(tipo: TipoRelatorio): ItemSecao[] {
-  return catalogoDo(tipo).map((d) => ({ id: d.id, ativa: d.ativaPadrao ?? true, ...(d.niveis ? { nivel: nivelValido(d, tipo, undefined) } : {}) }));
+export function estruturaPadrao(tipo: TipoRelatorio, extras: ExtraSecao[] = []): ItemSecao[] {
+  return catalogoDo(tipo, extras).map((d) => ({ id: d.id, ativa: d.ativaPadrao ?? true, ...(d.niveis ? { nivel: nivelValido(d, tipo, undefined) } : {}) }));
 }
 
 /**
@@ -64,13 +81,13 @@ export function estruturaPadrao(tipo: TipoRelatorio): ItemSecao[] {
  * que não existe mais, inclui seções novas na posição do padrão e mantém as
  * fixas sempre ligadas.
  */
-export function normalizarEstrutura(salva: unknown, tipo: TipoRelatorio): ItemSecao[] {
-  const padrao = estruturaPadrao(tipo);
+export function normalizarEstrutura(salva: unknown, tipo: TipoRelatorio, extras: ExtraSecao[] = []): ItemSecao[] {
+  const padrao = estruturaPadrao(tipo, extras);
   if (!Array.isArray(salva) || !salva.length) return padrao;
   const vistos = new Set<string>();
   const itens: ItemSecao[] = [];
   for (const x of salva as Partial<ItemSecao>[]) {
-    const d = typeof x?.id === "string" ? defSecao(x.id) : undefined;
+    const d = typeof x?.id === "string" ? defSecao(x.id, extras) : undefined;
     if (!d || !d.tipos.includes(tipo) || vistos.has(d.id)) continue;
     vistos.add(d.id);
     itens.push({ id: d.id, ativa: d.fixa ? true : x.ativa !== false, ...(d.niveis ? { nivel: nivelValido(d, tipo, x.nivel) } : {}) });
@@ -86,12 +103,12 @@ export function normalizarEstrutura(salva: unknown, tipo: TipoRelatorio): ItemSe
   return itens;
 }
 
-export function limparEstrutura(e: unknown): EstruturaRelatorio {
+export function limparEstrutura(e: unknown, extras: ExtraSecao[] = []): EstruturaRelatorio {
   const o = (e ?? {}) as Record<string, unknown>;
-  return { mensal: normalizarEstrutura(o.mensal, "mensal"), quinzenal: normalizarEstrutura(o.quinzenal, "quinzenal") };
+  return { mensal: normalizarEstrutura(o.mensal, "mensal", extras), quinzenal: normalizarEstrutura(o.quinzenal, "quinzenal", extras) };
 }
 
-export const ehPadrao = (itens: ItemSecao[], tipo: TipoRelatorio) => JSON.stringify(itens) === JSON.stringify(estruturaPadrao(tipo));
+export const ehPadrao = (itens: ItemSecao[], tipo: TipoRelatorio, extras: ExtraSecao[] = []) => JSON.stringify(itens) === JSON.stringify(estruturaPadrao(tipo, extras));
 
 /* ---------- páginas ---------- */
 
@@ -102,10 +119,10 @@ export interface Pagina { titulo: string; secoes: ItemSecao[] }
  * as pequenas seguem juntas na página aberta por outra pequena.
  * A primeira página, quando começa pelo resultado, leva o título do relatório.
  */
-export function paginar(itens: ItemSecao[], tipo: TipoRelatorio): Pagina[] {
+export function paginar(itens: ItemSecao[], tipo: TipoRelatorio, extras: ExtraSecao[] = []): Pagina[] {
   const paginas: (Pagina & { grande: boolean })[] = [];
   for (const it of itens.filter((x) => x.ativa)) {
-    const d = defSecao(it.id);
+    const d = defSecao(it.id, extras);
     if (!d) continue;
     const atual = paginas.at(-1);
     if (!d.grande && atual && !atual.grande) { atual.secoes.push(it); continue; }

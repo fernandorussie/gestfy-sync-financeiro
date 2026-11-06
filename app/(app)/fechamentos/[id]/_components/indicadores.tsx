@@ -151,6 +151,33 @@ export function PainelIndicadores({ r }: { r: ResultadoFechamento }) {
         {i.google && <p className="mt-3 text-sm">Avaliações Google: {i.google.avaliacoes}, nota {num(i.google.nota, 1)}</p>}
       </Secao>
 
+      {r.personalizadas.map((fp) => {
+        const varia = (x: number | null, y: number | null) => (x == null || !y ? "" : ` · ${x >= y ? "+" : "−"}${pct(Math.abs(x / y - 1))} vs anterior`);
+        return (
+          <Secao key={fp.id} titulo={fp.nome} extra={<span className="text-xs text-muted-foreground">fonte personalizada{fp.filtro ? ` · só ${fp.filtro.valores.join(", ")}` : ""}{fp.ignoradas ? ` · ${fp.ignoradas} linhas ignoradas` : ""}</span>}>
+            {fp.erro ? <p className="text-sm text-destructive">{fp.erro}</p> : (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  {fp.medidas.quantidade && <Kpi rotulo="Quantidade" valor={num(fp.atual.quantidade)}>anterior {num(fp.anterior.quantidade)}{varia(fp.atual.quantidade, fp.anterior.quantidade)}</Kpi>}
+                  {fp.medidas.valor && <Kpi rotulo="Valor total" valor={brl0(fp.atual.valor)}>anterior {brl0(fp.anterior.valor)}{varia(fp.atual.valor, fp.anterior.valor)}</Kpi>}
+                  {fp.medidas.media && <Kpi rotulo="Valor médio" valor={brl0(fp.atual.media)}>anterior {brl0(fp.anterior.media)}{varia(fp.atual.media, fp.anterior.media)}</Kpi>}
+                </div>
+                {fp.quebras.filter((q) => q.itens.length).length > 0 && (
+                  <div className="grid gap-6 md:grid-cols-2">
+                    {fp.quebras.filter((q) => q.itens.length).map((q) => (
+                      <div key={q.campo}>
+                        <p className="mb-1 text-xs font-medium text-muted-foreground">{q.rotulo}</p>
+                        <Barras itens={q.itens.slice(0, 10).map((x) => ({ nome: x.nome, v: fp.medidas.valor ? x.valor : x.quantidade, extra: fp.medidas.valor ? `${x.quantidade}` : undefined }))} formato={fp.medidas.valor ? brl0 : (v) => num(v)} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </Secao>
+        );
+      })}
+
       <Secao titulo="Receitas detalhadas" extra={<span className="text-xs text-muted-foreground">{i.faturamento?.lancamentos} lançamentos · {i.faturamento?.semValor} sem valor</span>}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">

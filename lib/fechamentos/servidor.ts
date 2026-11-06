@@ -10,6 +10,7 @@ import { calcularRitmo, type Ritmo } from "./ritmo";
 import { limparFicha, type FichaClinica } from "./ficha";
 import { claudeConfigurado } from "./claude-api";
 import { normalizarEstrutura, type ItemSecao } from "./estrutura";
+import { calcularPersonalizada, lerFontePersonalizada, limparFontePersonalizada, type FontePersonalizada, type LeituraPersonalizada, type ResultadoPersonalizado } from "./fonte-personalizada";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { readSheetValues } from "@/lib/google/sheets";
 import type { Fechamento, Json } from "@/lib/supabase/types";
@@ -62,6 +63,8 @@ export interface ResultadoFechamento {
   iaLigada: boolean;
   /** Seções do relatório (ordem, ligadas, nível). Concluído: a estrutura usada na conclusão. */
   estrutura: ItemSecao[];
+  /** Números das fontes personalizadas (contratos, cirurgias, recall…). */
+  personalizadas: ResultadoPersonalizado[];
 }
 
 /** O que fica gravado ao concluir: tudo que a tela e o PDF precisam, só totais. */
@@ -76,6 +79,7 @@ interface Retrato {
   ritmo?: Ritmo | null;
   /** Estrutura do relatório no momento da conclusão. */
   estrutura?: ItemSecao[];
+  personalizadas?: ResultadoPersonalizado[];
 }
 
 /* ---------- leitura ---------- */
@@ -155,13 +159,13 @@ export async function calcularFechamento(id: string, opcoes: { releitura?: boole
     equipe: lista<string>(config.equipe),
     ficha: limparFicha((config.ficha ?? {}) as Partial<FichaClinica>),
     iaLigada: claudeConfigurado(),
-    estrutura: normalizarEstrutura(((config as { relatorio?: Record<string, unknown> }).relatorio ?? {})[f.tipo], f.tipo),
+    estrutura: normalizarEstrutura(((config as { relatorio?: Record<string, unknown> }).relatorio ?? {})[f.tipo], f.tipo, extrasDaConfig(config)),
   };
 
   const congelado = (f.status === "concluido" || f.status === "enviado") && !!f.snapshot;
   if (congelado) {
     const r = f.snapshot as unknown as Retrato;
-    return { ...comuns, ...r, ritmo: r.ritmo ?? null, estrutura: r.estrutura ? normalizarEstrutura(r.estrutura, f.tipo) : comuns.estrutura, pendentesGraves: gravesPendentes(r.alertas, decisoes).length, congelado: true };
+    return { ...comuns, ...r, ritmo: r.ritmo ?? null, estrutura: r.estrutura ? normalizarEstrutura(r.estrutura, f.tipo, (r.personalizadas ?? []).map((x) => ({ id: x.id, nome: x.nome }))) : comuns.estrutura, personalizadas: r.personalizadas ?? [], pendentesGraves: gravesPendentes(r.alertas, decisoes).length, congelado: true };
   }
   const retrato = await calcularRetrato(f, config, decisoes, !!opcoes.releitura);
   await db.from("fechamentos").update({
@@ -169,13 +173,52 @@ export async function calcularFechamento(id: string, opcoes: { releitura?: boole
     alertas: retrato.alertas as unknown as Json,
     calculado_em: new Date().toISOString(),
   }).eq("id", id);
-  return { ...comuns, ...retrato, ritmo: retrato.ritmo ?? null, pendentesGraves: gravesPendentes(retrato.alertas, decisoes).length, congelado: false };
+  return { ...comuns, ...retrato, ritmo: retrato.ritmo ?? null, personalizadas: retrato.personalizadas ?? [], pendentesGraves: gravesPendentes(retrato.alertas, decisoes).length, congelado: false };
 }
 
 /** Lê as planilhas (ou o cache) e calcula alertas, indicadores, período anterior e ano. */
+/* ---------- fontes personalizadas ---------- */
+
+const cacheExtras = new Map<string, { em: number; leitura: LeituraPersonalizada | null; erro: string | null }>();
+
+export function fontesExtras(json: unknown): FontePersonalizada[] {
+  return (Array.isArray(json) ? json : []).map((x) => limparFontePersonalizada(x as Partial<FontePersonalizada>));
+}
+function extrasDaConfig(config: unknown) {
+  return fontesExtras((config as { fontes_extras?: unknown }).fontes_extras).map((x) => ({ id: x.id, nome: x.nome }));
+}
+
+async function calcularPersonalizadas(clinicaId: string, fontes: FontePersonalizada[], periodo: Periodo, anterior: Periodo, releitura: boolean): Promise<ResultadoPersonalizado[]> {
+  const out: ResultadoPersonalizado[] = [];
+  for (const f of fontes) {
+    const chave = `${clinicaId}|${f.id}|${f.sheetId}|${f.aba}|${f.linhaCabecalho ?? ""}|${JSON.stringify(f.colunas)}`;
+    let c = cacheExtras.get(chave);
+    if (releitura || !c || Date.now() - c.em > CACHE_MS) {
+      c = { em: Date.now(), ...(await lerFontePersonalizada(f, readSheetValues)) };
+      cacheExtras.set(chave, c);
+    }
+    out.push(calcularPersonalizada(f, c.erro ? null : c.leitura, periodo, anterior, c.erro));
+  }
+  return out;
+}
+
+function alertasPersonalizadas(rs: ResultadoPersonalizado[]): Alerta[] {
+  const a: Alerta[] = [];
+  for (const r of rs) {
+    if (r.erro) a.push({ chave: `personalizada-erro:${r.id}`, regra: "personalizada-erro", gravidade: "atencao", area: r.nome, titulo: `${r.nome}: planilha não lida`, descricao: `${r.erro} Os números desta fonte ficam fora do relatório.`, evidencias: [], sugestao: { tipo: "corrigir-na-origem" } });
+    else if (r.ignoradas) a.push({ chave: `personalizada-ilegivel:${r.id}`, regra: "personalizada-ilegivel", gravidade: "atencao", area: r.nome, titulo: `${r.nome}: ${r.ignoradas} ${r.ignoradas === 1 ? "linha" : "linhas"} com data ilegível`, descricao: "Essas linhas ficaram fora do cálculo. Corrija a data na planilha e leia de novo.", evidencias: [], sugestao: { tipo: "corrigir-na-origem" } });
+  }
+  return a;
+}
+
+/** Lê uma fonte personalizada isolada (tela de configuração), sem cache. */
+export async function testarFontePersonalizada(f: FontePersonalizada) {
+  return lerFontePersonalizada(f, readSheetValues);
+}
+
 async function calcularRetrato(
   f: Fechamento,
-  config: { fontes: Json; regras: Json },
+  config: { fontes: Json; regras: Json; fontes_extras?: Json },
   decisoes: Decisoes,
   releitura: boolean,
 ): Promise<Retrato> {
@@ -211,8 +254,10 @@ async function calcularRetrato(
   const [ano, mes] = f.fim.split("-").map(Number);
   const anual = resumoAnual(coleta.dados, ano, mes);
   const nomes = ["vendas", "despesas", "orcamentos", "leads", "nps", "avaliacoes"] as const;
+  const personalizadas = await calcularPersonalizadas(f.clinica_id, fontesExtras(config.fontes_extras), periodo, periodoAnterior(periodo, f.tipo), releitura);
+  alertas.push(...alertasPersonalizadas(personalizadas));
   return {
-    alertas, indicadores, anterior, anual, metaMensal, ritmo,
+    alertas, indicadores, anterior, anual, metaMensal, ritmo, personalizadas,
     fontes: nomes
       .filter((n) => fontes[n] || coleta.erros[n])
       .map((n) => ({ fonte: n, linhas: coleta.leituras[n]?.linhas ?? 0, erro: coleta.erros[n], avisos: coleta.leituras[n]?.avisos.length ?? 0 })),
@@ -227,7 +272,7 @@ export async function concluirFechamento(id: string): Promise<void> {
   if (r.congelado) return;
   if (r.pendentesGraves) throw new Error("Ainda há alertas graves sem decisão na conferência.");
   if (r.fontes.some((x) => x.erro && (x.fonte === "vendas" || x.fonte === "despesas"))) throw new Error("Vendas ou despesas não foram lidas. Corrija antes de concluir.");
-  const retrato: Retrato = { alertas: r.alertas, indicadores: r.indicadores, anterior: r.anterior, anual: r.anual, fontes: r.fontes, metaMensal: r.metaMensal, lidoEm: r.lidoEm, ritmo: r.ritmo, estrutura: r.estrutura };
+  const retrato: Retrato = { alertas: r.alertas, indicadores: r.indicadores, anterior: r.anterior, anual: r.anual, fontes: r.fontes, metaMensal: r.metaMensal, lidoEm: r.lidoEm, ritmo: r.ritmo, estrutura: r.estrutura, personalizadas: r.personalizadas };
   const agora = new Date().toISOString();
   await db.from("fechamentos").update({ status: "concluido", snapshot: retrato as unknown as Json, acompanhamento: r.acompanhamento as unknown as Json, concluido_em: agora, atualizado_em: agora }).eq("id", id);
 }

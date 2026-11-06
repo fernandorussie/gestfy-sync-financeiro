@@ -9,7 +9,8 @@ import type { FontesFechamento } from "@/lib/fechamentos/coleta";
 import type { Alerta } from "@/lib/fechamentos/conferencia";
 import { GRUPOS_DESPESA } from "@/lib/fechamentos/plano-contas";
 import { decidir, desfazer, type AcaoDecisao, type Decisao } from "@/lib/fechamentos/decisoes";
-import { calcularFechamento, concluirFechamento, lerDecisoes, limparCache, periodoDe, testarFonte, type ResultadoFechamento } from "@/lib/fechamentos/servidor";
+import { calcularFechamento, concluirFechamento, fontesExtras, lerDecisoes, limparCache, periodoDe, testarFonte, testarFontePersonalizada, type ResultadoFechamento } from "@/lib/fechamentos/servidor";
+import { limparFontePersonalizada, type FontePersonalizada } from "@/lib/fechamentos/fonte-personalizada";
 import type { Acao, Acompanhamento, TextoFechamento } from "@/lib/fechamentos/texto-fechamento";
 import { limparFicha, type FichaClinica } from "@/lib/fechamentos/ficha";
 import { montarPacote } from "@/lib/fechamentos/pacote-ia";
@@ -154,8 +155,10 @@ export async function salvarFicha(p: { clinicaId: string; ficha: FichaClinica })
 /** Estrutura do relatório da clínica (seções, ordem e nível), mensal e quinzenal. */
 export async function salvarEstrutura(p: { clinicaId: string; estrutura: EstruturaRelatorio }): Promise<Resposta<Required<EstruturaRelatorio>>> {
   const bloqueio = await limite(); if (bloqueio) return { ok: false, erro: bloqueio };
-  const estrutura = limparEstrutura(p.estrutura) as Required<EstruturaRelatorio>;
   const db = getSupabaseAdmin();
+  const { data: cfg } = await db.from("fechamento_config").select("*").eq("clinica_id", p.clinicaId).maybeSingle();
+  const extras = fontesExtras((cfg as { fontes_extras?: unknown } | null)?.fontes_extras).map((x) => ({ id: x.id, nome: x.nome }));
+  const estrutura = limparEstrutura(p.estrutura, extras) as Required<EstruturaRelatorio>;
   const { data: atual } = await db.from("fechamento_config").select("clinica_id").eq("clinica_id", p.clinicaId).maybeSingle();
   const { error } = atual
     ? await db.from("fechamento_config").update({ relatorio: estrutura as unknown as Json, atualizado_em: new Date().toISOString() }).eq("clinica_id", p.clinicaId)
@@ -164,6 +167,42 @@ export async function salvarEstrutura(p: { clinicaId: string; estrutura: Estrutu
   limparCache(p.clinicaId);
   revalidatePath(`/fechamentos/configurar/${p.clinicaId}`);
   return { ok: true, dados: estrutura };
+}
+
+/** Fontes personalizadas da clínica (lista completa, na ordem da tela). */
+export async function salvarFontesExtras(p: { clinicaId: string; fontes: FontePersonalizada[] }): Promise<Resposta<FontePersonalizada[]>> {
+  const bloqueio = await limite(); if (bloqueio) return { ok: false, erro: bloqueio };
+  const fontes = (p.fontes ?? []).slice(0, 12).map((f) => limparFontePersonalizada(f));
+  if (fontes.some((f) => !f.sheetId || !f.aba)) return { ok: false, erro: "Cada fonte precisa do link da planilha e do nome da aba." };
+  const db = getSupabaseAdmin();
+  const { data: atual } = await db.from("fechamento_config").select("clinica_id").eq("clinica_id", p.clinicaId).maybeSingle();
+  const { error } = atual
+    ? await db.from("fechamento_config").update({ fontes_extras: fontes as unknown as Json, atualizado_em: new Date().toISOString() }).eq("clinica_id", p.clinicaId)
+    : await db.from("fechamento_config").insert({ clinica_id: p.clinicaId, fontes_extras: fontes as unknown as Json });
+  if (error) return { ok: false, erro: /fontes_extras/.test(error.message) ? "Falta rodar a atualização do banco 009_fontes_personalizadas.sql no Supabase." : "Não foi possível salvar as fontes." };
+  limparCache(p.clinicaId);
+  revalidatePath(`/fechamentos/configurar/${p.clinicaId}`);
+  return { ok: true, dados: fontes };
+}
+
+/** Testa a leitura de uma fonte personalizada e devolve colunas, contagem e amostra. */
+export async function testarFonteExtra(p: { fonte: FontePersonalizada }) {
+  const bloqueio = await limite(); if (bloqueio) return { erro: bloqueio, leitura: null };
+  const f = limparFontePersonalizada(p.fonte);
+  const r = await testarFontePersonalizada(f);
+  if (!r.leitura) return { erro: r.erro, leitura: null };
+  const l = r.leitura;
+  return {
+    erro: r.erro,
+    leitura: {
+      linhas: l.linhas.length, linhaCabecalho: l.linhaCabecalho, cabecalho: l.cabecalho.filter(Boolean).slice(0, 30), colunas: l.colunas,
+      ignoradas: l.ignoradas.slice(0, 5), totalIgnoradas: l.ignoradas.length,
+      // Amostra só com campos agregáveis (sem observação), para conferir a leitura.
+      amostra: l.linhas.slice(-5).map((x) => ({ data: x.data, valor: x.valor, quantidade: x.quantidade, categoria: x.categoria, status: x.status, profissional: x.profissional })),
+      valoresStatus: [...new Set(l.linhas.map((x) => x.status))].slice(0, 15),
+      valoresCategoria: [...new Set(l.linhas.map((x) => x.categoria))].slice(0, 15),
+    },
+  };
 }
 
 /* ---------- análise e entrega ---------- */
@@ -183,7 +222,7 @@ export async function gerarComClaude(p: { id: string; anonimizar: boolean; texto
     const texto: TextoFechamento = { contexto: corta(p.texto?.contexto, 4000), observacao: corta(p.texto?.observacao, 8000), destaques: corta(p.texto?.destaques, 6000), comercial: corta(p.texto?.comercial, 6000), atencao: corta(p.texto?.atencao, 6000) };
     const prompt = montarPacote({
       clinica: r.clinicaNome, tipo: r.fechamento.tipo, indicadores: r.indicadores, anterior: r.anterior, anual: r.anual, ritmo: r.ritmo,
-      alertas: r.alertas, decisoes: r.decisoes, texto, acoes: (p.acoes ?? []).slice(0, 20), acompanhamento: (p.acompanhamento ?? []).slice(0, 20), ficha: r.ficha,
+      alertas: r.alertas, decisoes: r.decisoes, texto, acoes: (p.acoes ?? []).slice(0, 20), acompanhamento: (p.acompanhamento ?? []).slice(0, 20), ficha: r.ficha, personalizadas: r.personalizadas,
     }, { anonimizar: !!p.anonimizar, destino: "api" });
     const res = await chamarClaude(prompt);
     // Estimativa pelo preço do Sonnet (US$ 2 / US$ 10 por milhão de tokens); só para referência na tela.

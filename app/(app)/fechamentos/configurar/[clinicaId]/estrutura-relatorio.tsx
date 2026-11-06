@@ -4,12 +4,12 @@ import { useState, useTransition } from "react";
 import { ArrowDown, ArrowUp, Loader2, Lock, RotateCcw, Save } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { defSecao, ehPadrao, estruturaPadrao, paginar, type EstruturaRelatorio, type ItemSecao, type TipoRelatorio } from "@/lib/fechamentos/estrutura";
+import { defSecao, ehPadrao, estruturaPadrao, paginar, type EstruturaRelatorio, type ExtraSecao, type ItemSecao, type TipoRelatorio } from "@/lib/fechamentos/estrutura";
 import { salvarEstrutura } from "../../actions";
 
 const COR: Record<TipoRelatorio, string> = { mensal: "#7B099C", quinzenal: "#E04800" };
 
-export function EstruturaRelatorioCard({ clinicaId, inicial }: { clinicaId: string; inicial: Required<EstruturaRelatorio> }) {
+export function EstruturaRelatorioCard({ clinicaId, inicial, extras = [] }: { clinicaId: string; inicial: Required<EstruturaRelatorio>; extras?: ExtraSecao[] }) {
   const [tipo, setTipo] = useState<TipoRelatorio>("mensal");
   const [estrutura, setEstrutura] = useState(inicial);
   const [mudou, setMudou] = useState(false);
@@ -30,7 +30,7 @@ export function EstruturaRelatorioCard({ clinicaId, inicial }: { clinicaId: stri
     if (!r.ok) { toast.error(r.erro); return; }
     setEstrutura(r.dados); setMudou(false); toast.success("Estrutura do relatório salva.");
   });
-  const paginas = paginar(itens, tipo);
+  const paginas = paginar(itens, tipo, extras);
 
   return (
     <section className="space-y-4 rounded-lg border bg-card p-5">
@@ -54,7 +54,8 @@ export function EstruturaRelatorioCard({ clinicaId, inicial }: { clinicaId: stri
       <div className="grid gap-5 lg:grid-cols-[1fr_260px]">
         <ol className="divide-y rounded-md border">
           {itens.map((it, k) => {
-            const d = defSecao(it.id)!;
+            const d = defSecao(it.id, extras);
+            if (!d) return null;
             return (
               <li key={it.id} className={`flex flex-wrap items-center gap-3 px-3 py-2.5 ${it.ativa ? "" : "bg-muted/40"}`}>
                 <span className="flex flex-col">
@@ -90,7 +91,7 @@ export function EstruturaRelatorioCard({ clinicaId, inicial }: { clinicaId: stri
               <div key={p.secoes[0].id} className="w-[118px] rounded border bg-background p-2 shadow-sm lg:w-full">
                 <p className="truncate text-[11px] font-semibold" style={{ color: COR[tipo] }}>{n + 1}. {p.titulo}</p>
                 <ul className="mt-1 space-y-0.5">
-                  {p.secoes.map((s) => <li key={s.id} className="truncate text-[10.5px] text-muted-foreground">· {defSecao(s.id)!.titulo}</li>)}
+                  {p.secoes.map((s) => <li key={s.id} className="truncate text-[10.5px] text-muted-foreground">· {defSecao(s.id, extras)?.titulo}</li>)}
                 </ul>
               </div>
             ))}
@@ -100,7 +101,7 @@ export function EstruturaRelatorioCard({ clinicaId, inicial }: { clinicaId: stri
       </div>
 
       <div className="flex flex-wrap justify-between gap-2">
-        <Button variant="outline" size="sm" disabled={ehPadrao(itens, tipo)} onClick={() => definir(estruturaPadrao(tipo))}><RotateCcw />Voltar ao padrão Gestfy</Button>
+        <Button variant="outline" size="sm" disabled={ehPadrao(itens, tipo, extras)} onClick={() => definir(estruturaPadrao(tipo, extras))}><RotateCcw />Voltar ao padrão Gestfy</Button>
         <Button onClick={salvar} disabled={salvando || !mudou}>{salvando ? <Loader2 className="animate-spin" /> : <Save />}Salvar estrutura</Button>
       </div>
     </section>

@@ -199,3 +199,20 @@ do cliente e lê a resposta de volta (proposta: https://claude.ai/artifact/79NGW
 - Tela: card "Estrutura do relatório" em Configurar (abas Mensal/Quinzenal, subir/descer, mostrar,
   nível, mapa das páginas, voltar ao padrão).
 - WhatsApp: "Caixa do mês" desligado tira a linha do valor a pagar no quinzenal.
+
+## Etapa v2.3 — fontes personalizadas (06/11)
+
+- `lib/fechamentos/fonte-personalizada.ts`: planilha com uma linha por acontecimento. Campos:
+  Data (obrigatório), Valor, Categoria, Status, Profissional, Quantidade — achados pelo nome do
+  cabeçalho ou indicados (nome ou letra). Só as colunas indicadas são lidas. Medidas: quantidade
+  (soma da coluna Quantidade ou nº de linhas), valor total, valor médio; quebras por categoria,
+  status ou profissional; filtro "contar só quando" (sem diferenciar maiúsculas/acentos);
+  comparação com o período anterior (mesmo critério do relatório). Tipo "comparável" para o
+  benchmarking futuro.
+- Banco: `fechamento_config.fontes_extras` (migração 009). Números no retrato congelado
+  (`personalizadas`). Leitura com cache de 10 min, como as fontes padrão.
+- Conferência: alerta de atenção quando a planilha não é lida ou tem linhas com data ilegível.
+- Onde aparece: bloco na aba Indicadores; seção `fonte:<id>` no editor de estrutura (antes da
+  análise; níveis "só os totais" / "com quebras"); seção no PDF; dados no pacote do Claude.
+- Tela: card "Fontes personalizadas" em Configurar (adicionar, testar leitura com amostra das últimas
+  5 linhas e valores de status/categoria para montar o filtro, remover).

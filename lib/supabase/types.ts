@@ -216,9 +216,9 @@ export interface Database {
         Relationships: [];
       };
       fechamento_config: {
-        Row: { clinica_id: string; fontes: Json; regras: Json; equipe: Json; ficha: Json; relatorio: Json; atualizado_em: string };
-        Insert: { clinica_id: string; fontes?: Json; regras?: Json; equipe?: Json; ficha?: Json; relatorio?: Json; atualizado_em?: string };
-        Update: { fontes?: Json; regras?: Json; equipe?: Json; ficha?: Json; relatorio?: Json; atualizado_em?: string };
+        Row: { clinica_id: string; fontes: Json; regras: Json; equipe: Json; ficha: Json; relatorio: Json; fontes_extras: Json; atualizado_em: string };
+        Insert: { clinica_id: string; fontes?: Json; regras?: Json; equipe?: Json; ficha?: Json; relatorio?: Json; fontes_extras?: Json; atualizado_em?: string };
+        Update: { fontes?: Json; regras?: Json; equipe?: Json; ficha?: Json; relatorio?: Json; fontes_extras?: Json; atualizado_em?: string };
         Relationships: [];
       };
       fechamentos: {

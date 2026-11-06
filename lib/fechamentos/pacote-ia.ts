@@ -11,6 +11,7 @@ import type { Decisoes } from "./decisoes";
 import { fichaPreenchida, MODELOS, separarSecoes, type FichaClinica } from "./ficha";
 import type { Indicadores } from "./indicadores";
 import type { Ritmo } from "./ritmo";
+import type { ResultadoPersonalizado } from "./fonte-personalizada";
 import { citar, naturezaPontuais, nomeDoMes, rotulo, type Acao, type Acompanhamento, type SecoesTexto, type TextoFechamento } from "./texto-fechamento";
 
 export interface DadosPacote {
@@ -26,6 +27,8 @@ export interface DadosPacote {
   acoes: Acao[];
   acompanhamento: Acompanhamento[];
   ficha: FichaClinica | null;
+  /** Fontes personalizadas (contratos, cirurgias, recall…). */
+  personalizadas?: ResultadoPersonalizado[];
 }
 
 const fmt = (v: number | null | undefined, casas = 2) => (v == null ? "—" : `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas })}`);
@@ -189,6 +192,16 @@ export function montarPacote(d: DadosPacote, opcoes: { anonimizar?: boolean; des
     sec("Experiência do paciente");
     if (i.nps) L.push(`- NPS ${n(i.nps.nps)} com ${i.nps.respostas} respostas (promotores ${i.nps.promotores}, neutros ${i.nps.neutros}, detratores ${i.nps.detratores})${ant(` | anterior ${n(a.nps?.nps)}`)}`);
     if (i.google) L.push(`- Google: ${i.google.avaliacoes} avaliações novas, nota média ${i.google.nota?.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) ?? "—"}`);
+  }
+
+  for (const fp of (d.personalizadas ?? []).filter((x) => !x.erro)) {
+    sec(`${fp.nome} (controle específico da clínica${fp.filtro ? `; só ${fp.filtro.valores.join(", ")}` : ""})`);
+    if (fp.medidas.quantidade) L.push(`- Quantidade: ${n(fp.atual.quantidade)}${ant(` | anterior ${n(fp.anterior.quantidade)}`)}${vr(fp.atual.quantidade, fp.anterior.quantidade)}`);
+    if (fp.medidas.valor) L.push(`- Valor total: ${fmt(fp.atual.valor, 0)}${ant(` | anterior ${fmt(fp.anterior.valor, 0)}`)}${vr(fp.atual.valor, fp.anterior.valor)}`);
+    if (fp.medidas.media) L.push(`- Valor médio: ${fmt(fp.atual.media, 0)}${ant(` | anterior ${fmt(fp.anterior.media, 0)}`)}`);
+    for (const q of fp.quebras.filter((x) => x.itens.length)) {
+      L.push(`- ${q.rotulo}: ${q.itens.slice(0, 6).map((x) => `${q.campo === "profissional" ? prof(x.nome) : x.nome} ${x.quantidade}${fp.medidas.valor ? ` (${fmt(x.valor, 0)})` : ""}`).join(", ")}`);
+    }
   }
 
   if (d.anual.filter((m) => m.entradas || m.saidasCaixa).length > 1) {

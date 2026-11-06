@@ -46,3 +46,19 @@ describe("estrutura do relatório", () => {
     expect(l.quinzenal).toEqual(estruturaPadrao("quinzenal"));
   });
 });
+
+describe("fontes personalizadas na estrutura", () => {
+  const extras = [{ id: "c1", nome: "Cirurgias" }];
+  it("entram antes da análise, ligadas, e ficam na página das seções pequenas anteriores", () => {
+    const e = normalizarEstrutura([], "mensal", extras);
+    expect(e.map((s) => s.id).slice(-2)).toEqual(["fonte:c1", "analise"]);
+    expect(e.find((s) => s.id === "fonte:c1")).toEqual({ id: "fonte:c1", ativa: true, nivel: "completo" });
+    const p = paginar(e, "mensal", extras);
+    expect(p.at(-1)!.titulo).toBe("Cirurgias");
+  });
+  it("estrutura salva antes da fonte existir recebe a fonte depois da última seção anterior a ela", () => {
+    const e = normalizarEstrutura(estruturaPadrao("mensal"), "mensal", extras);
+    expect(e.map((s) => s.id).indexOf("fonte:c1")).toBe(e.map((s) => s.id).indexOf("regimes") + 1);
+    expect(normalizarEstrutura(e, "mensal", []).some((s) => s.id === "fonte:c1")).toBe(false);
+  });
+});

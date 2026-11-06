@@ -2,6 +2,7 @@ import { Fragment, type ReactNode } from "react";
 import type { ResultadoFechamento } from "@/lib/fechamentos/servidor";
 import { paginar, type ItemSecao } from "@/lib/fechamentos/estrutura";
 import { Folha, ROXO, SecAnalise, SecDespesas, SecExperiencia, SecFunilLeadsMensal, SecFunilOrcamentosMensal, SecGrafico, SecReceitasMensal, SecRegimes, SecResultadoMensal, temAnalise } from "./relatorio";
+import { SecFontePersonalizada } from "./secao-personalizada";
 import { COR_QUINZENAL, SecCaixaMes, SecFunilLeadsQuinzenal, SecFunilOrcamentosQuinzenal, SecReceitasQuinzenal, SecResultadoQuinzenal, SecRitmo } from "./relatorio-quinzenal";
 
 /*
@@ -24,7 +25,10 @@ function secao(r: ResultadoFechamento, s: ItemSecao, cor: string): ReactNode {
     case "despesas": return <SecDespesas {...p} />;
     case "regimes": return <SecRegimes {...p} />;
     case "analise": return <SecAnalise r={r} cor={cor} />;
-    default: return null;
+    default: {
+      const fonte = s.id.startsWith("fonte:") ? r.personalizadas.find((x) => `fonte:${x.id}` === s.id) : undefined;
+      return fonte ? <SecFontePersonalizada r={r} fonte={fonte} nivel={s.nivel} cor={cor} fundo={q ? "#FFF3EC" : undefined} /> : null;
+    }
   }
 }
 
@@ -57,7 +61,7 @@ export function RelatorioEstruturado({ r, estrutura }: { r: ResultadoFechamento;
   const itens = estrutura.map((s) => (s.id === "analise" && !temAnalise(r) ? { ...s, ativa: false } : s));
   return (
     <>
-      {paginar(itens, r.fechamento.tipo).map((pg) => (
+      {paginar(itens, r.fechamento.tipo, r.personalizadas.map((x) => ({ id: x.id, nome: x.nome }))).map((pg) => (
         <Folha key={pg.secoes[0].id} r={r} titulo={tituloDaPagina(r, pg.secoes[0], pg.titulo)} cor={cor} compacta={pg.secoes[0].id === "despesas"}>
           {conteudo(r, pg.secoes, cor)}
         </Folha>
