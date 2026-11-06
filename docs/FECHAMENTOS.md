@@ -110,3 +110,22 @@ Decisões viram `Ajustes` (`reclassificarDespesa`, `unificar`). Ao recalcular, o
 1. Validar com as planilhas reais da Claros: outubro, setembro e agosto contra a planilha-mãe.
 2. Análise (contexto do mês, texto com IA, plano de ação) e entrega (texto do WhatsApp e PDF), seguindo o protótipo.
 3. Congelar o fechamento ao concluir, versões, histórico e quinzenal.
+
+## Etapa 4 — Análise, plano de ação e entrega (sem IA)
+
+Fluxo da tela do fechamento: **1. Conferência → 2. Indicadores → 3. Análise → 4. Entrega**.
+
+- **Análise**: contexto do período, andamento das ações do fechamento anterior, texto em 4 seções
+  (observação, destaques, indicadores comerciais, pontos de atenção) e plano de ação com
+  responsáveis (vários por ação), prazo e "como saber se funcionou". Salva sozinho 1,2 s após
+  cada alteração. "Gerar rascunho" monta o texto a partir dos números (`lib/fechamentos/texto-fechamento.ts`),
+  sem IA; pagamentos pontuais só entram se o consultor escolheu citar na conferência.
+- **Entrega**: texto do WhatsApp pronto para copiar, PDF (`/fechamentos-pdf/[id]`, páginas A4,
+  botão "Salvar PDF" usa a impressão do navegador) e **Concluir**.
+- **Concluir** congela números, texto e plano (`fechamentos.snapshot`): o fechamento concluído
+  não relê as planilhas. **Reabrir** cria a versão seguinte e mantém a anterior no histórico.
+- Banco: `supabase/migrations/006_analise_entrega.sql`.
+
+PDF, nesta ordem: resultado do período (8 indicadores, faturamento no ano, comparativo) ·
+funil comercial e experiência do paciente · receitas detalhadas · despesas por grupo e categoria ·
+resultado anual em caixa e competência · análise e plano de ação.

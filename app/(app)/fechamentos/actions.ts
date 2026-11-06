@@ -9,7 +9,8 @@ import type { FontesFechamento } from "@/lib/fechamentos/coleta";
 import type { Alerta } from "@/lib/fechamentos/conferencia";
 import { GRUPOS_DESPESA } from "@/lib/fechamentos/plano-contas";
 import { decidir, desfazer, type AcaoDecisao, type Decisao } from "@/lib/fechamentos/decisoes";
-import { calcularFechamento, lerDecisoes, limparCache, periodoDe, testarFonte, type ResultadoFechamento } from "@/lib/fechamentos/servidor";
+import { calcularFechamento, concluirFechamento, lerDecisoes, limparCache, periodoDe, testarFonte, type ResultadoFechamento } from "@/lib/fechamentos/servidor";
+import type { Acao, Acompanhamento, TextoFechamento } from "@/lib/fechamentos/texto-fechamento";
 
 type Resposta<T> = { ok: true; dados: T } | { ok: false; erro: string };
 
@@ -47,8 +48,9 @@ export async function decidirAlerta(p: { id: string; chave: string; acao: AcaoDe
   const bloqueio = await limite(40); if (bloqueio) return { ok: false, erro: bloqueio };
   try {
     const db = getSupabaseAdmin();
-    const { data: f } = await db.from("fechamentos").select("decisoes, clinica_id, alertas").eq("id", p.id).maybeSingle();
+    const { data: f } = await db.from("fechamentos").select("decisoes, clinica_id, alertas, status").eq("id", p.id).maybeSingle();
     if (!f) return { ok: false, erro: "Fechamento não encontrado." };
+    if (f.status === "concluido" || f.status === "enviado") return { ok: false, erro: CONGELADO };
     // O alerta vem do último cálculo salvo, não da tela: a sugestão aplicada é sempre a do motor.
     const alerta = ((f.alertas ?? []) as unknown as Alerta[]).find((a) => a.chave === p.chave);
     if (!alerta) return { ok: false, erro: "Este alerta mudou desde a última leitura. Atualize a página." };
@@ -72,8 +74,9 @@ export async function desfazerDecisao(p: { id: string; chave: string }): Promise
   const bloqueio = await limite(40); if (bloqueio) return { ok: false, erro: bloqueio };
   try {
     const db = getSupabaseAdmin();
-    const { data: f } = await db.from("fechamentos").select("decisoes").eq("id", p.id).maybeSingle();
+    const { data: f } = await db.from("fechamentos").select("decisoes, status").eq("id", p.id).maybeSingle();
     if (!f) return { ok: false, erro: "Fechamento não encontrado." };
+    if (f.status === "concluido" || f.status === "enviado") return { ok: false, erro: CONGELADO };
     await db.from("fechamentos").update({ decisoes: desfazer(lerDecisoes(f.decisoes), p.chave) as unknown as Json, atualizado_em: new Date().toISOString() }).eq("id", p.id);
     return { ok: true, dados: await calcularFechamento(p.id) };
   } catch (e) { return falha(e); }
@@ -81,6 +84,8 @@ export async function desfazerDecisao(p: { id: string; chave: string }): Promise
 
 export async function salvarMetaAjustada(p: { id: string; valor: number | null }): Promise<Resposta<ResultadoFechamento>> {
   const bloqueio = await limite(); if (bloqueio) return { ok: false, erro: bloqueio };
+  const st = await statusDe(p.id);
+  if (st?.status === "concluido" || st?.status === "enviado") return { ok: false, erro: CONGELADO };
   try {
     await getSupabaseAdmin().from("fechamentos").update({ meta_ajustada: p.valor && p.valor > 0 ? p.valor : null }).eq("id", p.id);
     return { ok: true, dados: await calcularFechamento(p.id) };
@@ -125,4 +130,87 @@ export async function testarLeitura(p: { nome: keyof FontesFechamento; cfg: NonN
   const limpo = limparFontes({ [p.nome]: p.cfg } as FontesFechamento)[p.nome];
   if (!limpo) return { leitura: null, erro: "Informe o link da planilha e o nome da aba." };
   try { return await testarFonte(p.nome, limpo); } catch (e) { return { leitura: null, erro: e instanceof Error ? e.message : "Erro inesperado." }; }
+}
+
+/* ---------- análise e entrega ---------- */
+
+const CONGELADO = "Este fechamento já foi concluído. Use “Reabrir” para criar uma nova versão.";
+
+async function statusDe(id: string) {
+  const { data } = await getSupabaseAdmin().from("fechamentos").select("status, clinica_id").eq("id", id).maybeSingle();
+  return data;
+}
+
+/** Salva texto, plano de ação e acompanhamento. Os responsáveis entram na equipe da clínica. */
+export async function salvarAnalise(p: { id: string; texto: TextoFechamento; acoes: Acao[]; acompanhamento: Acompanhamento[] }): Promise<Resposta<null>> {
+  const bloqueio = await limite(60); if (bloqueio) return { ok: false, erro: bloqueio };
+  const f = await statusDe(p.id);
+  if (!f) return { ok: false, erro: "Fechamento não encontrado." };
+  if (f.status === "concluido" || f.status === "enviado") return { ok: false, erro: CONGELADO };
+  const corta = (t: unknown, n: number) => String(t ?? "").slice(0, n);
+  const texto: TextoFechamento = {
+    contexto: corta(p.texto.contexto, 4000), observacao: corta(p.texto.observacao, 8000), destaques: corta(p.texto.destaques, 6000),
+    comercial: corta(p.texto.comercial, 6000), atencao: corta(p.texto.atencao, 6000),
+  };
+  const acoes: Acao[] = p.acoes.slice(0, 20).map((a) => ({
+    id: corta(a.id, 40), titulo: corta(a.titulo, 200), descricao: corta(a.descricao, 1500), indicador: corta(a.indicador, 300),
+    responsaveis: (a.responsaveis ?? []).map((r) => corta(r, 60).trim()).filter(Boolean).slice(0, 8),
+    prazo: /^\d{4}-\d{2}-\d{2}$/.test(a.prazo ?? "") ? a.prazo : null,
+  }));
+  const acompanhamento: Acompanhamento[] = p.acompanhamento.slice(0, 30).map((a) => ({
+    id: corta(a.id, 40), titulo: corta(a.titulo, 200), responsaveis: (a.responsaveis ?? []).map((r) => corta(r, 60)),
+    status: a.status === "concluida" || a.status === "andamento" || a.status === "nao_feita" ? a.status : null, nota: corta(a.nota, 500),
+  }));
+  const db = getSupabaseAdmin();
+  const { error } = await db.from("fechamentos").update({
+    texto: texto as unknown as Json, acoes: acoes as unknown as Json, acompanhamento: acompanhamento as unknown as Json,
+    status: f.status === "conferencia" ? "analise" : f.status, atualizado_em: new Date().toISOString(),
+  }).eq("id", p.id);
+  if (error) return { ok: false, erro: "Não foi possível salvar." };
+  const nomes = acoes.flatMap((a) => a.responsaveis);
+  if (nomes.length) {
+    const { data: cfg } = await db.from("fechamento_config").select("equipe").eq("clinica_id", f.clinica_id).maybeSingle();
+    const atual = Array.isArray(cfg?.equipe) ? (cfg!.equipe as string[]) : [];
+    const novos = nomes.filter((n) => !atual.some((x) => x.toLowerCase() === n.toLowerCase()));
+    if (novos.length) await db.from("fechamento_config").update({ equipe: [...atual, ...new Set(novos)].slice(0, 60) as unknown as Json }).eq("clinica_id", f.clinica_id);
+  }
+  return { ok: true, dados: null };
+}
+
+export async function concluir(p: { id: string }): Promise<Resposta<ResultadoFechamento>> {
+  const bloqueio = await limite(); if (bloqueio) return { ok: false, erro: bloqueio };
+  try {
+    await concluirFechamento(p.id);
+    revalidatePath("/fechamentos");
+    return { ok: true, dados: await calcularFechamento(p.id) };
+  } catch (e) { return falha(e); }
+}
+
+export async function marcarEnviado(p: { id: string }): Promise<Resposta<ResultadoFechamento>> {
+  const bloqueio = await limite(); if (bloqueio) return { ok: false, erro: bloqueio };
+  const f = await statusDe(p.id);
+  if (f?.status !== "concluido") return { ok: false, erro: "Conclua o fechamento antes de marcar como enviado." };
+  const agora = new Date().toISOString();
+  await getSupabaseAdmin().from("fechamentos").update({ status: "enviado", enviado_em: agora, atualizado_em: agora }).eq("id", p.id);
+  revalidatePath("/fechamentos");
+  try { return { ok: true, dados: await calcularFechamento(p.id) }; } catch (e) { return falha(e); }
+}
+
+/** Cria a versão seguinte de um fechamento concluído, com as mesmas decisões, texto e plano. A anterior fica no histórico. */
+export async function reabrir(p: { id: string }): Promise<Resposta<{ id: string }>> {
+  const bloqueio = await limite(); if (bloqueio) return { ok: false, erro: bloqueio };
+  const db = getSupabaseAdmin();
+  const { data: f } = await db.from("fechamentos").select("*").eq("id", p.id).maybeSingle();
+  if (!f) return { ok: false, erro: "Fechamento não encontrado." };
+  if (f.status !== "concluido" && f.status !== "enviado") return { ok: false, erro: "Só fechamentos concluídos podem ser reabertos." };
+  const { data: ultima } = await db.from("fechamentos").select("versao").eq("clinica_id", f.clinica_id).eq("tipo", f.tipo)
+    .eq("inicio", f.inicio).eq("fim", f.fim).order("versao", { ascending: false }).limit(1).maybeSingle();
+  const { data, error } = await db.from("fechamentos").insert({
+    clinica_id: f.clinica_id, tipo: f.tipo, inicio: f.inicio, fim: f.fim, versao: (ultima?.versao ?? f.versao) + 1, status: "analise",
+    meta_ajustada: f.meta_ajustada, decisoes: f.decisoes, texto: f.texto, acoes: f.acoes, acompanhamento: f.acompanhamento,
+  }).select("id").single();
+  if (error || !data) return { ok: false, erro: "Não foi possível reabrir." };
+  limparCache(f.clinica_id);
+  revalidatePath("/fechamentos");
+  return { ok: true, dados: { id: data.id } };
 }

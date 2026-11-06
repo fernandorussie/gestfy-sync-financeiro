@@ -92,7 +92,7 @@ function Acoes({ a, decidir }: { a: Alerta; decidir: Decidir }) {
   }
 }
 
-export function Conferencia({ r, decidir, desfazer, irParaIndicadores }: { r: ResultadoFechamento; decidir: Decidir; desfazer: (chave: string) => void; irParaIndicadores: () => void }) {
+export function Conferencia({ r, decidir, desfazer, irParaIndicadores, somenteLeitura = false }: { r: ResultadoFechamento; decidir: Decidir; desfazer: (chave: string) => void; irParaIndicadores: () => void; somenteLeitura?: boolean }) {
   const decisaoDe = new Map(r.decisoes.registro.map((d) => [d.chave, d]));
   const pendentes = r.alertas.filter((a) => !decisaoDe.has(a.chave));
   const decididos = r.alertas.filter((a) => decisaoDe.has(a.chave));
@@ -127,7 +127,7 @@ export function Conferencia({ r, decidir, desfazer, irParaIndicadores }: { r: Re
             <h3 className="font-semibold">{a.titulo}</h3>
             <p className="text-sm text-muted-foreground">{a.descricao}</p>
             <Evidencias a={a} />
-            <div className="flex flex-wrap gap-2"><Acoes a={a} decidir={decidir} /></div>
+            {!somenteLeitura && <div className="flex flex-wrap gap-2"><Acoes a={a} decidir={decidir} /></div>}
           </div>
         </article>
       ))}
@@ -141,7 +141,7 @@ export function Conferencia({ r, decidir, desfazer, irParaIndicadores }: { r: Re
                 <p className="text-sm font-medium">{x.titulo}</p>
                 <p className="flex items-center gap-1.5 text-xs text-emerald-700 dark:text-emerald-400"><CheckCircle2 className="h-3.5 w-3.5" />{descreverDecisao(x.d)}</p>
               </div>
-              <Button size="sm" variant="ghost" onClick={() => desfazer(x.chave)}><Undo2 />Desfazer</Button>
+              {!somenteLeitura && <Button size="sm" variant="ghost" onClick={() => desfazer(x.chave)}><Undo2 />Desfazer</Button>}
             </div>
           ))}
         </section>

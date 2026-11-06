@@ -14,6 +14,7 @@ import { conferir, type Alerta } from "./conferencia";
 import { ajustesDasDecisoes, decisoesVazias, gravesPendentes, gruposEscolhidos, metaEscolhida, type Decisoes } from "./decisoes";
 import { calcularIndicadores, resumoAnual, type Indicadores, type LinhaAnual, type Periodo, type RegrasClinica } from "./indicadores";
 import { periodoAnterior } from "./periodo";
+import { textoVazio, type Acao, type Acompanhamento, type TextoFechamento } from "./texto-fechamento";
 
 export { periodoDe, periodoAnterior } from "./periodo";
 
@@ -36,6 +37,25 @@ export interface ResultadoFechamento {
   pendentesGraves: number;
   indicadores: Indicadores;
   /** Mesmo cálculo para o período anterior (mês ou quinzena), para as comparações. */
+  anterior: Indicadores;
+  anual: LinhaAnual[];
+  fontes: ResumoFonte[];
+  metaMensal: number | null;
+  lidoEm: string;
+  /** true = concluído: números do retrato congelado, sem reler planilhas. */
+  congelado: boolean;
+  texto: TextoFechamento;
+  acoes: Acao[];
+  /** Andamento das ações do fechamento anterior (começa com as ações dele). */
+  acompanhamento: Acompanhamento[];
+  /** Nomes já usados como responsáveis na clínica. */
+  equipe: string[];
+}
+
+/** O que fica gravado ao concluir: tudo que a tela e o PDF precisam, só totais. */
+interface Retrato {
+  alertas: Alerta[];
+  indicadores: Indicadores;
   anterior: Indicadores;
   anual: LinhaAnual[];
   fontes: ResumoFonte[];
@@ -87,6 +107,16 @@ export function lerDecisoes(json: Json | null): Decisoes {
   return d && Array.isArray(d.registro) ? d : decisoesVazias();
 }
 
+const lista = <T,>(j: Json | null | undefined): T[] => (Array.isArray(j) ? (j as unknown as T[]) : []);
+
+/** Ações do último fechamento anterior da clínica (mesmo tipo), para acompanhar no atual. */
+async function acoesDoAnterior(f: Fechamento): Promise<Acompanhamento[]> {
+  const { data } = await getSupabaseAdmin()
+    .from("fechamentos").select("acoes").eq("clinica_id", f.clinica_id).eq("tipo", f.tipo).lt("inicio", f.inicio)
+    .order("inicio", { ascending: false }).order("versao", { ascending: false }).limit(1).maybeSingle();
+  return lista<Acao>(data?.acoes).map((a) => ({ id: a.id, titulo: a.titulo, responsaveis: a.responsaveis ?? [], status: null, nota: "" }));
+}
+
 export async function calcularFechamento(id: string, opcoes: { releitura?: boolean } = {}): Promise<ResultadoFechamento> {
   const db = getSupabaseAdmin();
   const { data: f, error } = await db.from("fechamentos").select("*").eq("id", id).maybeSingle();
@@ -97,9 +127,42 @@ export async function calcularFechamento(id: string, opcoes: { releitura?: boole
   ]);
   if (!config) throw new Error("A clínica ainda não tem as planilhas configuradas para fechamento.");
 
-  const fontes = config.fontes as unknown as FontesFechamento;
-  const { coleta, em } = await coletarClinica(f.clinica_id, fontes, !!opcoes.releitura);
   const decisoes = lerDecisoes(f.decisoes);
+  const salvoAcomp = lista<Acompanhamento>(f.acompanhamento);
+  const comuns = {
+    fechamento: f,
+    clinicaNome: clinica?.nome ?? "",
+    periodo: { inicio: f.inicio, fim: f.fim } as Periodo,
+    decisoes,
+    texto: { ...textoVazio(), ...((f.texto ?? {}) as Partial<TextoFechamento>) },
+    acoes: lista<Acao>(f.acoes),
+    acompanhamento: salvoAcomp.length ? salvoAcomp : await acoesDoAnterior(f),
+    equipe: lista<string>(config.equipe),
+  };
+
+  const congelado = (f.status === "concluido" || f.status === "enviado") && !!f.snapshot;
+  if (congelado) {
+    const r = f.snapshot as unknown as Retrato;
+    return { ...comuns, ...r, pendentesGraves: gravesPendentes(r.alertas, decisoes).length, congelado: true };
+  }
+  const retrato = await calcularRetrato(f, config, decisoes, !!opcoes.releitura);
+  await db.from("fechamentos").update({
+    indicadores: retrato.indicadores as unknown as Json,
+    alertas: retrato.alertas as unknown as Json,
+    calculado_em: new Date().toISOString(),
+  }).eq("id", id);
+  return { ...comuns, ...retrato, pendentesGraves: gravesPendentes(retrato.alertas, decisoes).length, congelado: false };
+}
+
+/** Lê as planilhas (ou o cache) e calcula alertas, indicadores, período anterior e ano. */
+async function calcularRetrato(
+  f: Fechamento,
+  config: { fontes: Json; regras: Json },
+  decisoes: Decisoes,
+  releitura: boolean,
+): Promise<Retrato> {
+  const fontes = config.fontes as unknown as FontesFechamento;
+  const { coleta, em } = await coletarClinica(f.clinica_id, fontes, releitura);
   const regrasBase = (config.regras ?? {}) as unknown as RegrasClinica;
   const regras: RegrasClinica = { ...regrasBase, categoriasDespesa: { ...(regrasBase.categoriasDespesa ?? {}), ...gruposEscolhidos(decisoes) } };
   const ajustes = ajustesDasDecisoes(decisoes);
@@ -115,35 +178,30 @@ export async function calcularFechamento(id: string, opcoes: { releitura?: boole
       ];
   const valoresMeta = [...new Set(metas.map((m) => m.valor))];
   const meta = escolhida ?? (valoresMeta.length === 1 ? valoresMeta[0] : null);
-  // Quinzenal: a meta do período é proporcional; a comparação principal é com a meta do mês.
 
   const alertas = conferir({ dados: coleta.dados, periodo, regras, ajustes, metas, leituras: coleta.leituras });
   const indicadores = calcularIndicadores(coleta.dados, periodo, { regras, ajustes, meta });
   const anterior = calcularIndicadores(coleta.dados, periodoAnterior(periodo, f.tipo), { regras });
   const [ano, mes] = f.fim.split("-").map(Number);
   const anual = resumoAnual(coleta.dados, ano, mes);
-
-  await db.from("fechamentos").update({
-    indicadores: indicadores as unknown as Json,
-    alertas: alertas as unknown as Json,
-    calculado_em: new Date().toISOString(),
-  }).eq("id", id);
-
   const nomes = ["vendas", "despesas", "orcamentos", "leads", "nps", "avaliacoes"] as const;
   return {
-    fechamento: f,
-    clinicaNome: clinica?.nome ?? "",
-    periodo,
-    alertas,
-    decisoes,
-    pendentesGraves: gravesPendentes(alertas, decisoes).length,
-    indicadores,
-    anterior,
-    anual,
+    alertas, indicadores, anterior, anual, metaMensal,
     fontes: nomes
       .filter((n) => fontes[n] || coleta.erros[n])
       .map((n) => ({ fonte: n, linhas: coleta.leituras[n]?.linhas ?? 0, erro: coleta.erros[n], avisos: coleta.leituras[n]?.avisos.length ?? 0 })),
-    metaMensal,
     lidoEm: new Date(em).toISOString(),
   };
+}
+
+/** Conclui: recalcula com as decisões atuais e grava o retrato congelado. */
+export async function concluirFechamento(id: string): Promise<void> {
+  const db = getSupabaseAdmin();
+  const r = await calcularFechamento(id);
+  if (r.congelado) return;
+  if (r.pendentesGraves) throw new Error("Ainda há alertas graves sem decisão na conferência.");
+  if (r.fontes.some((x) => x.erro && (x.fonte === "vendas" || x.fonte === "despesas"))) throw new Error("Vendas ou despesas não foram lidas. Corrija antes de concluir.");
+  const retrato: Retrato = { alertas: r.alertas, indicadores: r.indicadores, anterior: r.anterior, anual: r.anual, fontes: r.fontes, metaMensal: r.metaMensal, lidoEm: r.lidoEm };
+  const agora = new Date().toISOString();
+  await db.from("fechamentos").update({ status: "concluido", snapshot: retrato as unknown as Json, acompanhamento: r.acompanhamento as unknown as Json, concluido_em: agora, atualizado_em: agora }).eq("id", id);
 }

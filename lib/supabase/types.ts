@@ -216,9 +216,9 @@ export interface Database {
         Relationships: [];
       };
       fechamento_config: {
-        Row: { clinica_id: string; fontes: Json; regras: Json; atualizado_em: string };
-        Insert: { clinica_id: string; fontes?: Json; regras?: Json; atualizado_em?: string };
-        Update: { fontes?: Json; regras?: Json; atualizado_em?: string };
+        Row: { clinica_id: string; fontes: Json; regras: Json; equipe: Json; atualizado_em: string };
+        Insert: { clinica_id: string; fontes?: Json; regras?: Json; equipe?: Json; atualizado_em?: string };
+        Update: { fontes?: Json; regras?: Json; equipe?: Json; atualizado_em?: string };
         Relationships: [];
       };
       fechamentos: {
@@ -237,6 +237,12 @@ export interface Database {
           calculado_em: string | null;
           criado_em: string;
           atualizado_em: string;
+          texto: Json;
+          acoes: Json;
+          acompanhamento: Json;
+          snapshot: Json | null;
+          concluido_em: string | null;
+          enviado_em: string | null;
         };
         Insert: {
           id?: string;
@@ -248,6 +254,9 @@ export interface Database {
           versao?: number;
           meta_ajustada?: number | null;
           decisoes?: Json;
+          texto?: Json;
+          acoes?: Json;
+          acompanhamento?: Json;
         };
         Update: {
           status?: "conferencia" | "analise" | "concluido" | "enviado";
@@ -257,6 +266,12 @@ export interface Database {
           alertas?: Json | null;
           calculado_em?: string | null;
           atualizado_em?: string;
+          texto?: Json;
+          acoes?: Json;
+          acompanhamento?: Json;
+          snapshot?: Json | null;
+          concluido_em?: string | null;
+          enviado_em?: string | null;
         };
         Relationships: [];
       };
