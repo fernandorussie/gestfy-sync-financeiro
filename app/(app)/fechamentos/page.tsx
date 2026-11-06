@@ -10,11 +10,12 @@ import { brl0, nomePeriodo } from "./_components/formato";
 
 export default async function FechamentosPage() {
   const db = getSupabaseAdmin();
-  const [{ data: clinicas }, { data: configs }, { data: fechamentos }] = await Promise.all([
+  const [{ data: clinicas, error: e1 }, { data: configs, error: e2 }, { data: fechamentos, error: e3 }] = await Promise.all([
     db.from("clinicas").select("id, nome").eq("ativa", true).order("nome"),
     db.from("fechamento_config").select("clinica_id, fontes"),
     db.from("fechamentos").select("id, clinica_id, tipo, inicio, fim, status, versao, indicadores, calculado_em").order("inicio", { ascending: false }).limit(40),
   ]);
+  const erroBanco = [e1, e2, e3].find(Boolean);
   const configuradas = new Set((configs ?? []).filter((c) => Object.keys((c.fontes ?? {}) as object).length > 0).map((c) => c.clinica_id));
   const nomeClinica = new Map((clinicas ?? []).map((c) => [c.id, c.nome]));
   const lista = clinicas ?? [];
@@ -26,6 +27,12 @@ export default async function FechamentosPage() {
         <h1 className="text-2xl font-semibold">Fechamentos</h1>
       </div>
 
+      {erroBanco && (
+        <div className="rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm">
+          <b>Não foi possível ler o banco de dados:</b> {erroBanco.message}
+          <span className="block text-muted-foreground">Abra /api/fechamentos/diagnostico para ver a causa.</span>
+        </div>
+      )}
       <NovoFechamento clinicas={lista.filter((c) => configuradas.has(c.id))} />
 
       <Card>
