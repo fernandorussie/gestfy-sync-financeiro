@@ -13,6 +13,7 @@ function isProtected(pathname: string): boolean {
     pathname.startsWith("/checkpoint") ||
     pathname.startsWith("/relatorio") ||
     pathname.startsWith("/configuracoes") ||
+    pathname.startsWith("/fechamentos") ||
     (pathname.startsWith("/api/") && !pathname.startsWith("/api/auth/"))
   );
 }

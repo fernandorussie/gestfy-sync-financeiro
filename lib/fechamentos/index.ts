@@ -12,3 +12,5 @@ export * from "./plano-contas";
 export * from "./indicadores";
 export * from "./conferencia";
 export * from "./coleta";
+export * from "./decisoes";
+export * from "./periodo";

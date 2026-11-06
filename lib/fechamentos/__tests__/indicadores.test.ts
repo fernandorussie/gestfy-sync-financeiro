@@ -71,6 +71,10 @@ describe("receitas detalhadas", () => {
     const u = Object.fromEntries(ind.faturamento!.porUnidade.map((x) => [x.nome, x.valor]));
     expect(u).toEqual({ Bangu: 92400, Freguesia: 24150, "Não informado": 1100 });
   });
+  it("meio de pagamento junta parcelamentos: crédito R$ 55.300, PIX R$ 35.000", () => {
+    const m = Object.fromEntries(ind.faturamento!.porPagamento.map((x) => [x.nome.toUpperCase(), x.valor]));
+    expect(m).toMatchObject({ CREDITO: 55300, PIX: 35000, DINHEIRO: 16450, "DÉBITO": 7500, "NÃO INFORMADO": 3400 });
+  });
   it("profissional principal com 90,3% da receita", () => {
     const p = ind.faturamento!.porProfissional[0];
     expect(p.valor).toBe(106200);

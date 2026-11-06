@@ -11,7 +11,7 @@
 import type { AvisoLeitura } from "./leitores";
 import type { Despesa } from "./leitores";
 import {
-  agruparPorNome, calcularIndicadores, categoriaDaDespesa, grupoDaVenda, NAO_INFORMADO,
+  agruparPorNome, calcularIndicadores, categoriaDaDespesa, grupoDaVenda, meioDePagamento, NAO_INFORMADO,
   type Ajustes, type CampoUnificavel, type DadosFechamento, type Periodo, type RegrasClinica,
 } from "./indicadores";
 import { GRUPO_SEM_CLASSIFICACAO, montarPlano, PISTAS_CATEGORIA } from "./plano-contas";
@@ -189,7 +189,7 @@ export function conferir(e: EntradaConferencia): Alerta[] {
   const campos: { campo: CampoUnificavel; fonte: Fonte; area: string; rotulo: string; itens: { nome: string; valor: number; quantidade: number; variantes: string[] }[] }[] = [
     { campo: "profissional", fonte: "vendas", area: "Vendas", rotulo: "Profissional", itens: agruparPorNome(vendas, (v) => v.profissional, (v) => v.valor ?? 0, un.profissional) },
     { campo: "unidade", fonte: "vendas", area: "Vendas", rotulo: "Unidade", itens: agruparPorNome(vendas, (v) => v.unidade, (v) => v.valor ?? 0, un.unidade) },
-    { campo: "pagamento", fonte: "vendas", area: "Vendas", rotulo: "Meio de pagamento", itens: agruparPorNome(vendas, (v) => v.pagamento, (v) => v.valor ?? 0, un.pagamento) },
+    { campo: "pagamento", fonte: "vendas", area: "Vendas", rotulo: "Meio de pagamento", itens: agruparPorNome(vendas, (v) => meioDePagamento(v.pagamento), (v) => v.valor ?? 0, un.pagamento) },
     { campo: "grupoReceita", fonte: "vendas", area: "Vendas", rotulo: "Grupo de receita", itens: agruparPorNome(vendas, (v) => grupoDaVenda(v, regras), (v) => v.valor ?? 0, un.grupoReceita) },
   ];
   if (dados.leads) {

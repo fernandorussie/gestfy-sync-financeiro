@@ -215,6 +215,51 @@ export interface Database {
         };
         Relationships: [];
       };
+      fechamento_config: {
+        Row: { clinica_id: string; fontes: Json; regras: Json; atualizado_em: string };
+        Insert: { clinica_id: string; fontes?: Json; regras?: Json; atualizado_em?: string };
+        Update: { fontes?: Json; regras?: Json; atualizado_em?: string };
+        Relationships: [];
+      };
+      fechamentos: {
+        Row: {
+          id: string;
+          clinica_id: string;
+          tipo: "mensal" | "quinzenal";
+          inicio: string;
+          fim: string;
+          status: "conferencia" | "analise" | "concluido" | "enviado";
+          versao: number;
+          meta_ajustada: number | null;
+          decisoes: Json;
+          indicadores: Json | null;
+          alertas: Json | null;
+          calculado_em: string | null;
+          criado_em: string;
+          atualizado_em: string;
+        };
+        Insert: {
+          id?: string;
+          clinica_id: string;
+          tipo: "mensal" | "quinzenal";
+          inicio: string;
+          fim: string;
+          status?: "conferencia" | "analise" | "concluido" | "enviado";
+          versao?: number;
+          meta_ajustada?: number | null;
+          decisoes?: Json;
+        };
+        Update: {
+          status?: "conferencia" | "analise" | "concluido" | "enviado";
+          meta_ajustada?: number | null;
+          decisoes?: Json;
+          indicadores?: Json | null;
+          alertas?: Json | null;
+          calculado_em?: string | null;
+          atualizado_em?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
@@ -252,3 +297,6 @@ export type NomeIndicador = CheckpointIndicador["indicador"];
 export type FormatoRelatorio = RelatorioGerado["formato"];
 export type FormatoMeta = TipoMeta["formato"];
 export type ComportamentoMeta = TipoMeta["comportamento"];
+
+export type FechamentoConfig = Database["public"]["Tables"]["fechamento_config"]["Row"];
+export type Fechamento = Database["public"]["Tables"]["fechamentos"]["Row"];

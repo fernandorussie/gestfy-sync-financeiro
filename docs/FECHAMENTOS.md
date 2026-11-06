@@ -91,8 +91,22 @@ Decisões viram `Ajustes` (`reclassificarDespesa`, `unificar`). Ao recalcular, o
 
 `npm test` roda tudo. Os testes do módulo usam `lib/fechamentos/__tests__/fixtures/claros-2026-10.json`: dados de outubro/2026 da Claros extraídos da planilha-mãe e **anonimizados** (pacientes, leads, equipe e profissionais com pseudônimos; CPF, endereço, e-mail, observações e comentários removidos). Os testes conferem os números com os do relatório mensal da planilha.
 
+## Telas e banco (etapa 3)
+
+| Caminho | O que faz |
+|---|---|
+| `/fechamentos` | Abre um fechamento (clínica, mensal ou quinzenal, mês), lista os fechamentos e as clínicas com planilhas configuradas |
+| `/fechamentos/configurar/[clinicaId]` | Link e aba de cada planilha, **Testar leitura** (linhas lidas e coluna encontrada para cada campo) e indicação manual de coluna |
+| `/fechamentos/[id]` | Conferência (alertas, decisões, desfazer) e Indicadores (liberados quando não há alerta grave pendente). Meta ajustada e "Ler de novo" no topo |
+
+- Tabelas novas: `fechamento_config` (planilhas e regras por clínica) e `fechamentos` (período, status, versão, meta ajustada, decisões e o último cálculo, só totais). Migração `supabase/migrations/004_fechamentos.sql`; para o banco de testes, `supabase/etapa-3-fechamentos.sql` (inclui o cadastro da Claros).
+- `lib/fechamentos/decisoes.ts`: o fechamento guarda só o registro das decisões; ajustes, meta escolhida e o que ainda bloqueia são derivados dele. Grupo escolhido para categoria fora do plano vai também para as regras da clínica.
+- `lib/fechamentos/servidor.ts`: lê as planilhas (cache de 10 minutos em memória por clínica; "Ler de novo" ignora o cache), aplica decisões, confere, calcula o período e o anterior, e grava só os totais.
+- A ação de decidir procura o alerta pelo identificador no último cálculo salvo; a tela não consegue mandar uma sugestão própria.
+- `/fechamentos` entrou na lista de rotas protegidas pela senha do app (`proxy.ts`).
+
 ## Próximos passos
 
-1. Banco (Supabase de testes): mapa de fontes por clínica, fechamentos congelados, decisões da conferência, plano de ação.
-2. Telas do fluxo (conferência → indicadores → análise → entrega), seguindo o protótipo.
-3. Leitura real das planilhas da Claros com a conta de serviço do ambiente de testes e comparação de 3 meses com a planilha-mãe.
+1. Validar com as planilhas reais da Claros: outubro, setembro e agosto contra a planilha-mãe.
+2. Análise (contexto do mês, texto com IA, plano de ação) e entrega (texto do WhatsApp e PDF), seguindo o protótipo.
+3. Congelar o fechamento ao concluir, versões, histórico e quinzenal.

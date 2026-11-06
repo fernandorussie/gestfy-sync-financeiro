@@ -57,21 +57,7 @@ export function SidebarNav() {
     <nav className="space-y-0.5">
       {mainNavItems.map(({ href, label, icon }) => navLink(href, label, icon))}
 
-      {/* Reports Financeiros — em breve */}
-      <div
-        title="Em breve"
-        className={cn(
-          "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium",
-          "opacity-50 cursor-not-allowed select-none text-sidebar-foreground"
-        )}
-        aria-disabled="true"
-      >
-        <TrendingUp className="h-4 w-4 shrink-0" />
-        <span>Reports Financeiros</span>
-        <span className="ml-auto rounded-sm bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
-          em breve
-        </span>
-      </div>
+      {navLink("/fechamentos", "Fechamentos", TrendingUp)}
 
       <div className="pt-4 pb-0.5">
         <p className="px-3 text-[10px] font-semibold text-sidebar-foreground/50 uppercase tracking-widest font-heading">

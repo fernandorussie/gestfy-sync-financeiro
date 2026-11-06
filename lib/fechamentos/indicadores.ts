@@ -189,6 +189,11 @@ function itensContagem(lista: { nome: string; quantidade: number }[], total: num
   return lista.map((g) => ({ nome: g.nome, quantidade: g.quantidade, pct: frac(g.quantidade, total) })).sort(porQuantidade);
 }
 
+/** "CREDITO 6x", "Crédito 10X" → "CREDITO": o parcelamento não separa o meio de pagamento. */
+export function meioDePagamento(texto: string): string {
+  return texto.replace(/\s*\(?\d{1,2}\s*x\)?\s*$/i, "").trim();
+}
+
 /** Grupo de receita de uma venda: coluna de grupo, depois regra da clínica, depois a própria categoria. */
 export function grupoDaVenda(v: Venda, regras: RegrasClinica = {}): string {
   if (v.grupo) return v.grupo;
@@ -228,7 +233,7 @@ export function calcularIndicadores(
         .sort((a, b) => b.valor - a.valor || b.quantidade - a.quantidade),
       porProfissional: itensValor(agruparPorNome(vs, (v) => v.profissional, valor, un.profissional), total),
       porUnidade: itensValor(agruparPorNome(vs, (v) => v.unidade, valor, un.unidade), total),
-      porPagamento: itensValor(agruparPorNome(vs.filter((v) => valor(v) > 0), (v) => v.pagamento, valor, un.pagamento), total),
+      porPagamento: itensValor(agruparPorNome(vs.filter((v) => valor(v) > 0), (v) => meioDePagamento(v.pagamento), valor, un.pagamento), total),
     };
     const chave = (v: Venda) => normalizar(v.paciente);
     const atendidos = new Set(vs.map(chave).filter(Boolean));
