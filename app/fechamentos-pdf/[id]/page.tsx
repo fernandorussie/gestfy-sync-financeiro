@@ -6,7 +6,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { calcularFechamento, type ResultadoFechamento } from "@/lib/fechamentos/servidor";
 import { nomePeriodo } from "../../(app)/fechamentos/_components/formato";
-import { CSS, Relatorio } from "./relatorio";
+import { CSS, Relatorio, temAnalise } from "./relatorio";
 import { BotaoImprimir } from "./imprimir";
 
 const carregar = cache((id: string) => calcularFechamento(id));
@@ -22,8 +22,9 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   }
 }
 
-export default async function FechamentoPdfPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function FechamentoPdfPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ analise?: string }> }) {
   const { id } = await params;
+  const comAnalise = (await searchParams).analise === "1";
   let r: ResultadoFechamento | null = null;
   let erro = "";
   try {
@@ -51,9 +52,16 @@ export default async function FechamentoPdfPage({ params }: { params: Promise<{ 
           <Link href={`/fechamentos/${f.id}`} className="font-medium underline">Voltar ao fechamento</Link>
           <span className="ml-2 text-[#6B6577]">{r.congelado ? `Versão ${f.versao} concluída` : "Prévia: o fechamento ainda não foi concluído"}</span>
         </div>
-        <BotaoImprimir />
+        <div className="flex flex-wrap items-center gap-3">
+          {temAnalise(r) && (
+            <Link href={`/fechamentos-pdf/${f.id}${comAnalise ? "" : "?analise=1"}`} replace className="text-sm font-medium underline">
+              {comAnalise ? "Tirar a página de análise" : "Incluir página de análise e plano de ação"}
+            </Link>
+          )}
+          <BotaoImprimir />
+        </div>
       </div>
-      <Relatorio r={r} />
+      <Relatorio r={r} comAnalise={comAnalise} />
     </div>
   );
 }

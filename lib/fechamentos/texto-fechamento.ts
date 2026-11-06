@@ -78,18 +78,39 @@ function citar(c: ContextoTexto, regra: string): Alerta | undefined {
 
 /* ---------- rascunho ---------- */
 
+const mil = (v: number) => `R$ ${(v / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mil`;
+const lista = (xs: string[]) => (xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} e ${xs[xs.length - 1]}`);
+const capital = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+
+/** Do que eram os pagamentos pontuais, sem citar nomes de pessoas. */
+function naturezaPontuais(al: Alerta): string[] {
+  const tipos: string[] = [];
+  const add = (t: string) => { if (!tipos.includes(t)) tipos.push(t); };
+  for (const e of al.evidencias) {
+    const t = e.texto.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase();
+    const imposto = t.match(/\b(IRPJ|CSLL|PIS|COFINS|ISS|IPTU|IPVA|SIMPLES|DAS)\b/);
+    if (/RESCIS|RECIS|FGTS|INSS|AVISO|MULTA/.test(t)) add("despesas relacionadas a desligamento de colaborador");
+    else if (/13|DECIMO/.test(t)) add("13º salário");
+    else if (imposto) add(imposto[1]);
+    else add("outros pagamentos não recorrentes");
+  }
+  // Impostos primeiro, como nos reports.
+  return tipos.sort((x, y) => Number(x.includes(" ")) - Number(y.includes(" ")));
+}
+
 export function rascunho(c: ContextoTexto): SecoesTexto {
   const i = c.indicadores, a = c.anterior;
   const per = rotuloPeriodo(c);
   const fat = i.faturamento?.total ?? 0, fatA = a.faturamento?.total ?? 0;
   const vFat = variacao(fat, fatA);
+  const temAnterior = fatA > 0;
 
   /* Observação */
   const obs: string[] = [];
   obs.push(`Fala, Drs.! Segue o fechamento ${c.tipo === "mensal" ? "mensal" : "quinzenal"} de ${per.atual} da ${c.clinica}.`);
   if (vFat !== null) {
-    const bom = vFat >= 0 && (!i.meta || i.meta.atingimento >= 1);
-    let p = `${bom ? "Tivemos um bom resultado" : "Tivemos um período de atenção"}. O faturamento ${vFat >= 0 ? "cresceu" : "caiu"} de ${brl(fatA)} em ${per.anterior} para ${brl(fat)} em ${per.atual}, ${vFat >= 0 ? "um crescimento" : "uma redução"} de ${pct(Math.abs(vFat))}.`;
+    const abertura = vFat <= -0.05 || (i.meta && i.meta.atingimento < 0.9) ? "Tivemos um período de atenção" : vFat >= 0.05 ? "Tivemos um bom período" : "Tivemos um período estável";
+    let p = `${abertura}. O faturamento ${vFat >= 0 ? "cresceu" : "caiu"} de ${brl(fatA)} em ${per.anterior} para ${brl(fat)} em ${per.atual}, ${vFat >= 0 ? "um crescimento" : "uma redução"} de ${pct(Math.abs(vFat))}.`;
     if (i.meta) p += i.meta.atingimento >= 1 ? ` Superamos a meta de ${brl(i.meta.valor)}, com ${pct(i.meta.atingimento)} de atingimento.` : ` Atingimos ${pct(i.meta.atingimento)} da meta de ${brl(i.meta.valor)}, ficando ${brl(i.meta.falta)} abaixo do objetivo.`;
     obs.push(p);
   } else {
@@ -97,18 +118,21 @@ export function rascunho(c: ContextoTexto): SecoesTexto {
   }
   const vPac = variacao(i.pacientes?.atendidos, a.pacientes?.atendidos);
   const vTk = variacao(i.pacientes?.ticketMedio, a.pacientes?.ticketMedio);
+  const volumeEstavel = vPac !== null && Math.abs(vPac) < 0.05;
   if (vPac !== null && vTk !== null && i.pacientes && a.pacientes) {
-    if (Math.abs(vPac) < 0.05 && Math.abs(vTk) >= 0.05) {
-      obs.push(`O volume de pacientes praticamente se manteve, passando de ${a.pacientes.atendidos} para ${i.pacientes.atendidos}. Já o ticket médio ${vTk < 0 ? "caiu" : "subiu"} ${pct(Math.abs(vTk))}. Ou seja, a variação do faturamento veio do valor médio dos atendimentos, e não da quantidade de pacientes.`);
+    if (volumeEstavel && Math.abs(vTk) >= 0.05) {
+      obs.push(`O principal ponto é que o volume de pacientes ${a.pacientes.atendidos === i.pacientes.atendidos ? `se manteve em ${i.pacientes.atendidos}` : `praticamente se manteve, passando de ${a.pacientes.atendidos} em ${per.anterior} para ${i.pacientes.atendidos} em ${per.atual}`}. Entretanto, o ticket médio ${vTk < 0 ? "caiu" : "subiu"} ${pct(Math.abs(vTk))}. Ou seja, ${vFat !== null && vFat < 0 ? "a queda" : "a variação"} do faturamento esteve muito mais relacionada ao valor médio dos atendimentos do que à quantidade de pacientes.`);
     } else {
-      obs.push(`Atendemos ${i.pacientes.atendidos} pacientes (${sinal(vPac)} em relação a ${per.anterior}), com ticket médio de ${brl(i.pacientes.ticketMedio)} (${sinal(vTk)}).`);
+      obs.push(`Atendemos ${i.pacientes.atendidos} pacientes, contra ${a.pacientes.atendidos} em ${per.anterior} (${sinal(vPac)}), com ticket médio de ${brl(i.pacientes.ticketMedio)} (${sinal(vTk)}).`);
     }
   }
   if (i.despesas) {
-    const vD = variacao(i.despesas.total, a.despesas?.total);
-    let p = `No caixa, pagamos ${brl(i.despesas.total)} em despesas${vD !== null ? `, contra ${brl(a.despesas!.total)} em ${per.anterior}` : ""}, e o resultado de caixa foi de ${brl(i.caixa?.resultado ?? 0)}.`;
     const pontuais = citar(c, "pagamentos-pontuais");
-    if (pontuais?.total) p += ` Parte desse valor veio de pagamentos pontuais, que somaram ${brl(pontuais.total)}. Portanto, esse aumento não representa uma elevação dos custos mensais.`;
+    let p = `${pontuais ? "Outro ponto importante foi o caixa. " : ""}Tivemos ${brl(i.despesas.total)} em despesas pagas${temAnterior && a.despesas ? `, contra ${brl(a.despesas.total)} em ${per.anterior}` : ""}, e o resultado de caixa foi de ${brl(i.caixa?.resultado ?? 0)}.`;
+    if (pontuais?.total) {
+      const nat = naturezaPontuais(pontuais);
+      p += ` Porém, ${per.atual} concentrou pagamentos de ${lista(nat)}, que somaram aproximadamente ${mil(pontuais.total)}. Portanto, esse aumento não representa uma elevação dos custos mensais.`;
+    }
     obs.push(p);
   }
 
@@ -116,44 +140,77 @@ export function rascunho(c: ContextoTexto): SecoesTexto {
   const dest: string[] = [];
   const grupos = i.faturamento?.porGrupo ?? [];
   const antes = new Map((a.faturamento?.porGrupo ?? []).map((g) => [g.nome.toLowerCase(), g.valor]));
-  if (grupos[0]) dest.push(`- ${grupos[0].nome}: principal categoria, com ${brl(grupos[0].valor)} (${pct(grupos[0].pct)} do faturamento).`);
-  const mudancas = grupos
-    .map((g) => ({ g, ant: antes.get(g.nome.toLowerCase()) ?? 0 }))
-    .filter((x) => x.ant > 0 && x.g !== grupos[0])
-    .sort((x, y) => Math.abs(y.g.valor - y.ant) - Math.abs(x.g.valor - x.ant))
-    .slice(0, 3);
-  for (const { g, ant } of mudancas) dest.push(`- ${g.nome}: ${g.valor >= ant ? "passou" : "caiu"} de ${brl(ant)} para ${brl(g.valor)} (${sinal(g.valor / ant - 1)}).`);
-  const prof = i.faturamento?.porProfissional[0];
-  if (prof && prof.pct > 0.6) dest.push(`- ${prof.nome} respondeu por ${pct(prof.pct)} do faturamento.`);
+  const ant = (nome: string) => antes.get(nome.toLowerCase()) ?? 0;
+  const top = grupos[0];
+  if (top) {
+    const v = variacao(top.valor, ant(top.nome));
+    dest.push(`- ${top.nome}: foi a principal categoria de ${per.atual}, com ${brl(top.valor)}${v !== null && temAnterior ? `, ${v >= 0 ? "crescimento" : "queda"} de ${pct(Math.abs(v))} em relação a ${per.anterior}` : ` (${pct(top.pct)} do faturamento)`}.`);
+  }
+  if (temAnterior) {
+    const relevante = Math.max(2000, fatA * 0.02);
+    const todos = [...new Set([...grupos.map((g) => g.nome), ...(a.faturamento?.porGrupo ?? []).map((g) => g.nome)])]
+      .map((nome) => ({ nome, atual: grupos.find((g) => g.nome.toLowerCase() === nome.toLowerCase())?.valor ?? 0, antes: ant(nome) }))
+      .filter((x) => x.nome !== top?.nome && x.antes > 0 && Math.abs(x.atual - x.antes) >= relevante);
+    const quedas = todos.filter((x) => x.atual < x.antes).sort((x, y) => (x.atual - x.antes) - (y.atual - y.antes)).slice(0, 2);
+    const altas = todos.filter((x) => x.atual > x.antes).sort((x, y) => (y.atual - y.antes) - (x.atual - x.antes)).slice(0, 2);
+    quedas.forEach((x, n) => {
+      let l = `- ${x.nome}: caiu de ${brl(x.antes)} para ${brl(x.atual)} (${sinal(x.atual / x.antes - 1)}).`;
+      if (n === 0) l += ` Foi uma das principais reduções de faturamento do período.`;
+      if (n === 1) l += ` Somando ${quedas[0].nome} e ${x.nome}, tivemos ${brl(quedas.reduce((s, q) => s + (q.antes - q.atual), 0))} a menos em faturamento.`;
+      dest.push(l);
+    });
+    for (const x of altas) dest.push(`- ${x.nome}: gerou ${brl(x.atual)}, crescimento de ${pct(x.atual / x.antes - 1)} em relação a ${per.anterior}.`);
+  }
+  const prof = i.faturamento?.porProfissional.find((p) => p.nome !== "Não informado");
+  if (prof && prof.pct > 0.6) {
+    const profA = a.faturamento?.porProfissional.find((p) => p.nome.toLowerCase() === prof.nome.toLowerCase());
+    const demais = fat - prof.valor, demaisA = profA ? fatA - profA.valor : 0;
+    if (profA && temAnterior && profA.pct - prof.pct >= 0.02 && demais > demaisA) {
+      dest.push(`- Demais profissionais: aumentaram sua participação no faturamento. A dependência de ${prof.nome} caiu de ${pct(profA.pct, 0)} para ${pct(prof.pct)}, enquanto a receita dos demais profissionais cresceu de ${brl(demaisA)} para ${brl(demais)}.`);
+    }
+  }
 
   /* Comercial */
   const com: string[] = [];
   if (i.leads) {
-    const ant = a.leads && a.leads.total ? ` Em ${per.anterior}, foram ${a.leads.total} leads e ${a.leads.agendados} agendamentos.` : "";
-    com.push(`- Leads e agendamentos: ${i.leads.total} leads e ${i.leads.agendados} agendamentos, conversão de ${pct(i.leads.conversao ?? 0, 0)}.${ant}`);
-    const sem = i.leads.porOrigem.find((o) => o.nome === "Não informado")?.quantidade ?? 0;
-    const top = i.leads.porOrigem.find((o) => o.nome !== "Não informado");
-    if (top) com.push(`- Origem: ${top.quantidade} dos ${i.leads.total} leads vieram de ${top.nome}${sem ? `; ${sem} sem origem informada` : ""}.`);
+    let l = `- Leads e agendamentos: tivemos ${i.leads.total} leads e ${i.leads.agendados} agendamentos, com conversão de ${pct(i.leads.conversao ?? 0, 0)}.`;
+    if (a.leads && a.leads.total) {
+      l += ` Em ${per.anterior}, foram ${a.leads.total} leads e ${a.leads.agendados} agendamentos.`;
+      if (i.leads.agendados > a.leads.agendados && vFat !== null && vFat < 0) l += " Ou seja, o volume de oportunidades e agendamentos cresceu, mas ainda não conseguimos transformar essa evolução em mais faturamento.";
+    }
+    com.push(l);
   }
   if (i.orcamentos && i.orcamentos.total) {
-    const vA = a.orcamentos?.conversaoValor;
-    com.push(`- Orçamentos: ${brl(i.orcamentos.valorGerado)} prescritos e ${brl(i.orcamentos.valorFechado)} fechados, conversão de ${pct(i.orcamentos.conversaoValor ?? 0, 0)} em valor${vA != null ? ` (${pct(vA, 0)} em ${per.anterior})` : ""}.${i.orcamentos.valorEmAberto ? ` Seguem ${brl(i.orcamentos.valorEmAberto)} em negociação.` : ""}`);
+    const cA = a.orcamentos?.conversaoValor;
+    const cI = i.orcamentos.conversaoValor ?? 0;
+    com.push(`- Orçamentos: foram ${brl(i.orcamentos.valorGerado)} prescritos e ${brl(i.orcamentos.valorFechado)} em vendas registradas, com conversão de ${pct(cI, 0)} em valor${cA != null && a.orcamentos?.total ? `, ${cI < cA ? "abaixo" : "acima"} dos ${pct(cA)} de ${per.anterior}` : ""}.${i.orcamentos.valorEmAberto ? ` Temos ${brl(i.orcamentos.valorEmAberto)} em propostas classificadas como em negociação.` : ""}`);
+  }
+  if (i.leads && i.leads.total) {
+    const origens = i.leads.porOrigem.filter((o) => o.nome !== "Não informado");
+    const principal = origens[0];
+    const busca = origens.filter((o) => o !== principal && /google|site/i.test(o.nome)).reduce((s, o) => s + o.quantidade, 0);
+    const sem = i.leads.porOrigem.find((o) => o.nome === "Não informado")?.quantidade ?? 0;
+    if (principal) {
+      com.push(`- Marketing: dos ${i.leads.total} leads, ${principal.quantidade} foram registrados como vindos de ${principal.nome}${busca ? `, além de ${busca} identificados como Google/Site` : ""}.${sem ? ` Outros ${sem} estão sem origem informada.` : ""} Ainda precisamos acompanhar quais campanhas estão gerando agendamentos e vendas.`);
+    }
   }
   if (i.nps && i.nps.respostas) {
-    com.push(`- Experiência do paciente: NPS ${i.nps.nps} com ${i.nps.respostas} respostas${i.google?.avaliacoes ? ` e ${i.google.avaliacoes} avaliações no Google, nota ${i.google.nota?.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}` : ""}.`);
+    const g = i.google?.avaliacoes ? ` e ${i.google.avaliacoes} avaliações no Google${i.google.nota === 5 ? ", todas com 5 estrelas" : `, nota média ${i.google.nota?.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}`}` : "";
+    const positivo = (i.nps.nps ?? 0) >= 75;
+    com.push(`- Experiência do paciente: ${positivo ? "mantivemos uma avaliação positiva, com " : ""}NPS de ${i.nps.nps} em ${i.nps.respostas} respostas${g}.`);
   }
 
   /* Pontos de atenção */
   const at: string[] = [];
-  if (vTk !== null && vTk <= -0.1) at.push(`- Ticket médio: queda de ${pct(Math.abs(vTk))}, de ${brl(a.pacientes!.ticketMedio)} para ${brl(i.pacientes!.ticketMedio)}.`);
-  if (i.meta && i.meta.atingimento < 0.9) at.push(`- Meta: ${pct(i.meta.atingimento)} de atingimento, ${brl(i.meta.falta)} abaixo.`);
-  const vConv = i.orcamentos?.conversaoValor != null && a.orcamentos?.conversaoValor != null ? i.orcamentos.conversaoValor - a.orcamentos.conversaoValor : null;
-  if (vConv !== null && vConv <= -0.05) at.push(`- Conversão de orçamentos: caiu de ${pct(a.orcamentos!.conversaoValor!, 0)} para ${pct(i.orcamentos!.conversaoValor!, 0)} em valor.`);
-  if (prof && prof.pct > 0.6) at.push(`- Concentração de receita: ${prof.nome} ainda responde por ${pct(prof.pct)} do faturamento.`);
+  if (vTk !== null && vTk <= -0.1) at.push(`- Faturamento e ticket: a queda de ${pct(Math.abs(vTk))} no ticket médio impactou diretamente a receita${volumeEstavel ? ", mesmo com praticamente o mesmo volume de pacientes atendidos" : ""}.`);
+  const vVend = variacao(i.orcamentos?.valorFechado, a.orcamentos?.valorFechado);
+  if (vVend !== null && vVend <= -0.15) at.push(`- Conversão de orçamentos: o valor vendido caiu de ${brl(a.orcamentos!.valorFechado)} para ${brl(i.orcamentos!.valorFechado)}, redução de ${pct(Math.abs(vVend))}.`);
+  if (i.meta && i.meta.atingimento < 0.9 && vFat === null) at.push(`- Meta: ${pct(i.meta.atingimento)} de atingimento, ${brl(i.meta.falta)} abaixo.`);
+  if (prof && prof.pct > 0.6) at.push(`- Concentração de receita: ${dest.some((d) => d.startsWith("- Demais profissionais")) ? "apesar da evolução dos demais profissionais, " : ""}${prof.nome} ainda representa ${pct(prof.pct)} do faturamento total.`);
   const semOrigem = citar(c, "leads-sem-origem");
   if (semOrigem) at.push(`- Origem dos leads: ${semOrigem.titulo.charAt(0).toLowerCase()}${semOrigem.titulo.slice(1)}, o que impede medir o retorno das campanhas.`);
 
-  return { observacao: obs.join("\n\n"), destaques: dest.join("\n"), comercial: com.join("\n"), atencao: at.join("\n") };
+  return { observacao: obs.join("\n\n"), destaques: dest.join("\n"), comercial: com.join("\n"), atencao: at.map(capital).join("\n") };
 }
 
 /* ---------- WhatsApp ---------- */
@@ -188,7 +245,8 @@ export function textoWhatsApp(p: {
   secao("⚠️ Pontos de Atenção", p.texto.atencao);
   const acoes = p.acoes.filter((x) => x.titulo.trim());
   if (acoes.length) {
-    linhas.push("", `🎯 Plano de Ação`, "");
+    const proximo = p.tipo === "mensal" ? ` para ${capital(MESES[(Number(i.periodo.inicio.slice(5, 7))) % 12])}` : "";
+    linhas.push("", `🎯 Plano de Ação${proximo}`, "");
     acoes.forEach((x, n) => {
       linhas.push(`${n + 1}. ${x.titulo.trim()}`);
       linhas.push(`- Responsável: ${x.responsaveis.join(" + ") || "a definir"}${x.prazo ? ` · até ${x.prazo.slice(8, 10)}/${x.prazo.slice(5, 7)}` : ""}`);

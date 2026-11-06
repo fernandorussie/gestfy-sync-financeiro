@@ -69,7 +69,7 @@ export function Entrega({ r, estado, onConcluir, onEnviado, onReabrir, ocupado }
         </section>
         <section className="space-y-3 rounded-lg border bg-card p-4">
           <h2 className="text-sm font-semibold">Relatório em PDF</h2>
-          <p className="text-sm text-muted-foreground">Abre o relatório em páginas A4, na estrutura padrão Gestfy. Na tela que abrir, use “Salvar PDF”.</p>
+          <p className="text-sm text-muted-foreground">Abre o relatório em páginas A4, na estrutura padrão Gestfy. Na tela que abrir, use “Salvar PDF”. A página com a análise e o plano de ação é opcional e pode ser incluída por lá.</p>
           <Button asChild variant="outline">
             <a href={`/fechamentos-pdf/${f.id}`} target="_blank" rel="noopener noreferrer"><FileDown />Abrir PDF</a>
           </Button>

@@ -27,24 +27,27 @@ describe("rascunho do texto", () => {
     expect(r.observacao).toContain("Fala, Drs.! Segue o fechamento mensal de outubro da Claros Clinic.");
     expect(r.observacao).toContain("O faturamento caiu de R$ 152.945,00 em setembro para R$ 117.650,00 em outubro, uma redução de 23,1%.");
     expect(r.observacao).toContain("Atingimos 78,4% da meta de R$ 150.000,00, ficando R$ 32.350,00 abaixo do objetivo.");
-    expect(r.observacao).toContain("O volume de pacientes praticamente se manteve");
+    expect(r.observacao).toContain("Tivemos um período de atenção.");
+    expect(r.observacao).toContain("O principal ponto é que o volume de pacientes se manteve em 136.");
     expect(r.observacao).toContain("ticket médio caiu 23,1%");
   });
 
   it("cita pagamentos pontuais só quando o consultor escolheu citar", () => {
-    expect(r.observacao).toContain("pagamentos pontuais, que somaram R$ 47.738,07");
+    expect(r.observacao).toContain("outubro concentrou pagamentos de IRPJ, CSLL e despesas relacionadas a desligamento de colaborador, que somaram aproximadamente R$ 47,7 mil.");
+    expect(r.observacao).toContain("contra R$ 73.161,09 em setembro");
     const sem = rascunho({ clinica: "Claros Clinic", tipo: "mensal", indicadores, anterior, alertas, decisoes: decisoesVazias() });
-    expect(sem.observacao).not.toContain("pagamentos pontuais");
+    expect(sem.observacao).not.toContain("concentrou pagamentos");
   });
 
   it("destaques, comercial e pontos de atenção com números do motor", () => {
-    expect(r.destaques).toContain("- Plano de Acompanhamento: principal categoria, com R$ 28.200,00 (24,0% do faturamento).");
-    expect(r.destaques).toContain("respondeu por 90,3% do faturamento");
-    expect(r.comercial).toContain("- Leads e agendamentos: 100 leads e 25 agendamentos, conversão de 25%.");
-    expect(r.comercial).toContain("R$ 66.400,00 prescritos e R$ 40.500,00 fechados, conversão de 61% em valor");
-    expect(r.comercial).toContain("NPS 96 com 50 respostas");
-    expect(r.atencao).toContain("- Ticket médio: queda de 23,1%");
-    expect(r.atencao).toContain("- Meta: 78,4% de atingimento");
+    expect(r.destaques).toContain("- Plano de Acompanhamento: foi a principal categoria de outubro, com R$ 28.200,00, queda de 23,1% em relação a setembro.");
+    expect(r.destaques).toMatch(/Somando .+ e .+, tivemos R\$ [\d.,]+ a menos em faturamento\./);
+    expect(r.comercial).toContain("- Leads e agendamentos: tivemos 100 leads e 25 agendamentos, com conversão de 25%.");
+    expect(r.comercial).toContain("R$ 66.400,00 prescritos e R$ 40.500,00 em vendas registradas, com conversão de 61% em valor");
+    expect(r.comercial).toContain("52 foram registrados como vindos de Redes Sociais Clínica, além de 5 identificados como Google/Site");
+    expect(r.comercial).toContain("NPS de 96 em 50 respostas e 18 avaliações no Google, todas com 5 estrelas");
+    expect(r.atencao).toContain("- Faturamento e ticket: a queda de 23,1% no ticket médio impactou diretamente a receita, mesmo com praticamente o mesmo volume de pacientes atendidos.");
+    expect(r.atencao).toContain("- Concentração de receita: Dr. Alfa ainda representa 90,3% do faturamento total.");
   });
 });
 
@@ -63,6 +66,7 @@ describe("texto do WhatsApp", () => {
   it("seções vazias não aparecem; plano de ação com responsáveis e prazo", () => {
     expect(t).toContain("Observação:\n\nTexto da observação.");
     expect(t).not.toContain("Principais destaques");
+    expect(t).toContain("🎯 Plano de Ação para Novembro");
     expect(t).toContain("1. Follow-up dos orçamentos em aberto\n- Responsável: Recepção + Gestfy · até 20/11\n> Ação: Ligar para os 3 orçamentos em negociação.");
   });
 });
