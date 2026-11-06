@@ -6,8 +6,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { calcularFechamento, type ResultadoFechamento } from "@/lib/fechamentos/servidor";
 import { nomePeriodo } from "../../(app)/fechamentos/_components/formato";
-import { CSS, Relatorio, temAnalise } from "./relatorio";
-import { RelatorioQuinzenal } from "./relatorio-quinzenal";
+import { CSS, temAnalise } from "./relatorio";
+import { RelatorioEstruturado } from "./relatorio-estruturado";
 import { BotaoImprimir } from "./imprimir";
 
 const carregar = cache((id: string) => calcularFechamento(id));
@@ -25,7 +25,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function FechamentoPdfPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ analise?: string }> }) {
   const { id } = await params;
-  const comAnalise = (await searchParams).analise === "1";
+  const pedido = (await searchParams).analise;
   let r: ResultadoFechamento | null = null;
   let erro = "";
   try {
@@ -45,6 +45,10 @@ export default async function FechamentoPdfPage({ params, searchParams }: { para
   }
 
   const f = r.fechamento;
+  // A página de análise segue a estrutura da clínica; o link da barra pode ligar ou tirar só nesta visualização.
+  const naEstrutura = r.estrutura.some((s) => s.id === "analise" && s.ativa);
+  const comAnalise = pedido === "1" ? true : pedido === "0" ? false : naEstrutura;
+  const estrutura = r.estrutura.map((s) => (s.id === "analise" ? { ...s, ativa: comAnalise } : s));
   return (
     <div className="pdf py-6 font-sans text-[#1d1b22]">
       <style>{CSS}</style>
@@ -55,14 +59,14 @@ export default async function FechamentoPdfPage({ params, searchParams }: { para
         </div>
         <div className="flex flex-wrap items-center gap-3">
           {temAnalise(r) && (
-            <Link href={`/fechamentos-pdf/${f.id}${comAnalise ? "" : "?analise=1"}`} replace className="text-sm font-medium underline">
+            <Link href={`/fechamentos-pdf/${f.id}?analise=${comAnalise ? "0" : "1"}`} replace className="text-sm font-medium underline">
               {comAnalise ? "Tirar a página de análise" : "Incluir página de análise e plano de ação"}
             </Link>
           )}
           <BotaoImprimir />
         </div>
       </div>
-      {f.tipo === "quinzenal" ? <RelatorioQuinzenal r={r} comAnalise={comAnalise} /> : <Relatorio r={r} comAnalise={comAnalise} />}
+      <RelatorioEstruturado r={r} estrutura={estrutura} />
     </div>
   );
 }

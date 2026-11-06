@@ -9,6 +9,7 @@
 import { calcularRitmo, type Ritmo } from "./ritmo";
 import { limparFicha, type FichaClinica } from "./ficha";
 import { claudeConfigurado } from "./claude-api";
+import { normalizarEstrutura, type ItemSecao } from "./estrutura";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { readSheetValues } from "@/lib/google/sheets";
 import type { Fechamento, Json } from "@/lib/supabase/types";
@@ -59,6 +60,8 @@ export interface ResultadoFechamento {
   ficha: FichaClinica;
   /** A chave da API do Claude está configurada (gerar análise dentro do app). */
   iaLigada: boolean;
+  /** Seções do relatório (ordem, ligadas, nível). Concluído: a estrutura usada na conclusão. */
+  estrutura: ItemSecao[];
 }
 
 /** O que fica gravado ao concluir: tudo que a tela e o PDF precisam, só totais. */
@@ -71,6 +74,8 @@ interface Retrato {
   metaMensal: number | null;
   lidoEm: string;
   ritmo?: Ritmo | null;
+  /** Estrutura do relatório no momento da conclusão. */
+  estrutura?: ItemSecao[];
 }
 
 /* ---------- leitura ---------- */
@@ -150,12 +155,13 @@ export async function calcularFechamento(id: string, opcoes: { releitura?: boole
     equipe: lista<string>(config.equipe),
     ficha: limparFicha((config.ficha ?? {}) as Partial<FichaClinica>),
     iaLigada: claudeConfigurado(),
+    estrutura: normalizarEstrutura(((config as { relatorio?: Record<string, unknown> }).relatorio ?? {})[f.tipo], f.tipo),
   };
 
   const congelado = (f.status === "concluido" || f.status === "enviado") && !!f.snapshot;
   if (congelado) {
     const r = f.snapshot as unknown as Retrato;
-    return { ...comuns, ...r, ritmo: r.ritmo ?? null, pendentesGraves: gravesPendentes(r.alertas, decisoes).length, congelado: true };
+    return { ...comuns, ...r, ritmo: r.ritmo ?? null, estrutura: r.estrutura ? normalizarEstrutura(r.estrutura, f.tipo) : comuns.estrutura, pendentesGraves: gravesPendentes(r.alertas, decisoes).length, congelado: true };
   }
   const retrato = await calcularRetrato(f, config, decisoes, !!opcoes.releitura);
   await db.from("fechamentos").update({
@@ -221,7 +227,7 @@ export async function concluirFechamento(id: string): Promise<void> {
   if (r.congelado) return;
   if (r.pendentesGraves) throw new Error("Ainda há alertas graves sem decisão na conferência.");
   if (r.fontes.some((x) => x.erro && (x.fonte === "vendas" || x.fonte === "despesas"))) throw new Error("Vendas ou despesas não foram lidas. Corrija antes de concluir.");
-  const retrato: Retrato = { alertas: r.alertas, indicadores: r.indicadores, anterior: r.anterior, anual: r.anual, fontes: r.fontes, metaMensal: r.metaMensal, lidoEm: r.lidoEm, ritmo: r.ritmo };
+  const retrato: Retrato = { alertas: r.alertas, indicadores: r.indicadores, anterior: r.anterior, anual: r.anual, fontes: r.fontes, metaMensal: r.metaMensal, lidoEm: r.lidoEm, ritmo: r.ritmo, estrutura: r.estrutura };
   const agora = new Date().toISOString();
   await db.from("fechamentos").update({ status: "concluido", snapshot: retrato as unknown as Json, acompanhamento: r.acompanhamento as unknown as Json, concluido_em: agora, atualizado_em: agora }).eq("id", id);
 }

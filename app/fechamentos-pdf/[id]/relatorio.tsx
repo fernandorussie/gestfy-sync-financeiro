@@ -165,86 +165,111 @@ function GraficoLinhas({ r }: { r: ResultadoFechamento }) {
 
 
 
-function PaginaResultado({ r }: { r: ResultadoFechamento }) {
+type Nivel = { nivel?: string };
+
+export function SecResultadoMensal({ r }: { r: ResultadoFechamento }) {
   const i = r.indicadores, a = r.anterior;
-  const vs = r.fechamento.tipo === "mensal" ? `vs ${mesDe(a.periodo.inicio)}` : "vs anterior";
+  const vs = `vs ${mesDe(a.periodo.inicio)}`;
   const n = (atual?: number | null, antes?: number | null, custo?: boolean) => <><Var atual={atual} antes={antes} custo={custo} /> {vs}</>;
   return (
-    <Folha r={r} titulo="Resultado do mês">
-      <div className="grid grid-cols-4 gap-2.5">
-        <Kpi rotulo="Faturamento (entradas)" valor={brl0(i.faturamento?.total)} nota={n(i.faturamento?.total, a.faturamento?.total)} />
-        <Kpi rotulo="Despesas (saídas)" valor={brl0(i.despesas?.total)} nota={n(i.despesas?.total, a.despesas?.total, true)} />
-        <Kpi rotulo="Resultado de caixa" valor={brl0(i.caixa?.resultado)} nota={i.caixa?.margem != null ? `${pct(i.caixa.margem)} da receita` : undefined} />
-        <Kpi rotulo="Atingimento da meta" valor={i.meta ? pct(i.meta.atingimento) : "—"} nota={i.meta ? `meta ${brl0(i.meta.valor)}` : "sem meta"} />
-        <Kpi rotulo="Pacientes atendidos" valor={num(i.pacientes?.atendidos)} nota={n(i.pacientes?.atendidos, a.pacientes?.atendidos)} />
-        <Kpi rotulo="Ticket médio" valor={brl(i.pacientes?.ticketMedio)} nota={n(i.pacientes?.ticketMedio, a.pacientes?.ticketMedio)} />
-        <Kpi rotulo="Pacientes novos" valor={num(i.pacientes?.novos)} nota={n(i.pacientes?.novos, a.pacientes?.novos)} />
-        <Kpi rotulo="Ticket médio dos novos" valor={brl(i.pacientes?.ticketNovos)} nota={n(i.pacientes?.ticketNovos, a.pacientes?.ticketNovos)} />
-      </div>
-
-      <div className="pdf-bloco">
-        <Titulo extra={<><span className="mr-1 inline-block h-[3px] w-3 align-middle" style={{ background: ROXO }} />Faturamento<span className="ml-3 mr-1 inline-block h-[2px] w-3 align-middle" style={{ background: LARANJA }} />Despesas pagas</>}>Faturamento e despesas em {r.periodo.fim.slice(0, 4)}</Titulo>
-        <GraficoLinhas r={r} />
-      </div>
-
-      <div className="grid grid-cols-2 gap-8">
-        <div className="pdf-bloco space-y-4">
-          <div>
-            <Titulo>Funil de leads</Titulo>
-            {i.leads ? (
-              <Linhas itens={[
-                { nome: "Leads", valor: num(i.leads.total) },
-                { nome: "Agendaram", valor: num(i.leads.agendados) },
-                { nome: "Conversão", valor: pct(i.leads.conversao, 0), destaque: true },
-              ]} />
-            ) : <p className="text-[11px]" style={{ color: CINZA }}>Planilha de leads não configurada.</p>}
-          </div>
-          {i.leads && <div><Titulo>Origem</Titulo><Linhas itens={contagens(i.leads.porOrigem, 6)} /></div>}
-        </div>
-        <div className="pdf-bloco space-y-4">
-          <div>
-            <Titulo>Orçamentos</Titulo>
-            {i.orcamentos ? (
-              <Linhas itens={[
-                { nome: "Gerados", valor: `${i.orcamentos.total} · ${brl0(i.orcamentos.valorGerado)}` },
-                { nome: "Fechados", valor: `${i.orcamentos.fechados} · ${brl0(i.orcamentos.valorFechado)}` },
-                { nome: "Em negociação", valor: `${i.orcamentos.emAberto} · ${brl0(i.orcamentos.valorEmAberto)}` },
-                { nome: "Conversão em valor", valor: pct(i.orcamentos.conversaoValor, 0), destaque: true },
-              ]} />
-            ) : <p className="text-[11px]" style={{ color: CINZA }}>Planilha de orçamentos não configurada.</p>}
-          </div>
-          {i.leads && <div><Titulo>Principais objeções</Titulo><Linhas itens={contagens(i.leads.porObjecao, 5, true)} /></div>}
-        </div>
-      </div>
-
-      <div className="pdf-bloco">
-        <Titulo>Experiência do paciente</Titulo>
-        {i.nps || i.google ? (
-          <div className="grid grid-cols-4 gap-2.5">
-            {i.nps && <Kpi rotulo="NPS" valor={num(i.nps.nps)} nota={`${i.nps.respostas} respostas`} />}
-            {i.nps && <Kpi rotulo="Recepção" valor={num(i.nps.notas.recepcao, i.nps.notas.recepcao === 5 ? 1 : 2)} nota="de 5" />}
-            {i.nps && <Kpi rotulo="Profissional" valor={num(i.nps.notas.profissional, i.nps.notas.profissional === 5 ? 1 : 2)} nota="de 5" />}
-            {i.google && <Kpi rotulo="Google" valor={num(i.google.nota, 1)} nota={`${i.google.avaliacoes} avaliações`} />}
-          </div>
-        ) : <p className="text-[11px]" style={{ color: CINZA }}>Planilha de NPS não configurada.</p>}
-      </div>
-    </Folha>
+    <div className="grid grid-cols-4 gap-2.5">
+      <Kpi rotulo="Faturamento (entradas)" valor={brl0(i.faturamento?.total)} nota={n(i.faturamento?.total, a.faturamento?.total)} />
+      <Kpi rotulo="Despesas (saídas)" valor={brl0(i.despesas?.total)} nota={n(i.despesas?.total, a.despesas?.total, true)} />
+      <Kpi rotulo="Resultado de caixa" valor={brl0(i.caixa?.resultado)} nota={i.caixa?.margem != null ? `${pct(i.caixa.margem)} da receita` : undefined} />
+      <Kpi rotulo="Atingimento da meta" valor={i.meta ? pct(i.meta.atingimento) : "—"} nota={i.meta ? `meta ${brl0(i.meta.valor)}` : "sem meta"} />
+      <Kpi rotulo="Pacientes atendidos" valor={num(i.pacientes?.atendidos)} nota={n(i.pacientes?.atendidos, a.pacientes?.atendidos)} />
+      <Kpi rotulo="Ticket médio" valor={brl(i.pacientes?.ticketMedio)} nota={n(i.pacientes?.ticketMedio, a.pacientes?.ticketMedio)} />
+      <Kpi rotulo="Pacientes novos" valor={num(i.pacientes?.novos)} nota={n(i.pacientes?.novos, a.pacientes?.novos)} />
+      <Kpi rotulo="Ticket médio dos novos" valor={brl(i.pacientes?.ticketNovos)} nota={n(i.pacientes?.ticketNovos, a.pacientes?.ticketNovos)} />
+    </div>
   );
+}
+
+export function SecGrafico({ r }: { r: ResultadoFechamento }) {
+  return (
+    <div className="pdf-bloco">
+      <Titulo extra={<><span className="mr-1 inline-block h-[3px] w-3 align-middle" style={{ background: ROXO }} />Faturamento<span className="ml-3 mr-1 inline-block h-[2px] w-3 align-middle" style={{ background: LARANJA }} />Despesas pagas</>}>Faturamento e despesas em {r.periodo.fim.slice(0, 4)}</Titulo>
+      <GraficoLinhas r={r} />
+    </div>
+  );
+}
+
+export function SecFunilLeadsMensal({ r, nivel }: { r: ResultadoFechamento } & Nivel) {
+  const i = r.indicadores;
+  return (
+    <div className="pdf-bloco space-y-4">
+      <div>
+        <Titulo>Funil de leads</Titulo>
+        {i.leads ? (
+          <Linhas itens={[
+            { nome: "Leads", valor: num(i.leads.total) },
+            { nome: "Agendaram", valor: num(i.leads.agendados) },
+            { nome: "Conversão", valor: pct(i.leads.conversao, 0), destaque: true },
+          ]} />
+        ) : <p className="text-[11px]" style={{ color: CINZA }}>Planilha de leads não configurada.</p>}
+      </div>
+      {i.leads && nivel !== "resumo" && <div><Titulo>Origem</Titulo><Linhas itens={contagens(i.leads.porOrigem, 6)} /></div>}
+    </div>
+  );
+}
+
+export function SecFunilOrcamentosMensal({ r, nivel }: { r: ResultadoFechamento } & Nivel) {
+  const i = r.indicadores;
+  return (
+    <div className="pdf-bloco space-y-4">
+      <div>
+        <Titulo>Orçamentos</Titulo>
+        {i.orcamentos ? (
+          <Linhas itens={[
+            { nome: "Gerados", valor: `${i.orcamentos.total} · ${brl0(i.orcamentos.valorGerado)}` },
+            { nome: "Fechados", valor: `${i.orcamentos.fechados} · ${brl0(i.orcamentos.valorFechado)}` },
+            { nome: "Em negociação", valor: `${i.orcamentos.emAberto} · ${brl0(i.orcamentos.valorEmAberto)}` },
+            { nome: "Conversão em valor", valor: pct(i.orcamentos.conversaoValor, 0), destaque: true },
+          ]} />
+        ) : <p className="text-[11px]" style={{ color: CINZA }}>Planilha de orçamentos não configurada.</p>}
+      </div>
+      {i.leads && nivel !== "resumo" && <div><Titulo>Principais objeções</Titulo><Linhas itens={contagens(i.leads.porObjecao, 5, true)} /></div>}
+    </div>
+  );
+}
+
+export function SecExperiencia({ r }: { r: ResultadoFechamento }) {
+  const i = r.indicadores;
+  return (
+    <div className="pdf-bloco">
+      <Titulo>Experiência do paciente</Titulo>
+      {i.nps || i.google ? (
+        <div className="grid grid-cols-4 gap-2.5">
+          {i.nps && <Kpi rotulo="NPS" valor={num(i.nps.nps)} nota={`${i.nps.respostas} respostas`} />}
+          {i.nps && <Kpi rotulo="Recepção" valor={num(i.nps.notas.recepcao, i.nps.notas.recepcao === 5 ? 1 : 2)} nota="de 5" />}
+          {i.nps && <Kpi rotulo="Profissional" valor={num(i.nps.notas.profissional, i.nps.notas.profissional === 5 ? 1 : 2)} nota="de 5" />}
+          {i.google && <Kpi rotulo="Google" valor={num(i.google.nota, 1)} nota={`${i.google.avaliacoes} avaliações`} />}
+        </div>
+      ) : <p className="text-[11px]" style={{ color: CINZA }}>Planilha de NPS não configurada.</p>}
+    </div>
+  );
+}
+
+/** Categorias de receita para as tabelas: catálogo + as que zeraram, em ordem alfabética. */
+export function categoriasReceita(r: ResultadoFechamento, nivel?: string) {
+  const i = r.indicadores, a = r.anterior;
+  const antes = new Map((a.faturamento?.porGrupo ?? []).map((g) => [chave(g.nome), g]));
+  const atuais = i.faturamento?.porGrupo ?? [];
+  const sumiram = (a.faturamento?.porGrupo ?? []).filter((g) => g.valor > 0 && !atuais.some((x) => chave(x.nome) === chave(g.nome)));
+  const linhas = [...atuais, ...sumiram.map((g) => ({ nome: g.nome, valor: 0, quantidade: 0, ticket: 0, pct: 0 }))]
+    .filter((g) => nivel !== "com_valor" || g.valor || g.quantidade || antes.get(chave(g.nome))?.valor)
+    .sort(ordemAlfabetica);
+  return { linhas, antes };
 }
 
 /* ---------- 2. receitas ---------- */
 
-function PaginaReceitas({ r }: { r: ResultadoFechamento }) {
+export function SecReceitasMensal({ r, nivel }: { r: ResultadoFechamento } & Nivel) {
   const i = r.indicadores, a = r.anterior;
-  const antes = new Map((a.faturamento?.porGrupo ?? []).map((g) => [chave(g.nome), g]));
-  const atuais = i.faturamento?.porGrupo ?? [];
-  // Categorias que faturaram no mês anterior e zeraram agora também aparecem.
-  const sumiram = (a.faturamento?.porGrupo ?? []).filter((g) => g.valor > 0 && !atuais.some((x) => chave(x.nome) === chave(g.nome)));
-  // Todas as categorias do catálogo (inclusive zeradas), em ordem alfabética.
-  const linhas = [...atuais, ...sumiram.map((g) => ({ nome: g.nome, valor: 0, quantidade: 0, ticket: 0, pct: 0 }))].sort(ordemAlfabetica);
+  const { linhas, antes } = categoriasReceita(r, nivel);
   const mesA = mesDe(a.periodo.inicio);
   return (
-    <Folha r={r} titulo="Receitas detalhadas">
+    <>
       <table className="w-full text-[11px]">
         <Cabecalho colunas={[{ t: "Categoria" }, { t: "Valor", dir: true }, { t: `vs ${mesA.slice(0, 3)}`, dir: true }, { t: "Qtd.", dir: true }, { t: "Ticket médio", dir: true }, { t: `vs ${mesA.slice(0, 3)}`, dir: true }, { t: "% fat.", dir: true }]} />
         <tbody>
@@ -274,7 +299,7 @@ function PaginaReceitas({ r }: { r: ResultadoFechamento }) {
         </tbody>
       </table>
       <p className="text-[10px]" style={{ color: CINZA }}>Variação em relação a {mesA}. O ticket médio do total é por paciente atendido; o das categorias, por lançamento.</p>
-    </Folha>
+    </>
   );
 }
 
@@ -283,7 +308,7 @@ function PaginaReceitas({ r }: { r: ResultadoFechamento }) {
 /** Aumento que merece destaque: mais de 10% e pelo menos R$ 300, ou categoria nova acima de R$ 300. */
 const aumentoRelevante = (atual: number, antes: number) => atual - antes >= 300 && (!antes || atual / antes - 1 > 0.1);
 
-function PaginaDespesas({ r }: { r: ResultadoFechamento }) {
+export function SecDespesas({ r, nivel }: { r: ResultadoFechamento } & Nivel) {
   const i = r.indicadores, a = r.anterior;
   const temAnterior = !!a.despesas?.total;
   const gruposA = new Map((a.despesas?.porGrupo ?? []).map((g) => [chave(g.nome), g]));
@@ -310,7 +335,7 @@ function PaginaDespesas({ r }: { r: ResultadoFechamento }) {
   };
 
   return (
-    <Folha r={r} titulo="Despesas detalhadas" compacta>
+    <>
       {aumentos.length > 0 && (
         <div className="pdf-bloco">
           <Titulo extra={`regime de caixa · em vermelho, o que subiu mais de 10% (e ao menos R$ 300) em relação a ${mesA}`}>O que mais aumentou</Titulo>
@@ -333,7 +358,7 @@ function PaginaDespesas({ r }: { r: ResultadoFechamento }) {
             const igual = g.categorias.length === 1 && g.categorias[0].nome === g.nome;
             return [
               <Linha key={g.nome} nome={g.nome} atual={g.valor} antes={ga?.valor ?? 0} grupo />,
-              ...(igual ? [] : g.categorias.map((c) => <Linha key={g.nome + c.nome} nome={c.nome} atual={c.valor} antes={catA.get(`${chave(g.nome)}|${chave(c.nome)}`) ?? 0} />)),
+              ...(igual || nivel === "grupos" ? [] : g.categorias.map((c) => <Linha key={g.nome + c.nome} nome={c.nome} atual={c.valor} antes={catA.get(`${chave(g.nome)}|${chave(c.nome)}`) ?? 0} />)),
             ];
           })}
           <tr className="border-t-2 font-semibold" style={{ borderColor: ROXO }}>
@@ -345,7 +370,7 @@ function PaginaDespesas({ r }: { r: ResultadoFechamento }) {
           </tr>
         </tbody>
       </table>
-    </Folha>
+    </>
   );
 }
 
@@ -384,28 +409,29 @@ function TabelaRegime({ r, regime }: { r: ResultadoFechamento; regime: "caixa" |
   );
 }
 
-function PaginaAno({ r }: { r: ResultadoFechamento }) {
-  const ano = r.periodo.fim.slice(0, 4);
+export function SecRegimes({ r, nivel }: { r: ResultadoFechamento } & Nivel) {
   return (
-    <Folha r={r} titulo={`Resultado em ${ano}: caixa e competência`}>
+    <>
       <div className="pdf-bloco">
         <Titulo extra="despesas no mês em que foram pagas">Regime de caixa</Titulo>
         <TabelaRegime r={r} regime="caixa" />
       </div>
-      <div className="pdf-bloco">
-        <Titulo extra="despesas no mês a que se referem · receita pela data de atendimento nos dois regimes">Regime de competência</Titulo>
-        <TabelaRegime r={r} regime="competencia" />
-      </div>
-    </Folha>
+      {nivel !== "caixa" && (
+        <div className="pdf-bloco">
+          <Titulo extra="despesas no mês a que se referem · receita pela data de atendimento nos dois regimes">Regime de competência</Titulo>
+          <TabelaRegime r={r} regime="competencia" />
+        </div>
+      )}
+    </>
   );
 }
 
 /* ---------- 5. análise (opcional) ---------- */
 
-export function PaginaAnalise({ r, cor = ROXO }: { r: ResultadoFechamento; cor?: string }) {
+export function SecAnalise({ r, cor = ROXO }: { r: ResultadoFechamento; cor?: string }) {
   const secoes: [string, string][] = [["Observação", r.texto.observacao], ["Principais destaques", r.texto.destaques], ["Indicadores comerciais", r.texto.comercial], ["Pontos de atenção", r.texto.atencao]];
   return (
-    <Folha r={r} titulo="Análise e plano de ação" cor={cor}>
+    <>
       {secoes.filter(([, t]) => t.trim()).map(([t, corpo]) => (
         <div key={t}><Titulo cor={cor}>{t}</Titulo><div className="whitespace-pre-wrap text-[12px] leading-relaxed">{corpo.trim()}</div></div>
       ))}
@@ -430,23 +456,10 @@ export function PaginaAnalise({ r, cor = ROXO }: { r: ResultadoFechamento; cor?:
           </ol>
         </div>
       )}
-    </Folha>
+    </>
   );
 }
 
 export function temAnalise(r: ResultadoFechamento) {
   return [r.texto.observacao, r.texto.destaques, r.texto.comercial, r.texto.atencao].some((t) => t.trim()) || r.acoes.length > 0;
 }
-
-export function Relatorio({ r, comAnalise = false }: { r: ResultadoFechamento; comAnalise?: boolean }) {
-  return (
-    <>
-      <PaginaResultado r={r} />
-      <PaginaReceitas r={r} />
-      <PaginaDespesas r={r} />
-      <PaginaAno r={r} />
-      {comAnalise && temAnalise(r) && <PaginaAnalise r={r} />}
-    </>
-  );
-}
-

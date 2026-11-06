@@ -183,3 +183,19 @@ do cliente e lê a resposta de volta (proposta: https://claude.ai/artifact/79NGW
   custo aproximado.
 - Fluxo: 1. Gerar com o Claude (app) → 2. Copiar para o projeto do cliente (o pacote leva o texto e o
   plano já rascunhados para refinar) → 3. Colar resposta.
+
+## Etapa v2.2 — relatório em seções e editor de estrutura (06/11)
+
+- `lib/fechamentos/estrutura.ts`: catálogo de seções (resultado, gráfico, ritmo, caixa do mês, funil de
+  leads, funil de orçamentos, experiência, receitas, despesas, caixa e competência, análise), com tipo
+  (mensal/quinzenal), nível de detalhe e quais são **fixas** (padrão mínimo Gestfy: resultado,
+  receitas, despesas no mensal; resultado, ritmo e receitas no quinzenal). `normalizarEstrutura` junta
+  o que foi salvo com o catálogo; `paginar` agrupa: seções grandes abrem página, pequenas seguem juntas.
+- Banco: `fechamento_config.relatorio` (migração 008). Sem configuração = padrão (relatório idêntico ao
+  anterior). Ao concluir, a estrutura vai no retrato congelado.
+- PDF: `relatorio-estruturado.tsx` monta as páginas a partir da estrutura; seções em `relatorio.tsx`
+  (mensal) e `relatorio-quinzenal.tsx`. Os dois funis ficam lado a lado quando estão em sequência.
+  Página de análise segue a estrutura; o link da barra liga/tira só naquela visualização.
+- Tela: card "Estrutura do relatório" em Configurar (abas Mensal/Quinzenal, subir/descer, mostrar,
+  nível, mapa das páginas, voltar ao padrão).
+- WhatsApp: "Caixa do mês" desligado tira a linha do valor a pagar no quinzenal.

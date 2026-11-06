@@ -13,6 +13,7 @@ import { calcularFechamento, concluirFechamento, lerDecisoes, limparCache, perio
 import type { Acao, Acompanhamento, TextoFechamento } from "@/lib/fechamentos/texto-fechamento";
 import { limparFicha, type FichaClinica } from "@/lib/fechamentos/ficha";
 import { montarPacote } from "@/lib/fechamentos/pacote-ia";
+import { limparEstrutura, type EstruturaRelatorio } from "@/lib/fechamentos/estrutura";
 import { chamarClaude, claudeConfigurado } from "@/lib/fechamentos/claude-api";
 
 type Resposta<T> = { ok: true; dados: T } | { ok: false; erro: string };
@@ -148,6 +149,21 @@ export async function salvarFicha(p: { clinicaId: string; ficha: FichaClinica })
   if (error) return { ok: false, erro: /ficha/.test(error.message) ? "Falta rodar a atualização do banco 007_ficha_clinica.sql no Supabase." : "Não foi possível salvar a ficha." };
   revalidatePath(`/fechamentos/configurar/${p.clinicaId}`);
   return { ok: true, dados: ficha };
+}
+
+/** Estrutura do relatório da clínica (seções, ordem e nível), mensal e quinzenal. */
+export async function salvarEstrutura(p: { clinicaId: string; estrutura: EstruturaRelatorio }): Promise<Resposta<Required<EstruturaRelatorio>>> {
+  const bloqueio = await limite(); if (bloqueio) return { ok: false, erro: bloqueio };
+  const estrutura = limparEstrutura(p.estrutura) as Required<EstruturaRelatorio>;
+  const db = getSupabaseAdmin();
+  const { data: atual } = await db.from("fechamento_config").select("clinica_id").eq("clinica_id", p.clinicaId).maybeSingle();
+  const { error } = atual
+    ? await db.from("fechamento_config").update({ relatorio: estrutura as unknown as Json, atualizado_em: new Date().toISOString() }).eq("clinica_id", p.clinicaId)
+    : await db.from("fechamento_config").insert({ clinica_id: p.clinicaId, relatorio: estrutura as unknown as Json });
+  if (error) return { ok: false, erro: /relatorio/.test(error.message) ? "Falta rodar a atualização do banco 008_estrutura_relatorio.sql no Supabase." : "Não foi possível salvar a estrutura." };
+  limparCache(p.clinicaId);
+  revalidatePath(`/fechamentos/configurar/${p.clinicaId}`);
+  return { ok: true, dados: estrutura };
 }
 
 /* ---------- análise e entrega ---------- */

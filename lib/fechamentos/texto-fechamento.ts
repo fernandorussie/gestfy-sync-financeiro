@@ -250,6 +250,8 @@ export function textoWhatsApp(p: {
   texto: TextoFechamento;
   acoes: Acao[];
   ritmo?: Ritmo | null;
+  /** Seções desligadas na estrutura do relatório (ex.: "caixaMes" tira a linha do valor a pagar). */
+  ocultas?: string[];
 }): string {
   const i = p.indicadores, a = p.anterior;
   const r = p.tipo === "quinzenal" ? p.ritmo ?? null : null;
@@ -268,7 +270,7 @@ export function textoWhatsApp(p: {
   } else if (i.meta) linhas.push(`🎯 Meta: ${brl(i.meta.valor)} | Atingimento: ${pct(i.meta.atingimento)}`);
   linhas.push("");
   if (i.despesas) linhas.push(`💳 Saídas ${r ? "pagas até o dia 15" : "no período"}: ${brl(i.despesas.total)}`);
-  if (r && r.provisionado !== null) linhas.push(`🧾 A pagar até o fim do mês (pela média de ${r.mesesMedia.length === 1 ? "1 mês" : `${r.mesesMedia.length} meses`}): ${brl(r.provisionado)}`);
+  if (r && r.provisionado !== null && !p.ocultas?.includes("caixaMes")) linhas.push(`🧾 A pagar até o fim do mês (pela média de ${r.mesesMedia.length === 1 ? "1 mês" : `${r.mesesMedia.length} meses`}): ${brl(r.provisionado)}`);
   if (i.caixa) linhas.push(`💵 Saldo de caixa no período: ${brl(i.caixa.resultado)}`);
   const secao = (rotuloSecao: string, corpo: string) => { if (corpo.trim()) linhas.push("", rotuloSecao, "", corpo.trim()); };
   secao("Observação:", p.texto.observacao);

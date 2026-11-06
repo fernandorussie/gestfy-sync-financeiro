@@ -8,6 +8,8 @@ import type { FontesFechamento } from "@/lib/fechamentos/coleta";
 import { limparFicha, type FichaClinica } from "@/lib/fechamentos/ficha";
 import { ConfigurarClient } from "./configurar-client";
 import { FichaClinicaCard } from "./ficha-clinica";
+import { EstruturaRelatorioCard } from "./estrutura-relatorio";
+import { limparEstrutura, type EstruturaRelatorio } from "@/lib/fechamentos/estrutura";
 
 export default async function ConfigurarPage({ params }: { params: Promise<{ clinicaId: string }> }) {
   const { clinicaId } = await params;
@@ -28,6 +30,7 @@ export default async function ConfigurarPage({ params }: { params: Promise<{ cli
         </p>
       </div>
       <ConfigurarClient clinicaId={clinica.id} inicial={(config?.fontes ?? {}) as unknown as FontesFechamento} />
+      <EstruturaRelatorioCard clinicaId={clinica.id} inicial={limparEstrutura((config as { relatorio?: unknown } | null)?.relatorio) as Required<EstruturaRelatorio>} />
       <FichaClinicaCard clinicaId={clinica.id} clinicaNome={clinica.nome} inicial={limparFicha(((config as { ficha?: unknown } | null)?.ficha ?? {}) as Partial<FichaClinica>)} />
     </div>
   );
