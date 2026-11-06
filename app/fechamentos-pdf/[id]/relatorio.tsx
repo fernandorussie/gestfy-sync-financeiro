@@ -46,9 +46,9 @@ export function Folha({ r, titulo, children, compacta, cor = ROXO, selo }: { r: 
     <section className="pdf-folha">
       <header className="mb-5 flex items-end justify-between border-b-2 pb-3" style={{ borderColor: cor }}>
         <div>
-          <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: cor === ROXO ? LARANJA : CINZA }}>
-            {selo && <span className="rounded px-1.5 py-0.5 text-[9px] text-white" style={{ background: cor }}>{selo}</span>}
-            {r.clinicaNome} · {f.tipo === "mensal" ? "Fechamento mensal" : "Relatório quinzenal"} · {nomePeriodo(f.tipo, f.inicio, f.fim)}
+          <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em]" style={{ color: CINZA }}>
+            <span className="rounded px-1.5 py-0.5 text-[9px] text-white" style={{ background: cor }}>{selo ?? (f.tipo === "mensal" ? "Mensal" : "Quinzenal")}</span>
+            {r.clinicaNome} · {f.tipo === "mensal" ? "Relatório mensal" : "Relatório quinzenal"} · {nomePeriodo(f.tipo, f.inicio, f.fim)}
           </p>
           <h2 className="font-heading text-xl font-semibold" style={{ color: cor }}>{titulo}</h2>
         </div>
@@ -389,7 +389,7 @@ function PaginaAno({ r }: { r: ResultadoFechamento }) {
 export function PaginaAnalise({ r, cor = ROXO }: { r: ResultadoFechamento; cor?: string }) {
   const secoes: [string, string][] = [["Observação", r.texto.observacao], ["Principais destaques", r.texto.destaques], ["Indicadores comerciais", r.texto.comercial], ["Pontos de atenção", r.texto.atencao]];
   return (
-    <Folha r={r} titulo="Análise e plano de ação" cor={cor} selo={r.fechamento.tipo === "quinzenal" ? "Quinzenal" : undefined}>
+    <Folha r={r} titulo="Análise e plano de ação" cor={cor}>
       {secoes.filter(([, t]) => t.trim()).map(([t, corpo]) => (
         <div key={t}><Titulo cor={cor}>{t}</Titulo><div className="whitespace-pre-wrap text-[12px] leading-relaxed">{corpo.trim()}</div></div>
       ))}
