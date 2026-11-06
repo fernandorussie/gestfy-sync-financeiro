@@ -8,6 +8,7 @@
  */
 import { calcularRitmo, type Ritmo } from "./ritmo";
 import { limparFicha, type FichaClinica } from "./ficha";
+import { claudeConfigurado } from "./claude-api";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { readSheetValues } from "@/lib/google/sheets";
 import type { Fechamento, Json } from "@/lib/supabase/types";
@@ -56,6 +57,8 @@ export interface ResultadoFechamento {
   equipe: string[];
   /** Ficha da clínica (contexto para o Claude). Vazia até ser preenchida. */
   ficha: FichaClinica;
+  /** A chave da API do Claude está configurada (gerar análise dentro do app). */
+  iaLigada: boolean;
 }
 
 /** O que fica gravado ao concluir: tudo que a tela e o PDF precisam, só totais. */
@@ -146,6 +149,7 @@ export async function calcularFechamento(id: string, opcoes: { releitura?: boole
     acompanhamento: salvoAcomp.length ? salvoAcomp : await acoesDoAnterior(f),
     equipe: lista<string>(config.equipe),
     ficha: limparFicha((config.ficha ?? {}) as Partial<FichaClinica>),
+    iaLigada: claudeConfigurado(),
   };
 
   const congelado = (f.status === "concluido" || f.status === "enviado") && !!f.snapshot;

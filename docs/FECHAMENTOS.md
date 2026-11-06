@@ -172,3 +172,14 @@ do cliente e lê a resposta de volta (proposta: https://claude.ai/artifact/79NGW
   Ação e Como medir. Sem títulos, tudo vai para a Observação com aviso.
 - Tela: card "Análise com o Claude" no topo da aba Análise (copiar, colar, revisar, aplicar;
   substituir ou adicionar ao plano).
+
+## Etapa v2.1b — gerar com o Claude dentro do app (06/11)
+
+- `lib/fechamentos/claude-api.ts`: chamada à API da Anthropic (Messages), só no servidor. Liga com
+  `ANTHROPIC_API_KEY` na Vercel; modelo em `ANTHROPIC_MODEL` (padrão `claude-sonnet-5-5`). Dados da
+  API não são usados para treino por padrão (termos comerciais).
+- Ação `gerarComClaude`: monta o pacote com `destino: "api"` (contexto = ficha + ações anteriores,
+  sem citar "projeto") e devolve o texto; a tela lê seções e plano para revisar e aplicar, e mostra o
+  custo aproximado.
+- Fluxo: 1. Gerar com o Claude (app) → 2. Copiar para o projeto do cliente (o pacote leva o texto e o
+  plano já rascunhados para refinar) → 3. Colar resposta.

@@ -135,3 +135,38 @@ não informado`, fichaVazia());
     expect(ficha).toMatchObject({ cidade: "Goiânia", uf: "GO", segmento: "Clínica médica", modelo: "particular", perfil: "- Emagrecimento e saúde da mulher", evitar: "" });
   });
 });
+
+import { chamarClaude } from "../claude-api";
+
+describe("geração dentro do app (API do Claude)", () => {
+  it("instruções do destino api não falam do projeto e o plano rascunhado vai junto", () => {
+    const p = montarPacote({ ...base, acoes: [{ id: "1", titulo: "Follow-up", descricao: "Ligar", responsaveis: ["Recepção"], prazo: "2026-11-20", indicador: "" }] }, { destino: "api" });
+    expect(p).toContain("Use a ficha da clínica e as ações anteriores");
+    expect(p).not.toContain("neste projeto");
+    expect(p).toContain("## Plano de ação já rascunhado");
+    expect(p).toContain("1. Follow-up\nResponsável: Recepção\nPrazo: 20/11/2026\nAção: Ligar");
+  });
+
+  it("chama a API com a chave e devolve texto e tokens", async () => {
+    process.env.ANTHROPIC_API_KEY = "teste";
+    let corpo: { model: string; messages: { content: string }[] } | null = null;
+    let cab: Record<string, string> = {};
+    const fetchFn = (async (_url: string, init: RequestInit) => {
+      corpo = JSON.parse(String(init.body)); cab = init.headers as Record<string, string>;
+      return new Response(JSON.stringify({ content: [{ type: "text", text: "### OBSERVAÇÃO\nOk" }], usage: { input_tokens: 1000, output_tokens: 200 } }), { status: 200 });
+    }) as unknown as typeof fetch;
+    const r = await chamarClaude("pacote", { fetchFn });
+    expect(r).toMatchObject({ texto: "### OBSERVAÇÃO\nOk", tokensEntrada: 1000, tokensSaida: 200, modelo: "claude-sonnet-5-5" });
+    expect(cab["x-api-key"]).toBe("teste");
+    expect(corpo!.messages[0].content).toBe("pacote");
+  });
+
+  it("mensagens claras para chave recusada e sem créditos", async () => {
+    process.env.ANTHROPIC_API_KEY = "teste";
+    const resp = (status: number, erro: object) => (async () => new Response(JSON.stringify({ error: erro }), { status })) as unknown as typeof fetch;
+    await expect(chamarClaude("x", { fetchFn: resp(401, { type: "authentication_error" }) })).rejects.toThrow("chave da API do Claude foi recusada");
+    await expect(chamarClaude("x", { fetchFn: resp(400, { type: "invalid_request_error", message: "Your credit balance is too low" }) })).rejects.toThrow("sem créditos");
+    delete process.env.ANTHROPIC_API_KEY;
+    await expect(chamarClaude("x")).rejects.toThrow("ANTHROPIC_API_KEY");
+  });
+});

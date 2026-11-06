@@ -48,10 +48,13 @@ export function apelidosProfissionais(i: Indicadores, a: Indicadores): Map<strin
   return m;
 }
 
+const CONTEXTO_PROJETO = "- Use o que você sabe desta clínica neste projeto (histórico, particularidades, combinados) para explicar os números. Não invente números: use só os que estão aqui.";
+const CONTEXTO_API = "- Use a ficha da clínica e as ações anteriores, abaixo, como contexto do cliente. Não invente números nem fatos: use só o que está aqui. Quando faltar contexto para explicar uma variação, descreva o que os números mostram sem supor a causa.";
+
 const INSTRUCOES = `Você é o analista financeiro da Gestfy, consultoria de gestão de clínicas. Escreva a análise do fechamento abaixo para enviar aos sócios da clínica por WhatsApp.
 
 Como escrever:
-- Use o que você sabe desta clínica neste projeto (histórico, particularidades, combinados) para explicar os números. Não invente números: use só os que estão aqui.
+{{CONTEXTO}}
 - Tom: direto, próximo e consultivo, como a Gestfy escreve. Comece a observação com "Fala, Drs.!" (ou o tratamento que a clínica usa).
 - Compare sempre com o período anterior e explique o porquê das variações (volume × ticket, categorias que subiram ou caíram, pagamentos pontuais).
 - Destaques, comercial e pontos de atenção: um item por linha, começando com "- Tema: ...", sempre com número.
@@ -78,7 +81,11 @@ Prazo: dd/mm/aaaa (ou "sem prazo")
 Ação: o que fazer, em 1 ou 2 frases
 Como medir: indicador que mostra se funcionou`;
 
-export function montarPacote(d: DadosPacote, opcoes: { anonimizar?: boolean } = {}): string {
+/**
+ * `destino`: "projeto" = para colar no projeto do cliente no claude.ai (o Claude
+ * já conhece o histórico); "api" = geração dentro do app, só com a ficha.
+ */
+export function montarPacote(d: DadosPacote, opcoes: { anonimizar?: boolean; destino?: "projeto" | "api" } = {}): string {
   const i = d.indicadores, a = d.anterior;
   const apelidos = opcoes.anonimizar ? apelidosProfissionais(i, a) : new Map<string, string>();
   const prof = (nome: string) => apelidos.get(nome) ?? nome;
@@ -90,7 +97,7 @@ export function montarPacote(d: DadosPacote, opcoes: { anonimizar?: boolean } = 
   const L: string[] = [];
   const sec = (t: string) => L.push("", `## ${t}`, "");
 
-  L.push(INSTRUCOES, "", "---", "", `# Fechamento ${d.tipo === "mensal" ? "mensal" : "quinzenal (parcial do dia 1 ao 15)"} · ${d.clinica} · ${A.nome}/${i.periodo.inicio.slice(0, 4)}`);
+  L.push(INSTRUCOES.replace("{{CONTEXTO}}", opcoes.destino === "api" ? CONTEXTO_API : CONTEXTO_PROJETO), "", "---", "", `# Fechamento ${d.tipo === "mensal" ? "mensal" : "quinzenal (parcial do dia 1 ao 15)"} · ${d.clinica} · ${A.nome}/${i.periodo.inicio.slice(0, 4)}`);
   L.push(temAnterior
     ? `Comparação: ${P.nome}${d.tipo === "quinzenal" ? " (mesmo período do mês anterior)" : ""}. Valores em regime de caixa.`
     : `As planilhas não têm dados de ${P.nome}, então não há comparação com o período anterior. Valores em regime de caixa.`);
@@ -201,6 +208,17 @@ export function montarPacote(d: DadosPacote, opcoes: { anonimizar?: boolean } = 
     sec("Texto já escrito pelo consultor (use como ponto de partida e melhore)");
     const nomes = { observacao: "Observação", destaques: "Destaques", comercial: "Comercial", atencao: "Atenção" };
     for (const k of rascunho) L.push(`**${nomes[k]}:**`, d.texto[k].trim(), "");
+  }
+
+  const acoes = d.acoes.filter((x) => x.titulo.trim());
+  if (acoes.length) {
+    sec("Plano de ação já rascunhado (revise, melhore e devolva completo)");
+    acoes.forEach((x, k) => {
+      L.push(`${k + 1}. ${x.titulo.trim()}`, `Responsável: ${x.responsaveis.join(" + ") || "a definir"}`, `Prazo: ${x.prazo ? x.prazo.split("-").reverse().join("/") : "sem prazo"}`);
+      if (x.descricao.trim()) L.push(`Ação: ${x.descricao.trim()}`);
+      if (x.indicador.trim()) L.push(`Como medir: ${x.indicador.trim()}`);
+      L.push("");
+    });
   }
 
   let texto = L.join("\n").replace(/\n{3,}/g, "\n\n").trim();

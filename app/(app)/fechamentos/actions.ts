@@ -12,6 +12,8 @@ import { decidir, desfazer, type AcaoDecisao, type Decisao } from "@/lib/fechame
 import { calcularFechamento, concluirFechamento, lerDecisoes, limparCache, periodoDe, testarFonte, type ResultadoFechamento } from "@/lib/fechamentos/servidor";
 import type { Acao, Acompanhamento, TextoFechamento } from "@/lib/fechamentos/texto-fechamento";
 import { limparFicha, type FichaClinica } from "@/lib/fechamentos/ficha";
+import { montarPacote } from "@/lib/fechamentos/pacote-ia";
+import { chamarClaude, claudeConfigurado } from "@/lib/fechamentos/claude-api";
 
 type Resposta<T> = { ok: true; dados: T } | { ok: false; erro: string };
 
@@ -149,6 +151,30 @@ export async function salvarFicha(p: { clinicaId: string; ficha: FichaClinica })
 }
 
 /* ---------- análise e entrega ---------- */
+
+/**
+ * Rascunho com o Claude dentro do app (API): números do fechamento + ficha da
+ * clínica + o que o consultor já anotou. Devolve o texto bruto; a tela lê as
+ * seções e o plano e mostra para revisar antes de aplicar.
+ */
+export async function gerarComClaude(p: { id: string; anonimizar: boolean; texto: TextoFechamento; acompanhamento: Acompanhamento[]; acoes: Acao[] }): Promise<Resposta<{ resposta: string; custoUsd: number; modelo: string }>> {
+  const bloqueio = await limite(6); if (bloqueio) return { ok: false, erro: bloqueio };
+  if (!claudeConfigurado()) return { ok: false, erro: "A IA ainda não está ligada: falta cadastrar a chave ANTHROPIC_API_KEY nas variáveis da Vercel." };
+  try {
+    const r = await calcularFechamento(p.id);
+    if (r.congelado) return { ok: false, erro: CONGELADO };
+    const corta = (t: unknown, n: number) => String(t ?? "").slice(0, n);
+    const texto: TextoFechamento = { contexto: corta(p.texto?.contexto, 4000), observacao: corta(p.texto?.observacao, 8000), destaques: corta(p.texto?.destaques, 6000), comercial: corta(p.texto?.comercial, 6000), atencao: corta(p.texto?.atencao, 6000) };
+    const prompt = montarPacote({
+      clinica: r.clinicaNome, tipo: r.fechamento.tipo, indicadores: r.indicadores, anterior: r.anterior, anual: r.anual, ritmo: r.ritmo,
+      alertas: r.alertas, decisoes: r.decisoes, texto, acoes: (p.acoes ?? []).slice(0, 20), acompanhamento: (p.acompanhamento ?? []).slice(0, 20), ficha: r.ficha,
+    }, { anonimizar: !!p.anonimizar, destino: "api" });
+    const res = await chamarClaude(prompt);
+    // Estimativa pelo preço do Sonnet (US$ 2 / US$ 10 por milhão de tokens); só para referência na tela.
+    const custoUsd = (res.tokensEntrada * 2 + res.tokensSaida * 10) / 1_000_000;
+    return { ok: true, dados: { resposta: res.texto, custoUsd, modelo: res.modelo } };
+  } catch (e) { return falha(e); }
+}
 
 const CONGELADO = "Este fechamento já foi concluído. Use “Reabrir” para criar uma nova versão.";
 
