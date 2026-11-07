@@ -230,3 +230,14 @@ Sequência aprovada (etapas 0 a 6), sem refazer o que já funcionava. As fontes 
 - **6. Comparativos** (`/fechamentos/clinica/[id]/comparativos`): série de qualquer indicador (padrão ou personalizado, 6 ou 12 meses) com média, maior, menor e último x média; caixa x competência do ano. **Base para benchmarking**: migração `010_metricas_fechamento.sql` (tabela `fechamento_metricas`, uma linha por indicador de cada fechamento concluído, com `comparavel`), gravada ao concluir e completada ao abrir os comparativos. Perfil do cliente ganhou porte (ou cálculo pelo faturamento). Benchmark em si ainda não existe: deve mostrar só médias de grupos com 5 ou mais clientes.
 
 Testes: 212 passando (novo `v3.test.ts`; `fonte-personalizada.test.ts` reescrito, inclusive conferindo que a fonte antiga dá os mesmos números).
+
+## Etapa v3.1 — navegação e organização das telas (07/11)
+
+Sem mudança em coleta, cálculos, fontes, relatórios ou banco.
+
+- **Menu lateral:** cabeçalho com o símbolo G e "Gestfy Sync". Grupo recolhível **Relatórios Financeiros** com Fechamentos do mês (`/fechamentos`), Histórico (`/fechamentos/historico`), Comparativos (`/fechamentos/comparativos`) e Clientes e configurações (`/fechamentos/clientes`). Abre sozinho dentro do módulo; fora dele, lembra se foi recolhido.
+- **Fechamentos do mês:** quatro cards calculados com os dados do mês escolhido (clientes com fechamento no período = clientes prontos; concluídos ou enviados; em andamento; próximo quinzenal = dia 16). Sem botão Configurar por linha: cada fechamento mostra "Continuar" ou "Revisar", e a pendência de configuração é um atalho para as fontes do cliente.
+- **Clientes e configurações:** lista os clientes do cadastro do GestfySync com situação, fontes padrão e personalizadas, perfil e estrutura. Cada linha abre a configuração em abas. Corrigida a barra de rolagem vertical sobre as abas (a barra tinha `overflow-x-auto` com abas em `-mb-px`).
+- **Histórico:** sem formulário de novo fechamento. Filtros por cliente, competência, ano, tipo, situação e versões anteriores; cada linha abre o fechamento inteiro ou direto em Conferência, Indicadores, Análise, Texto (`?etapa=`) e o PDF. `/fechamentos/clinica/[id]` redireciona para o Histórico filtrado. Removidos `historico-view.tsx` e `novo-fechamento.tsx` (criação fica só no painel).
+- **Comparativos:** página própria com seleção de cliente; caixa x competência para despesas, resultado e margem (competência vem do resumo anual do último mensal concluído). `/fechamentos/clinica/[id]/comparativos` redireciona.
+- Conferido localmente com um banco falso (dados fictícios + fixture da Claros): painel, clientes, configuração (abas sem rolagem, cards recolhidos, atalho de pendência), histórico com versões, comparativos com troca de regime, as 4 etapas de um fechamento e o menu recolhendo e expandindo.

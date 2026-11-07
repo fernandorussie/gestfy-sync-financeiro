@@ -26,10 +26,11 @@ export function AbasConfig({ inicial, fontes, estrutura, perfil }: { inicial: Ab
   const paineis: Record<AbaConfig, ReactNode> = { fontes, estrutura, perfil };
   return (
     <div className="space-y-5">
-      <div className="flex gap-1 overflow-x-auto border-b" role="tablist" aria-label="Configuração do cliente">
+      {/* Sem overflow na barra: o "-mb-px" das abas criava uma barra de rolagem vertical. Em tela estreita, as abas quebram linha. */}
+      <div className="flex flex-wrap gap-x-1 border-b" role="tablist" aria-label="Configuração do cliente">
         {ABAS.map((a) => (
           <button key={a.id} type="button" role="tab" id={`aba-${a.id}`} aria-selected={aba === a.id} aria-controls={`painel-${a.id}`} onClick={() => trocar(a.id)}
-            className={`-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors ${aba === a.id ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
+            className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors ${aba === a.id ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
             {a.rotulo}
           </button>
         ))}

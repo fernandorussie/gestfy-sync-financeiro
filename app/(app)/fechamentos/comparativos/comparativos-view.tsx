@@ -2,10 +2,11 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { estatisticas, type PontoSerie, type SerieComparativo } from "@/lib/fechamentos/historico";
 import type { LinhaAnual } from "@/lib/fechamentos/indicadores";
 import { formatarIndicador, variacaoIndicador } from "@/lib/fechamentos/formato-indicador";
-import { brl0, mesAbrev } from "../../_components/formato";
+import { brl0, mesAbrev } from "../_components/formato";
 
 const rotMes = (m: string) => `${mesAbrev(m)}/${m.slice(2, 4)}`;
 
@@ -49,10 +50,38 @@ function Stat({ rotulo, valor, nota }: { rotulo: string; valor: string; nota?: s
   );
 }
 
+/** Indicadores que mudam conforme o regime (a receita é sempre pela data de atendimento). */
+const COM_REGIME = new Set(["despesas", "resultado", "margem"]);
+
+/** Série por competência, a partir do resumo anual do último fechamento mensal concluído. */
+function serieCompetencia(base: SerieComparativo, ano: { linhas: LinhaAnual[] } | null): PontoSerie[] {
+  return (ano?.linhas ?? []).map((m) => {
+    const res = m.entradas - m.saidasCompetencia;
+    const valor = base.id === "despesas" ? m.saidasCompetencia : base.id === "resultado" ? res : m.entradas ? Math.round((res / m.entradas) * 1000) / 10 : 0;
+    return { mes: m.mes, valor, definitivo: true, id: "" };
+  });
+}
+
+export function SeletorCliente({ clientes, atual }: { clientes: { id: string; nome: string }[]; atual: string }) {
+  const router = useRouter();
+  return (
+    <label className="flex w-full max-w-sm flex-col gap-1.5 text-sm font-medium">Cliente
+      <select className="h-9 min-w-56 rounded-md border border-input bg-background px-3 text-sm" value={atual}
+        onChange={(e) => router.push(`/fechamentos/comparativos?cliente=${e.target.value}`)}>
+        {!atual && <option value="">Escolha um cliente…</option>}
+        {clientes.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+      </select>
+    </label>
+  );
+}
+
 export function ComparativosView({ series, ano, rotulos }: { series: SerieComparativo[]; ano: { ano: string; linhas: LinhaAnual[] } | null; rotulos: Record<string, string> }) {
   const [id, setId] = useState(series[0]?.id ?? "faturamento");
   const [meses, setMeses] = useState<6 | 12>(12);
-  const serie = series.find((s) => s.id === id) ?? series[0];
+  const [regime, setRegime] = useState<"caixa" | "competencia">("caixa");
+  const base = series.find((s) => s.id === id) ?? series[0];
+  const temRegime = !!base && COM_REGIME.has(base.id) && !!ano?.linhas.length;
+  const serie = useMemo(() => (base && temRegime && regime === "competencia" ? { ...base, pontos: serieCompetencia(base, ano) } : base), [base, temRegime, regime, ano]);
   const pontos = useMemo(() => (serie?.pontos ?? []).slice(-meses), [serie, meses]);
   const st = estatisticas(pontos);
   const nome = (s: SerieComparativo) => rotulos[s.id] ?? s.rotulo;
@@ -70,11 +99,21 @@ export function ComparativosView({ series, ano, rotulos }: { series: SerieCompar
               {series.some((s) => s.personalizada) && <optgroup label="Personalizados">{series.filter((s) => s.personalizada).map((s) => <option key={s.id} value={s.id}>{s.rotulo}</option>)}</optgroup>}
             </select>
           </label>
+          <div className="flex flex-wrap gap-2">
+          {temRegime && (
+            <div className="inline-flex rounded-md border p-0.5" role="radiogroup" aria-label="Regime">
+              {([["caixa", "Caixa"], ["competencia", "Competência"]] as const).map(([k, r]) => (
+                <button key={k} type="button" role="radio" aria-checked={regime === k} onClick={() => setRegime(k)}
+                  className={`rounded px-3 py-1 text-sm font-medium ${regime === k ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:bg-muted"}`}>{r}</button>
+              ))}
+            </div>
+          )}
           <div className="inline-flex rounded-md border p-0.5" role="radiogroup" aria-label="Período">
             {([6, 12] as const).map((m) => (
               <button key={m} type="button" role="radio" aria-checked={meses === m} onClick={() => setMeses(m)}
                 className={`rounded px-3 py-1 text-sm font-medium ${meses === m ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:bg-muted"}`}>{m} meses</button>
             ))}
+          </div>
           </div>
         </div>
         {st && (
@@ -87,11 +126,14 @@ export function ComparativosView({ series, ano, rotulos }: { series: SerieCompar
         )}
         {pontos.length > 1 ? <Linha pontos={pontos} formato={serie.formato} media={st!.media} /> : <p className="text-sm text-muted-foreground">Só um mês com esse indicador. O gráfico aparece a partir de dois.</p>}
         <p className="text-xs text-muted-foreground">
-          Fechamentos mensais, versão mais recente de cada mês. Ponto vazio = mês em andamento. {serie.personalizada ? "Indicadores personalizados entram só a partir de fechamentos concluídos." : ""}
-          {" "}Clique num mês abaixo para abrir o fechamento.
+          {temRegime && regime === "competencia"
+            ? `Competência: despesas pelo mês a que se referem, do resumo anual de ${ano!.ano} guardado no último fechamento mensal concluído.`
+            : <>Fechamentos mensais, versão mais recente de cada mês{temRegime ? ", regime de caixa" : ""}. Ponto vazio = mês em andamento. {serie.personalizada ? "Indicadores personalizados entram só a partir de fechamentos concluídos. " : ""}Clique num mês abaixo para abrir o fechamento.</>}
         </p>
         <div className="flex flex-wrap gap-1.5 text-xs">
-          {pontos.map((p) => <Link key={p.mes} href={`/fechamentos/${p.id}`} className="rounded-full border px-2 py-0.5 hover:bg-muted">{rotMes(p.mes)}: {formatarIndicador(p.valor, serie.formato)}</Link>)}
+          {pontos.map((p) => p.id
+            ? <Link key={p.mes} href={`/fechamentos/${p.id}`} className="rounded-full border px-2 py-0.5 hover:bg-muted">{rotMes(p.mes)}: {formatarIndicador(p.valor, serie.formato)}</Link>
+            : <span key={p.mes} className="rounded-full border px-2 py-0.5 text-muted-foreground">{rotMes(p.mes)}: {formatarIndicador(p.valor, serie.formato)}</span>)}
         </div>
       </section>
 

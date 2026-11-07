@@ -47,7 +47,7 @@ export default async function ConfigurarPage({ params, searchParams }: { params:
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-6 md:p-8">
       <div className="space-y-1">
-        <p className="text-sm text-muted-foreground"><Link href="/fechamentos" className="hover:underline">Fechamentos</Link> / <Link href={`/fechamentos/clinica/${clinica.id}`} className="hover:underline">{clinica.nome}</Link> / Configurar</p>
+        <p className="text-sm text-muted-foreground"><Link href="/fechamentos/clientes" className="hover:underline">Clientes e configurações</Link> / {clinica.nome}</p>
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-semibold">{clinica.nome}</h1>
           <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${pronto ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"}`}>

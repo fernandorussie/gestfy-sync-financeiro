@@ -22,10 +22,14 @@ export type Decidir = (chave: string, acao: AcaoDecisao, escolha?: Decisao["esco
 type Aba = "conferencia" | "indicadores" | "analise" | "entrega";
 type Salvamento = "salvo" | "pendente" | "salvando" | "erro";
 
-export function FechamentoClient({ inicial }: { inicial: ResultadoFechamento }) {
+const ABAS_VALIDAS: Aba[] = ["conferencia", "indicadores", "analise", "entrega"];
+
+/** etapaInicial vem do endereço (?etapa=analise), para o histórico abrir direto na parte pedida. */
+export function FechamentoClient({ inicial, etapaInicial }: { inicial: ResultadoFechamento; etapaInicial?: string }) {
   const router = useRouter();
   const [r, setR] = useState(inicial);
-  const [aba, setAba] = useState<Aba>(inicial.congelado ? "entrega" : inicial.pendentesGraves ? "conferencia" : "indicadores");
+  const pedida = ABAS_VALIDAS.find((x) => x === etapaInicial);
+  const [aba, setAba] = useState<Aba>(pedida ?? (inicial.congelado ? "entrega" : inicial.pendentesGraves ? "conferencia" : "indicadores"));
   const [ocupado, iniciar] = useTransition();
   const [meta, setMeta] = useState(inicial.fechamento.meta_ajustada ? String(inicial.fechamento.meta_ajustada) : "");
   const [analise, setAnalise] = useState<EstadoAnalise>({ texto: inicial.texto, acoes: inicial.acoes, acompanhamento: inicial.acompanhamento });
@@ -102,7 +106,9 @@ export function FechamentoClient({ inicial }: { inicial: ResultadoFechamento }) 
     <div className="mx-auto max-w-6xl space-y-6 p-6 md:p-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-1">
-          <p className="text-sm text-muted-foreground"><Link href="/fechamentos" className="hover:underline">Fechamentos</Link> / <Link href={`/fechamentos/clinica/${f.clinica_id}`} className="hover:underline">{r.clinicaNome}</Link></p>
+          <p className="text-sm text-muted-foreground">
+            <Link href={`/fechamentos?mes=${f.inicio.slice(0, 7)}`} className="hover:underline">Fechamentos do mês</Link> / <Link href={`/fechamentos/historico?cliente=${f.clinica_id}`} className="hover:underline" title="Histórico deste cliente">{r.clinicaNome}</Link>
+          </p>
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-semibold">{r.clinicaNome} · {f.tipo === "mensal" ? "Mensal de " : "Quinzenal · "}{nomePeriodo(f.tipo, f.inicio, f.fim)}</h1>
             <StatusFechamento status={f.status} />
