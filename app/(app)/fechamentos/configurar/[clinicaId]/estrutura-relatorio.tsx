@@ -1,20 +1,32 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { ArrowDown, ArrowUp, Loader2, Lock, RotateCcw, Save } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowDown, ArrowUp, Loader2, Lock, Plus, RotateCcw, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { defSecao, ehPadrao, estruturaPadrao, paginar, type EstruturaRelatorio, type ExtraSecao, type ItemSecao, type TipoRelatorio } from "@/lib/fechamentos/estrutura";
+import { defSecao, ehPadrao, estruturaPadrao, normalizarEstrutura, paginar, type EstruturaRelatorio, type ExtraSecao, type ItemSecao, type SecaoPersonalizada, type TipoRelatorio } from "@/lib/fechamentos/estrutura";
 import { salvarEstrutura } from "../../actions";
 
 const COR: Record<TipoRelatorio, string> = { mensal: "#7B099C", quinzenal: "#E04800" };
 
-export function EstruturaRelatorioCard({ clinicaId, inicial, extras = [] }: { clinicaId: string; inicial: Required<EstruturaRelatorio>; extras?: ExtraSecao[] }) {
+const comSecoes = (fontes: ExtraSecao[], secoes: SecaoPersonalizada[]): ExtraSecao[] => [...fontes, ...secoes.map((x) => ({ id: x.id, nome: x.titulo || "Seção sem nome", tipo: "secao" as const }))];
+
+export function EstruturaRelatorioCard({ clinicaId, inicial, extrasFontes = [], porSecao = {} }: { clinicaId: string; inicial: Required<EstruturaRelatorio>; extrasFontes?: ExtraSecao[]; porSecao?: Record<string, string[]> }) {
+  const router = useRouter();
   const [tipo, setTipo] = useState<TipoRelatorio>("mensal");
   const [estrutura, setEstrutura] = useState(inicial);
   const [mudou, setMudou] = useState(false);
   const [salvando, iniciar] = useTransition();
   const itens = estrutura[tipo];
+  const extras = comSecoes(extrasFontes, estrutura.secoes);
+
+  /** Cria, renomeia ou remove seções personalizadas, mantendo as listas mensal e quinzenal em dia. */
+  const mudarSecoes = (secoes: SecaoPersonalizada[]) => {
+    const ex = comSecoes(extrasFontes, secoes);
+    setEstrutura({ ...estrutura, secoes, mensal: normalizarEstrutura(estrutura.mensal, "mensal", ex), quinzenal: normalizarEstrutura(estrutura.quinzenal, "quinzenal", ex) });
+    setMudou(true);
+  };
 
   const definir = (novos: ItemSecao[]) => { setEstrutura({ ...estrutura, [tipo]: novos }); setMudou(true); };
   const mover = (k: number, d: -1 | 1) => {
@@ -29,6 +41,7 @@ export function EstruturaRelatorioCard({ clinicaId, inicial, extras = [] }: { cl
     const r = await salvarEstrutura({ clinicaId, estrutura });
     if (!r.ok) { toast.error(r.erro); return; }
     setEstrutura(r.dados); setMudou(false); toast.success("Estrutura do relatório salva.");
+    router.refresh();
   });
   const paginas = paginar(itens, tipo, extras);
 
@@ -38,7 +51,7 @@ export function EstruturaRelatorioCard({ clinicaId, inicial, extras = [] }: { cl
         <div className="max-w-2xl space-y-1">
           <h2 className="font-semibold">Estrutura do relatório</h2>
           <p className="text-sm text-muted-foreground">
-            Escolha as seções do PDF desta clínica, a ordem e o nível de detalhe. As seções com cadeado formam o padrão mínimo Gestfy e não podem ser ocultadas. Fechamentos já concluídos mantêm a estrutura da época.
+            Escolha as seções do PDF deste cliente, a ordem e o nível de detalhe. As seções com cadeado formam o padrão mínimo Gestfy e não podem ser ocultadas. Fechamentos já concluídos mantêm a estrutura da época.
           </p>
         </div>
         <div className="inline-flex rounded-md border p-0.5" role="tablist" aria-label="Tipo de relatório">
@@ -71,6 +84,7 @@ export function EstruturaRelatorioCard({ clinicaId, inicial, extras = [] }: { cl
                   <span className="min-w-0">
                     <span className={`block text-sm font-medium ${it.ativa ? "" : "text-muted-foreground line-through decoration-muted-foreground/40"}`}>{d.titulo}</span>
                     <span className="block text-xs text-muted-foreground">{d.descricao}{d.fixa ? " · padrão Gestfy" : ""}</span>
+                    {porSecao[it.id]?.length ? <span className="block text-xs text-primary">+ {porSecao[it.id].join(", ")}</span> : it.id.startsWith("sec:") ? <span className="block text-xs text-amber-700 dark:text-amber-400">Sem indicadores: escolha esta seção em “Onde aparece” nos indicadores das fontes.</span> : null}
                   </span>
                 </label>
                 {d.niveis && (
@@ -98,6 +112,24 @@ export function EstruturaRelatorioCard({ clinicaId, inicial, extras = [] }: { cl
           </div>
           <p className="text-[11px] text-muted-foreground">A análise só aparece quando o fechamento tem texto ou plano de ação.</p>
         </div>
+      </div>
+
+      <div className="space-y-2 rounded-md border border-dashed p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="text-sm font-medium">Seções personalizadas</p>
+            <p className="text-xs text-muted-foreground">Junte indicadores de fontes diferentes numa seção própria (ex.: “Relacionamento” com recall e retorno). Depois de salvar, escolha a seção no indicador, em Fontes de dados.</p>
+          </div>
+          <Button size="sm" variant="outline" disabled={estrutura.secoes.length >= 10} onClick={() => mudarSecoes([...estrutura.secoes, { id: crypto.randomUUID().slice(0, 8), titulo: "Nova seção" }])}><Plus />Nova seção</Button>
+        </div>
+        {estrutura.secoes.map((x, k) => (
+          <div key={x.id} className="flex items-center gap-2">
+            <input className="h-8 w-72 rounded-md border border-input bg-background px-2 text-sm" value={x.titulo} aria-label="Título da seção"
+              onChange={(e) => mudarSecoes(estrutura.secoes.map((y, j) => (j === k ? { ...y, titulo: e.target.value } : y)))} />
+            <button type="button" className="rounded p-1 text-muted-foreground hover:bg-muted" aria-label={`Remover ${x.titulo}`} onClick={() => mudarSecoes(estrutura.secoes.filter((_, j) => j !== k))}><Trash2 className="h-4 w-4" /></button>
+            {porSecao[`sec:${x.id}`]?.length ? <span className="text-xs text-muted-foreground">{porSecao[`sec:${x.id}`].length} indicador(es); se remover, eles vão para o Resultado</span> : null}
+          </div>
+        ))}
       </div>
 
       <div className="flex flex-wrap justify-between gap-2">

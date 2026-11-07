@@ -32,11 +32,11 @@ export function ClaudeAnalise({ r, estado, mudar }: { r: ResultadoFechamento; es
   const copiar = async () => {
     const texto = montarPacote({
       clinica: r.clinicaNome, tipo: r.fechamento.tipo, indicadores: r.indicadores, anterior: r.anterior, anual: r.anual, ritmo: r.ritmo,
-      alertas: r.alertas, decisoes: r.decisoes, texto: estado.texto, acoes: estado.acoes, acompanhamento: estado.acompanhamento, ficha, personalizadas: r.personalizadas,
+      alertas: r.alertas, decisoes: r.decisoes, texto: estado.texto, acoes: estado.acoes, acompanhamento: estado.acompanhamento, ficha, personalizadas: r.personalizadas, vocab: r.vocab,
     }, { anonimizar });
     try {
       await navigator.clipboard.writeText(texto);
-      toast.success(`Fechamento copiado. Cole numa conversa do projeto da ${r.clinicaNome} no Claude.`);
+      toast.success(`Fechamento copiado. Cole numa conversa do projeto de ${r.clinicaNome} no Claude.`);
     } catch { toast.error("Não foi possível copiar. Tente de novo."); }
   };
 
@@ -68,15 +68,15 @@ export function ClaudeAnalise({ r, estado, mudar }: { r: ResultadoFechamento; es
         <div className="max-w-2xl space-y-1">
           <h2 className="flex items-center gap-2 text-sm font-semibold"><MessageSquareText className="h-4 w-4 text-primary" />Análise com o Claude</h2>
           <ol className="list-decimal space-y-0.5 pl-5 text-sm text-muted-foreground">
-            <li><b className="font-medium text-foreground">Gerar com o Claude:</b> rascunho do texto e do plano de ação aqui no app, com os números e a ficha da clínica.</li>
-            <li><b className="font-medium text-foreground">Refinar no projeto:</b> copie e cole numa conversa do projeto da {r.clinicaNome} no Claude, que conhece o histórico do cliente.</li>
+            <li><b className="font-medium text-foreground">Gerar com o Claude:</b> rascunho do texto e do plano de ação aqui no app, com os números e o perfil do cliente.</li>
+            <li><b className="font-medium text-foreground">Refinar no projeto:</b> copie e cole numa conversa do projeto de {r.clinicaNome} no Claude, que conhece o histórico do cliente.</li>
             <li><b className="font-medium text-foreground">Colar resposta:</b> o app atualiza o texto e o plano.</li>
           </ol>
           <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
             <span className="inline-flex items-center gap-1"><FileText className="h-3.5 w-3.5" />
-              {temFicha ? `Ficha da clínica incluída${ficha.atualizadoEm ? ` (atualizada em ${new Date(ficha.atualizadoEm).toLocaleDateString("pt-BR")})` : ""}` : "Sem ficha da clínica"}
+              {temFicha ? `Perfil do cliente incluído${ficha.atualizadoEm ? ` (atualizado em ${new Date(ficha.atualizadoEm).toLocaleDateString("pt-BR")})` : ""}` : "Sem perfil do cliente"}
             </span>
-            <Link href={`/fechamentos/configurar/${r.fechamento.clinica_id}`} className="underline">{temFicha ? "Ver ficha" : "Preencher ficha"}</Link>
+            <Link href={`/fechamentos/configurar/${r.fechamento.clinica_id}?aba=perfil`} className="underline">{temFicha ? "Ver perfil" : "Preencher perfil"}</Link>
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">
@@ -90,7 +90,7 @@ export function ClaudeAnalise({ r, estado, mudar }: { r: ResultadoFechamento; es
           {!r.iaLigada && <p className="text-xs text-amber-700 dark:text-amber-400">“Gerar com o Claude” liga quando a chave da API for cadastrada na Vercel.</p>}
           <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <input type="checkbox" checked={anonimizar} onChange={(e) => setAnonimizar(e.target.checked)} />
-            Trocar nomes dos profissionais por “Profissional 1, 2…”
+            Trocar nomes de {r.vocab.profissionais} por “Profissional 1, 2…”
           </label>
         </div>
       </div>

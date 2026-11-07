@@ -86,7 +86,7 @@ describe("texto do quinzenal", () => {
   const r = rascunho({ clinica: "Claros Clinic", tipo: "quinzenal", indicadores: ind, anterior: ant, alertas: [], decisoes: decisoesVazias(), ritmo });
 
   it("abre como parcial e traz ritmo e projeção", () => {
-    expect(r.observacao).toContain("Segue o parcial da 1ª quinzena de outubro da Claros Clinic.");
+    expect(r.observacao).toContain("Segue o parcial da 1ª quinzena de outubro.");
     expect(r.observacao).toContain(`No ritmo atual, de`);
     expect(r.observacao).toContain("(10 de 21 dias úteis)");
     expect(r.observacao).toContain("por dia útil nos 11 dias úteis restantes");

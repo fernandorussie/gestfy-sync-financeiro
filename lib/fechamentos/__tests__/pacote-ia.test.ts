@@ -141,7 +141,7 @@ import { chamarClaude } from "../claude-api";
 describe("geração dentro do app (API do Claude)", () => {
   it("instruções do destino api não falam do projeto e o plano rascunhado vai junto", () => {
     const p = montarPacote({ ...base, acoes: [{ id: "1", titulo: "Follow-up", descricao: "Ligar", responsaveis: ["Recepção"], prazo: "2026-11-20", indicador: "" }] }, { destino: "api" });
-    expect(p).toContain("Use a ficha da clínica e as ações anteriores");
+    expect(p).toContain("Use o perfil do cliente e as ações anteriores");
     expect(p).not.toContain("neste projeto");
     expect(p).toContain("## Plano de ação já rascunhado");
     expect(p).toContain("1. Follow-up\nResponsável: Recepção\nPrazo: 20/11/2026\nAção: Ligar");

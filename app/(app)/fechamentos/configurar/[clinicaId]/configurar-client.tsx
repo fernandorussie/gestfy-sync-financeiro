@@ -1,41 +1,55 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { CheckCircle2, Loader2, PlayCircle, Save, XCircle } from "lucide-react";
-import { toast } from "sonner";
+import { CheckCircle2, Loader2, PlayCircle, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { DefinicaoFonte } from "@/lib/fechamentos/colunas";
 import type { FontesFechamento } from "@/lib/fechamentos/coleta";
 import { DEF_DESPESAS, DEF_LEADS, DEF_NPS, DEF_ORCAMENTOS, DEF_VENDAS } from "@/lib/fechamentos/leitores";
-import { salvarConfig, testarLeitura } from "../../actions";
+import { testarLeitura } from "../../actions";
 
-type Nome = "vendas" | "despesas" | "orcamentos" | "leads" | "nps";
-type Cfg = { sheetId: string; aba: string; colunas?: Record<string, string>; linhaCabecalho?: number };
+/*
+ * Planilhas padrão do fechamento (vendas, despesas, orçamentos, leads, NPS).
+ * O corpo de cada uma aparece dentro do card expandido da lista de fontes.
+ */
 
-const FONTES: { nome: Nome; titulo: string; ajuda: string; def: DefinicaoFonte<string>; obrigatoria?: boolean }[] = [
-  { nome: "vendas", titulo: "Vendas", ajuda: "Faturamento, pacientes, grupos de receita", def: DEF_VENDAS, obrigatoria: true },
+export type NomePadrao = "vendas" | "despesas" | "orcamentos" | "leads" | "nps";
+export type CfgPadrao = { sheetId: string; aba: string; colunas?: Record<string, string>; linhaCabecalho?: number };
+export type EstadoConexao = { tipo: "ok"; texto: string } | { tipo: "erro"; texto: string } | null;
+
+export const FONTES_PADRAO: { nome: NomePadrao; titulo: string; ajuda: string; def: DefinicaoFonte<string>; obrigatoria?: boolean }[] = [
+  { nome: "vendas", titulo: "Vendas", ajuda: "Faturamento, atendimentos e grupos de receita", def: DEF_VENDAS, obrigatoria: true },
   { nome: "despesas", titulo: "Despesas", ajuda: "Saídas por grupo e categoria", def: DEF_DESPESAS, obrigatoria: true },
-  { nome: "orcamentos", titulo: "Fechamentos / orçamentos", ajuda: "Orçamentos gerados e fechados", def: DEF_ORCAMENTOS },
+  { nome: "orcamentos", titulo: "Orçamentos", ajuda: "Orçamentos gerados e fechados", def: DEF_ORCAMENTOS },
   { nome: "leads", titulo: "Leads / CRM", ajuda: "Funil de leads, origem e objeções", def: DEF_LEADS },
   { nome: "nps", titulo: "NPS", ajuda: "Pesquisa de satisfação", def: DEF_NPS },
 ];
 
+export function cfgInicial(inicial: FontesFechamento): Record<NomePadrao, CfgPadrao> {
+  return Object.fromEntries(FONTES_PADRAO.map((f) => {
+    const c = (inicial as Record<string, CfgPadrao | undefined>)[f.nome];
+    return [f.nome, { sheetId: c?.sheetId ? `https://docs.google.com/spreadsheets/d/${c.sheetId}` : "", aba: c?.aba ?? "", colunas: c?.colunas ?? {}, linhaCabecalho: c?.linhaCabecalho }];
+  })) as Record<NomePadrao, CfgPadrao>;
+}
+
 type Teste = Awaited<ReturnType<typeof testarLeitura>>;
 
-function Fonte({ f, cfg, onChange }: { f: (typeof FONTES)[number]; cfg: Cfg; onChange: (c: Cfg) => void }) {
+/** Testa uma planilha padrão e resume o resultado (usado também no "Testar todas"). */
+export async function testarPadrao(nome: NomePadrao, cfg: CfgPadrao): Promise<{ teste: Teste; estado: EstadoConexao }> {
+  const teste = await testarLeitura({ nome, cfg: cfg as never });
+  const estado: EstadoConexao = teste.erro ? { tipo: "erro", texto: teste.erro } : teste.leitura ? { tipo: "ok", texto: `${teste.leitura.linhas} linhas` } : null;
+  return { teste, estado };
+}
+
+export function CorpoFontePadrao({ f, cfg, onChange, onEstado }: { f: (typeof FONTES_PADRAO)[number]; cfg: CfgPadrao; onChange: (c: CfgPadrao) => void; onEstado: (e: EstadoConexao) => void }) {
   const [teste, setTeste] = useState<Teste | null>(null);
   const [testando, iniciar] = useTransition();
-  const testar = () => iniciar(async () => setTeste(await testarLeitura({ nome: f.nome, cfg: cfg as never })));
+  const testar = () => iniciar(async () => { const r = await testarPadrao(f.nome, cfg); setTeste(r.teste); onEstado(r.estado); });
   const campo = "h-9 w-full rounded-md border border-input bg-background px-3 text-sm";
   const origem = (teste?.leitura?.colunas.origem ?? {}) as Record<string, { letra: string; cabecalho: string; como: string } | undefined>;
 
   return (
-    <section className="space-y-4 rounded-lg border bg-card p-5">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="font-semibold">{f.titulo}{f.obrigatoria ? "" : <span className="ml-2 text-xs font-normal text-muted-foreground">opcional</span>}</h2>
-        <span className="text-xs text-muted-foreground">{f.ajuda}</span>
-      </div>
+    <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-[1fr_200px]">
         <label className="flex flex-col gap-1.5 text-sm font-medium">Link da planilha
           <input className={campo} value={cfg.sheetId} onChange={(e) => onChange({ ...cfg, sheetId: e.target.value })} placeholder="https://docs.google.com/spreadsheets/d/…" />
@@ -75,34 +89,6 @@ function Fonte({ f, cfg, onChange }: { f: (typeof FONTES)[number]; cfg: Cfg; onC
           </table>
         </div>
       )}
-    </section>
-  );
-}
-
-export function ConfigurarClient({ clinicaId, inicial }: { clinicaId: string; inicial: FontesFechamento }) {
-  const router = useRouter();
-  const [fontes, setFontes] = useState<Record<Nome, Cfg>>(() =>
-    Object.fromEntries(FONTES.map((f) => {
-      const c = (inicial as Record<string, Cfg | undefined>)[f.nome];
-      return [f.nome, { sheetId: c?.sheetId ? `https://docs.google.com/spreadsheets/d/${c.sheetId}` : "", aba: c?.aba ?? "", colunas: c?.colunas ?? {}, linhaCabecalho: c?.linhaCabecalho }];
-    })) as Record<Nome, Cfg>,
-  );
-  const [salvando, iniciar] = useTransition();
-  const salvar = () => iniciar(async () => {
-    const r = await salvarConfig({ clinicaId, fontes: fontes as unknown as FontesFechamento });
-    if (!r.ok) { toast.error(r.erro); return; }
-    toast.success("Planilhas salvas.");
-    router.push("/fechamentos");
-  });
-
-  return (
-    <div className="space-y-4">
-      {FONTES.map((f) => <Fonte key={f.nome} f={f} cfg={fontes[f.nome]} onChange={(c) => setFontes({ ...fontes, [f.nome]: c })} />)}
-      <div className="flex justify-end">
-        <Button onClick={salvar} disabled={salvando || !fontes.vendas.sheetId || !fontes.despesas.sheetId}>
-          {salvando ? <Loader2 className="animate-spin" /> : <Save />}Salvar planilhas
-        </Button>
-      </div>
     </div>
   );
 }

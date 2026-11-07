@@ -16,7 +16,7 @@ export interface EstadoAnalise {
 const SECOES: { chave: keyof SecoesTexto; titulo: string; ajuda: string; linhas: number }[] = [
   { chave: "observacao", titulo: "Observação", ajuda: "Leitura geral do período, em parágrafos.", linhas: 9 },
   { chave: "destaques", titulo: "Principais destaques", ajuda: "Um item por linha, começando com “- ”.", linhas: 6 },
-  { chave: "comercial", titulo: "Indicadores comerciais", ajuda: "Leads, orçamentos, marketing, experiência do paciente.", linhas: 6 },
+  { chave: "comercial", titulo: "Indicadores comerciais", ajuda: "Leads, orçamentos, marketing, experiência dos clientes.", linhas: 6 },
   { chave: "atencao", titulo: "Pontos de atenção", ajuda: "Um item por linha, sempre com número.", linhas: 5 },
 ];
 
@@ -61,7 +61,7 @@ export function Analise({ r, estado, mudar, desabilitado }: { r: ResultadoFecham
   const equipe = [...new Set([...r.equipe, ...acoes.flatMap((a) => a.responsaveis), ...acompanhamento.flatMap((a) => a.responsaveis)])];
 
   const gerar = () => {
-    const novo = rascunho({ clinica: r.clinicaNome, tipo: r.fechamento.tipo, indicadores: r.indicadores, anterior: r.anterior, alertas: r.alertas, decisoes: r.decisoes, ritmo: r.ritmo });
+    const novo = rascunho({ clinica: r.clinicaNome, tipo: r.fechamento.tipo, indicadores: r.indicadores, anterior: r.anterior, alertas: r.alertas, decisoes: r.decisoes, ritmo: r.ritmo, vocab: r.vocab });
     mudar({ ...estado, texto: { ...texto, ...novo } });
     setConfirmarRascunho(false);
   };
@@ -83,7 +83,7 @@ export function Analise({ r, estado, mudar, desabilitado }: { r: ResultadoFecham
         <section className="space-y-3 rounded-lg border bg-card p-4">
           <h2 className="text-sm font-semibold">Ações do fechamento anterior</h2>
           {acompanhamento.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhuma ação registrada no fechamento anterior desta clínica.</p>
+            <p className="text-sm text-muted-foreground">Nenhuma ação registrada no fechamento anterior deste cliente.</p>
           ) : acompanhamento.map((a, i) => (
             <div key={a.id} className="space-y-1.5 border-b pb-3 last:border-0 last:pb-0">
               <div className="flex flex-wrap items-start justify-between gap-2">

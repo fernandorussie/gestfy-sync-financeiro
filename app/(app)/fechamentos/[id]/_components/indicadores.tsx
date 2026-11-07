@@ -3,7 +3,16 @@
 import type { ReactNode } from "react";
 import type { GrupoDespesa, ItemContagem, ItemValor } from "@/lib/fechamentos/indicadores";
 import type { ResultadoFechamento } from "@/lib/fechamentos/servidor";
+import { cap } from "@/lib/fechamentos/vocabulario";
 import { brl, brl0, mesAbrev, num, pct } from "../../_components/formato";
+import { defSecao } from "@/lib/fechamentos/estrutura";
+import { formatarIndicador, variacaoIndicador } from "@/lib/fechamentos/formato-indicador";
+
+function ondeAparece(secao: string, r: ResultadoFechamento): string {
+  if (secao === "fonte") return "seção da própria fonte";
+  if (secao.startsWith("sec:")) return r.secoes.find((x) => `sec:${x.id}` === secao)?.titulo ?? "seção removida (vai para o resultado)";
+  return defSecao(secao)?.titulo ?? secao;
+}
 
 function Variacao({ atual, anterior, inverso, rotulo }: { atual?: number | null; anterior?: number | null; inverso?: boolean; rotulo: string }) {
   if (atual == null || !anterior) return <span className="text-muted-foreground">sem {rotulo}</span>;
@@ -92,9 +101,9 @@ export function PainelIndicadores({ r }: { r: ResultadoFechamento }) {
         ) : (
           <Kpi rotulo="Atingimento da meta" valor={i.meta ? pct(i.meta.atingimento) : "—"} destaque>{i.meta ? `meta ${brl0(i.meta.valor)} · faltam ${brl0(i.meta.falta)}` : "sem meta definida"}</Kpi>
         )}
-        <Kpi rotulo="Pacientes atendidos" valor={num(i.pacientes?.atendidos)}><Variacao atual={i.pacientes?.atendidos} anterior={a.pacientes?.atendidos} rotulo={rot} /></Kpi>
+        <Kpi rotulo={`${cap(r.vocab.clientes)} atendidos`} valor={num(i.pacientes?.atendidos)}><Variacao atual={i.pacientes?.atendidos} anterior={a.pacientes?.atendidos} rotulo={rot} /></Kpi>
         <Kpi rotulo="Ticket médio" valor={brl(i.pacientes?.ticketMedio)}><Variacao atual={i.pacientes?.ticketMedio} anterior={a.pacientes?.ticketMedio} rotulo={rot} /></Kpi>
-        <Kpi rotulo="Pacientes novos" valor={num(i.pacientes?.novos)}>{i.pacientes?.atendidos ? `${pct(i.pacientes.novos / i.pacientes.atendidos, 0)} dos atendidos` : ""}</Kpi>
+        <Kpi rotulo={`${cap(r.vocab.clientes)} novos`} valor={num(i.pacientes?.novos)}>{i.pacientes?.atendidos ? `${pct(i.pacientes.novos / i.pacientes.atendidos, 0)} dos atendidos` : ""}</Kpi>
         <Kpi rotulo="Ticket médio dos novos" valor={brl(i.pacientes?.ticketNovos)}>{brl0(i.pacientes?.faturamentoNovos)} com novos</Kpi>
       </div>
 
@@ -139,11 +148,11 @@ export function PainelIndicadores({ r }: { r: ResultadoFechamento }) {
         </Secao>
       </div>
 
-      <Secao titulo="Experiência do paciente">
+      <Secao titulo={`Experiência do ${r.vocab.cliente}`}>
         {i.nps ? (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Kpi rotulo="NPS" valor={num(i.nps.nps)}>{i.nps.respostas} respostas · {i.nps.promotores}/{i.nps.neutros}/{i.nps.detratores}</Kpi>
-            <Kpi rotulo="Profissional de saúde" valor={num(i.nps.notas.profissional, 2)}>de 5</Kpi>
+            <Kpi rotulo={cap(r.vocab.profissional)} valor={num(i.nps.notas.profissional, 2)}>de 5</Kpi>
             <Kpi rotulo="Recepção" valor={num(i.nps.notas.recepcao, 2)}>de 5</Kpi>
             <Kpi rotulo="Infraestrutura · enfermagem" valor={`${num(i.nps.notas.infraestrutura, 2)} · ${num(i.nps.notas.enfermagem, 2)}`}>de 5</Kpi>
           </div>
@@ -151,32 +160,37 @@ export function PainelIndicadores({ r }: { r: ResultadoFechamento }) {
         {i.google && <p className="mt-3 text-sm">Avaliações Google: {i.google.avaliacoes}, nota {num(i.google.nota, 1)}</p>}
       </Secao>
 
-      {r.personalizadas.map((fp) => {
-        const varia = (x: number | null, y: number | null) => (x == null || !y ? "" : ` · ${x >= y ? "+" : "−"}${pct(Math.abs(x / y - 1))} vs anterior`);
-        return (
-          <Secao key={fp.id} titulo={fp.nome} extra={<span className="text-xs text-muted-foreground">fonte personalizada{fp.filtro ? ` · só ${fp.filtro.valores.join(", ")}` : ""}{fp.ignoradas ? ` · ${fp.ignoradas} linhas ignoradas` : ""}</span>}>
-            {fp.erro ? <p className="text-sm text-destructive">{fp.erro}</p> : (
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  {fp.medidas.quantidade && <Kpi rotulo="Quantidade" valor={num(fp.atual.quantidade)}>anterior {num(fp.anterior.quantidade)}{varia(fp.atual.quantidade, fp.anterior.quantidade)}</Kpi>}
-                  {fp.medidas.valor && <Kpi rotulo="Valor total" valor={brl0(fp.atual.valor)}>anterior {brl0(fp.anterior.valor)}{varia(fp.atual.valor, fp.anterior.valor)}</Kpi>}
-                  {fp.medidas.media && <Kpi rotulo="Valor médio" valor={brl0(fp.atual.media)}>anterior {brl0(fp.anterior.media)}{varia(fp.atual.media, fp.anterior.media)}</Kpi>}
-                </div>
-                {fp.quebras.filter((q) => q.itens.length).length > 0 && (
-                  <div className="grid gap-6 md:grid-cols-2">
-                    {fp.quebras.filter((q) => q.itens.length).map((q) => (
-                      <div key={q.campo}>
-                        <p className="mb-1 text-xs font-medium text-muted-foreground">{q.rotulo}</p>
-                        <Barras itens={q.itens.slice(0, 10).map((x) => ({ nome: x.nome, v: fp.medidas.valor ? x.valor : x.quantidade, extra: fp.medidas.valor ? `${x.quantidade}` : undefined }))} formato={fp.medidas.valor ? brl0 : (v) => num(v)} />
-                      </div>
-                    ))}
-                  </div>
-                )}
+      {r.personalizadas.map((fp) => (
+        <Secao key={fp.id} titulo={fp.nome} extra={<span className="text-xs text-muted-foreground">fonte personalizada · {fp.linhasLidas} linhas{fp.ignoradas ? ` · ${fp.ignoradas} ignoradas` : ""}</span>}>
+          {fp.erro ? <p className="text-sm text-destructive">{fp.erro}</p> : !fp.indicadores.length ? <p className="text-sm text-muted-foreground">Nenhum indicador configurado.</p> : (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                {fp.indicadores.filter((d) => !d.grupos).map((d) => {
+                  const v = variacaoIndicador(d.atual, d.anterior, d.formato, d.melhor);
+                  return (
+                    <Kpi key={d.id} rotulo={d.nome} valor={formatarIndicador(d.atual, d.formato)}>
+                      anterior {formatarIndicador(d.anterior, d.formato)}
+                      {v && <> · <b className={v.tom === "bom" ? "text-emerald-600 dark:text-emerald-400" : v.tom === "ruim" ? "text-red-600 dark:text-red-400" : ""}>{v.texto}</b></>}
+                      <span className="mt-1 block truncate" title={d.descricao}>{d.descricao}</span>
+                      <span className="block">no relatório: {ondeAparece(d.secao, r)}</span>
+                    </Kpi>
+                  );
+                })}
               </div>
-            )}
-          </Secao>
-        );
-      })}
+              {fp.indicadores.some((d) => d.grupos?.length) && (
+                <div className="grid gap-6 md:grid-cols-2">
+                  {fp.indicadores.filter((d) => d.grupos?.length).map((d) => (
+                    <div key={d.id}>
+                      <p className="mb-1 text-xs font-medium text-muted-foreground">{d.nome} · no relatório: {ondeAparece(d.secao, r)}</p>
+                      <Barras itens={d.grupos!.slice(0, 10).map((g) => ({ nome: g.nome, v: g.valor ?? 0, extra: d.formato === "moeda" ? `${g.linhas}` : undefined }))} formato={(v) => formatarIndicador(v, d.formato)} />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </Secao>
+      ))}
 
       <Secao titulo="Receitas detalhadas" extra={<span className="text-xs text-muted-foreground">{i.faturamento?.lancamentos} lançamentos · {i.faturamento?.semValor} sem valor</span>}>
         <div className="overflow-x-auto">
@@ -193,7 +207,7 @@ export function PainelIndicadores({ r }: { r: ResultadoFechamento }) {
       </Secao>
 
       <div className="grid gap-5 lg:grid-cols-3">
-        <Secao titulo="Por profissional"><Barras itens={valores(i.faturamento?.porProfissional ?? [])} formato={brl0} /></Secao>
+        <Secao titulo={`Por ${r.vocab.profissional}`}><Barras itens={valores(i.faturamento?.porProfissional ?? [])} formato={brl0} /></Secao>
         <Secao titulo="Por unidade"><Barras itens={valores(i.faturamento?.porUnidade ?? [])} formato={brl0} /></Secao>
         <Secao titulo="Meio de pagamento"><Barras itens={valores(i.faturamento?.porPagamento ?? [])} formato={brl0} /></Secao>
       </div>

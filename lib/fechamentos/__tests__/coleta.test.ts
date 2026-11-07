@@ -40,7 +40,7 @@ describe("coleta", () => {
 
   it("fonte com erro vira mensagem clara e não derruba as outras", async () => {
     const r = await coletar(fontes, lerFalso);
-    expect(r.erros.avaliacoes).toBe("Aba não encontrada. Confira o nome exato da aba no mapa da clínica.");
+    expect(r.erros.avaliacoes).toBe("Aba não encontrada. Confira o nome exato da aba na configuração do cliente.");
     expect(r.dados.avaliacoes).toBeNull();
     expect(r.dados.vendas).not.toBeNull();
   });

@@ -12,6 +12,8 @@ import { fichaPreenchida, MODELOS, separarSecoes, type FichaClinica } from "./fi
 import type { Indicadores } from "./indicadores";
 import type { Ritmo } from "./ritmo";
 import type { ResultadoPersonalizado } from "./fonte-personalizada";
+import { formatarIndicador, variacaoIndicador } from "./formato-indicador";
+import { NEUTRO, cap, type Vocabulario } from "./vocabulario";
 import { citar, naturezaPontuais, nomeDoMes, rotulo, type Acao, type Acompanhamento, type SecoesTexto, type TextoFechamento } from "./texto-fechamento";
 
 export interface DadosPacote {
@@ -27,6 +29,8 @@ export interface DadosPacote {
   acoes: Acao[];
   acompanhamento: Acompanhamento[];
   ficha: FichaClinica | null;
+  /** Palavras do cliente (paciente/cliente…). Sem informar: neutras. */
+  vocab?: Vocabulario;
   /** Fontes personalizadas (contratos, cirurgias, recall…). */
   personalizadas?: ResultadoPersonalizado[];
 }
@@ -51,17 +55,18 @@ export function apelidosProfissionais(i: Indicadores, a: Indicadores): Map<strin
   return m;
 }
 
-const CONTEXTO_PROJETO = "- Use o que você sabe desta clínica neste projeto (histórico, particularidades, combinados) para explicar os números. Não invente números: use só os que estão aqui.";
-const CONTEXTO_API = "- Use a ficha da clínica e as ações anteriores, abaixo, como contexto do cliente. Não invente números nem fatos: use só o que está aqui. Quando faltar contexto para explicar uma variação, descreva o que os números mostram sem supor a causa.";
+const CONTEXTO_PROJETO = "- Use o que você sabe deste cliente neste projeto (histórico, particularidades, combinados) para explicar os números. Não invente números: use só os que estão aqui.";
+const CONTEXTO_API = "- Use o perfil do cliente e as ações anteriores, abaixo, como contexto do cliente. Não invente números nem fatos: use só o que está aqui. Quando faltar contexto para explicar uma variação, descreva o que os números mostram sem supor a causa.";
 
-const INSTRUCOES = `Você é o analista financeiro da Gestfy, consultoria de gestão de clínicas. Escreva a análise do fechamento abaixo para enviar aos sócios da clínica por WhatsApp.
+const INSTRUCOES = `Você é o analista financeiro da Gestfy, consultoria de gestão. Escreva a análise do fechamento abaixo para enviar aos sócios do cliente por WhatsApp.
 
 Como escrever:
 {{CONTEXTO}}
-- Tom: direto, próximo e consultivo, como a Gestfy escreve. Comece a observação com "Fala, Drs.!" (ou o tratamento que a clínica usa).
+- Vocabulário deste cliente: {{VOCAB}}. Não use termos de outro tipo de negócio.
+- Tom: direto, próximo e consultivo, como a Gestfy escreve. Comece a observação com "{{SAUDACAO}}" (ou o tratamento que o cliente usa).
 - Compare sempre com o período anterior e explique o porquê das variações (volume × ticket, categorias que subiram ou caíram, pagamentos pontuais).
 - Destaques, comercial e pontos de atenção: um item por linha, começando com "- Tema: ...", sempre com número.
-- Plano de ação: de 3 a 5 ações práticas para o próximo período, com responsáveis reais da clínica.
+- Plano de ação: de 3 a 5 ações práticas para o próximo período, com responsáveis reais do cliente.
 
 Responda SOMENTE no formato abaixo, mantendo os títulos exatamente assim (sem texto antes ou depois):
 
@@ -100,18 +105,20 @@ export function montarPacote(d: DadosPacote, opcoes: { anonimizar?: boolean; des
   const L: string[] = [];
   const sec = (t: string) => L.push("", `## ${t}`, "");
 
-  L.push(INSTRUCOES.replace("{{CONTEXTO}}", opcoes.destino === "api" ? CONTEXTO_API : CONTEXTO_PROJETO), "", "---", "", `# Fechamento ${d.tipo === "mensal" ? "mensal" : "quinzenal (parcial do dia 1 ao 15)"} · ${d.clinica} · ${A.nome}/${i.periodo.inicio.slice(0, 4)}`);
+  const V = d.vocab ?? NEUTRO;
+  const vocabTxt = `quem compra = "${V.clientes}", quem atende = "${V.profissionais}", o que é vendido = "${V.servicos}"`;
+  L.push(INSTRUCOES.replace("{{CONTEXTO}}", opcoes.destino === "api" ? CONTEXTO_API : CONTEXTO_PROJETO).replace("{{VOCAB}}", vocabTxt).replace("{{SAUDACAO}}", V.saudacao), "", "---", "", `# Fechamento ${d.tipo === "mensal" ? "mensal" : "quinzenal (parcial do dia 1 ao 15)"} · ${d.clinica} · ${A.nome}/${i.periodo.inicio.slice(0, 4)}`);
   L.push(temAnterior
     ? `Comparação: ${P.nome}${d.tipo === "quinzenal" ? " (mesmo período do mês anterior)" : ""}. Valores em regime de caixa.`
     : `As planilhas não têm dados de ${P.nome}, então não há comparação com o período anterior. Valores em regime de caixa.`);
 
   if (d.ficha && fichaPreenchida(d.ficha)) {
     const f = d.ficha;
-    sec("Ficha da clínica (registrada no GestfySync)");
+    sec("Perfil do cliente (registrado no GestfySync)");
     const item = (t: string, v: string) => { if (v.trim()) L.push(`**${t}:** ${v.trim()}`); };
     item("Local", [f.cidade, f.uf].filter(Boolean).join("/"));
     item("Segmento", f.segmento);
-    item("Especialidades", f.especialidades);
+    item(cap(V.areas), f.especialidades);
     item("Modelo de negócio", f.modelo ? MODELOS[f.modelo] : "");
     item("Perfil", f.perfil);
     item("Prioridades do momento", f.prioridades);
@@ -126,9 +133,9 @@ export function montarPacote(d: DadosPacote, opcoes: { anonimizar?: boolean; des
   L.push(`- Resultado de caixa: ${fmt(i.caixa?.resultado)}${ant(` | anterior ${fmt(a.caixa?.resultado)}`)}`);
   if (d.tipo === "mensal" && i.meta) L.push(`- Meta do mês: ${fmt(i.meta.valor)} | atingimento ${pc(i.meta.atingimento)} | faltaram ${fmt(i.meta.falta)}`);
   if (i.pacientes) {
-    L.push(`- Pacientes atendidos: ${n(i.pacientes.atendidos)}${ant(` | anterior ${n(a.pacientes?.atendidos)}`)}${vr(i.pacientes.atendidos, a.pacientes?.atendidos)}`);
+    L.push(`- ${cap(V.clientes)} atendidos: ${n(i.pacientes.atendidos)}${ant(` | anterior ${n(a.pacientes?.atendidos)}`)}${vr(i.pacientes.atendidos, a.pacientes?.atendidos)}`);
     L.push(`- Ticket médio: ${fmt(i.pacientes.ticketMedio)}${ant(` | anterior ${fmt(a.pacientes?.ticketMedio)}`)}${vr(i.pacientes.ticketMedio, a.pacientes?.ticketMedio)}`);
-    L.push(`- Pacientes novos: ${n(i.pacientes.novos)}${ant(` | anterior ${n(a.pacientes?.novos)}`)} | ticket dos novos ${fmt(i.pacientes.ticketNovos)}`);
+    L.push(`- ${cap(V.clientes)} novos: ${n(i.pacientes.novos)}${ant(` | anterior ${n(a.pacientes?.novos)}`)} | ticket dos novos ${fmt(i.pacientes.ticketNovos)}`);
   }
 
   if (d.ritmo) {
@@ -154,7 +161,7 @@ export function montarPacote(d: DadosPacote, opcoes: { anonimizar?: boolean; des
   const profs = (i.faturamento?.porProfissional ?? []).filter((p) => p.nome !== "Não informado");
   if (profs.length) {
     const profA = new Map((a.faturamento?.porProfissional ?? []).map((p) => [chave(p.nome), p]));
-    sec("Faturamento por profissional");
+    sec(`Faturamento por ${V.profissional}`);
     for (const p of profs.slice(0, 8)) L.push(`- ${prof(p.nome)}: ${fmt(p.valor, 0)} (${pc(p.pct)} do total)${ant(` | anterior ${fmt(profA.get(chave(p.nome))?.valor ?? 0, 0)} (${pc(profA.get(chave(p.nome))?.pct ?? 0)})`)}`);
   }
 
@@ -189,18 +196,21 @@ export function montarPacote(d: DadosPacote, opcoes: { anonimizar?: boolean; des
     L.push(`- Em negociação: ${o.emAberto} (${fmt(o.valorEmAberto, 0)}) · Conversão em valor: ${pc(o.conversaoValor, 0)}${ant(` | anterior ${pc(oa?.conversaoValor, 0)}`)}`);
   }
   if (i.nps || i.google) {
-    sec("Experiência do paciente");
+    sec(`Experiência do ${V.cliente}`);
     if (i.nps) L.push(`- NPS ${n(i.nps.nps)} com ${i.nps.respostas} respostas (promotores ${i.nps.promotores}, neutros ${i.nps.neutros}, detratores ${i.nps.detratores})${ant(` | anterior ${n(a.nps?.nps)}`)}`);
     if (i.google) L.push(`- Google: ${i.google.avaliacoes} avaliações novas, nota média ${i.google.nota?.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) ?? "—"}`);
   }
 
-  for (const fp of (d.personalizadas ?? []).filter((x) => !x.erro)) {
-    sec(`${fp.nome} (controle específico da clínica${fp.filtro ? `; só ${fp.filtro.valores.join(", ")}` : ""})`);
-    if (fp.medidas.quantidade) L.push(`- Quantidade: ${n(fp.atual.quantidade)}${ant(` | anterior ${n(fp.anterior.quantidade)}`)}${vr(fp.atual.quantidade, fp.anterior.quantidade)}`);
-    if (fp.medidas.valor) L.push(`- Valor total: ${fmt(fp.atual.valor, 0)}${ant(` | anterior ${fmt(fp.anterior.valor, 0)}`)}${vr(fp.atual.valor, fp.anterior.valor)}`);
-    if (fp.medidas.media) L.push(`- Valor médio: ${fmt(fp.atual.media, 0)}${ant(` | anterior ${fmt(fp.anterior.media, 0)}`)}`);
-    for (const q of fp.quebras.filter((x) => x.itens.length)) {
-      L.push(`- ${q.rotulo}: ${q.itens.slice(0, 6).map((x) => `${q.campo === "profissional" ? prof(x.nome) : x.nome} ${x.quantidade}${fp.medidas.valor ? ` (${fmt(x.valor, 0)})` : ""}`).join(", ")}`);
+  for (const fp of (d.personalizadas ?? []).filter((x) => !x.erro && x.indicadores.length)) {
+    sec(`${fp.nome} (controle específico do cliente)`);
+    for (const x of fp.indicadores) {
+      const fmtI = (v: number | null) => formatarIndicador(v, x.formato);
+      if (x.grupos?.length) {
+        L.push(`- ${x.nome} (${x.descricao}): ${x.grupos.slice(0, 6).map((g) => `${prof(g.nome)} ${fmtI(g.valor)}`).join(", ")}`);
+        continue;
+      }
+      const v = variacaoIndicador(x.atual, x.anterior, x.formato, x.melhor);
+      L.push(`- ${x.nome}: ${fmtI(x.atual)}${ant(` | anterior ${fmtI(x.anterior)}${v ? ` (${v.texto})` : ""}`)} — ${x.descricao}`);
     }
   }
 

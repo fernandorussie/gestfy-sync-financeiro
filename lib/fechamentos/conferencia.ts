@@ -112,7 +112,7 @@ export function conferir(e: EntradaConferencia): Alerta[] {
     alertas.push({
       chave: `despesa-sem-grupo:${cats.map(normalizar).sort().join("|")}`, regra: "despesa-sem-grupo", gravidade: "grave", area: "Despesas",
       titulo: `${plural(cats.length, "categoria de despesa", "categorias de despesa")} fora do plano de contas`,
-      descricao: `Ficariam em “${GRUPO_SEM_CLASSIFICACAO}”: ${cats.join(", ")}. Escolha o grupo de cada uma; a escolha fica salva no mapa da clínica.`,
+      descricao: `Ficariam em “${GRUPO_SEM_CLASSIFICACAO}”: ${cats.join(", ")}. Escolha o grupo de cada uma; a escolha fica salva na configuração do cliente.`,
       evidencias: semGrupo.map(evDesp), total: centavos(semGrupo.reduce((s, d) => s + d.valor, 0)),
       sugestao: { tipo: "classificar", categorias: cats },
     });
@@ -222,7 +222,7 @@ export function conferir(e: EntradaConferencia): Alerta[] {
     alertas.push({
       chave: "grafias-unidas", regra: "grafias-unidas", gravidade: "info", area: "Vendas e leads",
       titulo: "Nomes escritos de formas diferentes foram unidos",
-      descricao: "Maiúsculas, acentos e espaços não separam mais os totais. Se algum par não for a mesma coisa, ajuste no mapa da clínica.",
+      descricao: "Maiúsculas, acentos e espaços não separam mais os totais. Se algum par não for a mesma coisa, ajuste na configuração do cliente.",
       evidencias: unidas,
     });
   }
@@ -257,7 +257,7 @@ export function conferir(e: EntradaConferencia): Alerta[] {
     alertas.push({
       chave: "vendas-sem-valor", regra: "vendas-sem-valor", gravidade: "info", area: "Vendas",
       titulo: `${ind.faturamento.semValor} de ${ind.faturamento.lancamentos} lançamentos sem valor`,
-      descricao: `${zero} com R$ 0 e ${branco} em branco. Costumam ser retornos: contam como paciente atendido e reduzem o ticket médio.`,
+      descricao: `${zero} com R$ 0 e ${branco} em branco. Costumam ser retornos ou cortesias: contam como atendimento e reduzem o ticket médio.`,
       evidencias: [],
     });
   }
@@ -273,8 +273,8 @@ export function conferir(e: EntradaConferencia): Alerta[] {
   if (ind.pacientes && ind.faturamento && ind.faturamento.lancamentos > 0 && (!ind.pacientes.temInformacaoDeNovos || ind.pacientes.novos === 0)) {
     alertas.push({
       chave: "novos-sem-informacao", regra: "novos-sem-informacao", gravidade: "atencao", area: "Vendas",
-      titulo: "Nenhum paciente marcado como novo",
-      descricao: "A coluna “1ª vez na clínica” está vazia ou não existe. Pacientes novos e ticket dos novos vão sair zerados.",
+      titulo: "Nenhum cliente marcado como novo",
+      descricao: "A coluna de 1ª vez (cliente novo) está vazia ou não existe. Novos e ticket dos novos vão sair zerados.",
       evidencias: [], sugestao: { tipo: "corrigir-na-origem" },
     });
   }

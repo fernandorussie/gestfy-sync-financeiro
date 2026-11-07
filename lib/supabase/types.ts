@@ -275,6 +275,39 @@ export interface Database {
         };
         Relationships: [];
       };
+      fechamento_metricas: {
+        Row: {
+          fechamento_id: string;
+          clinica_id: string;
+          tipo: "mensal" | "quinzenal";
+          inicio: string;
+          fim: string;
+          versao: number;
+          indicador: string;
+          valor: number | null;
+          comparavel: string | null;
+          formato: string | null;
+          criado_em: string;
+        };
+        Insert: {
+          fechamento_id: string;
+          clinica_id: string;
+          tipo: "mensal" | "quinzenal";
+          inicio: string;
+          fim: string;
+          versao?: number;
+          indicador: string;
+          valor?: number | null;
+          comparavel?: string | null;
+          formato?: string | null;
+        };
+        Update: {
+          valor?: number | null;
+          comparavel?: string | null;
+          formato?: string | null;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

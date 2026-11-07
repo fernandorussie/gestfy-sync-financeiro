@@ -24,7 +24,7 @@ function descreverDecisao(d: Decisao): string {
     case "reclassificar": return `Reclassificado para ${s.categoria} (${s.grupo}). A planilha não muda.`;
     case "unificar": return `Unificado como “${s.para}”. Vale para este fechamento.`;
     case "escolher-meta": return `Meta usada: ${brl(d.escolha?.meta ?? 0)}.`;
-    case "classificar": return `Grupos definidos: ${Object.entries(d.escolha?.grupos ?? {}).map(([c, g]) => `${c} → ${g}`).join("; ")}. Fica salvo para a clínica.`;
+    case "classificar": return `Grupos definidos: ${Object.entries(d.escolha?.grupos ?? {}).map(([c, g]) => `${c} → ${g}`).join("; ")}. Fica salvo para o clieca.`;
     case "citar-no-texto": return "Será citado no texto do fechamento.";
     default: return "Decidido.";
   }

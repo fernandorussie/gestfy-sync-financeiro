@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { ordemAlfabetica, type GrupoDespesa, type ItemContagem } from "@/lib/fechamentos/indicadores";
 import type { ResultadoFechamento } from "@/lib/fechamentos/servidor";
+import { cap } from "@/lib/fechamentos/vocabulario";
 import { brl, brl0, dataBR, mesAbrev, nomePeriodo, num, pct } from "../../(app)/fechamentos/_components/formato";
 
 /*
@@ -177,9 +178,9 @@ export function SecResultadoMensal({ r }: { r: ResultadoFechamento }) {
       <Kpi rotulo="Despesas (saídas)" valor={brl0(i.despesas?.total)} nota={n(i.despesas?.total, a.despesas?.total, true)} />
       <Kpi rotulo="Resultado de caixa" valor={brl0(i.caixa?.resultado)} nota={i.caixa?.margem != null ? `${pct(i.caixa.margem)} da receita` : undefined} />
       <Kpi rotulo="Atingimento da meta" valor={i.meta ? pct(i.meta.atingimento) : "—"} nota={i.meta ? `meta ${brl0(i.meta.valor)}` : "sem meta"} />
-      <Kpi rotulo="Pacientes atendidos" valor={num(i.pacientes?.atendidos)} nota={n(i.pacientes?.atendidos, a.pacientes?.atendidos)} />
+      <Kpi rotulo={`${cap(r.vocab.clientes)} atendidos`} valor={num(i.pacientes?.atendidos)} nota={n(i.pacientes?.atendidos, a.pacientes?.atendidos)} />
       <Kpi rotulo="Ticket médio" valor={brl(i.pacientes?.ticketMedio)} nota={n(i.pacientes?.ticketMedio, a.pacientes?.ticketMedio)} />
-      <Kpi rotulo="Pacientes novos" valor={num(i.pacientes?.novos)} nota={n(i.pacientes?.novos, a.pacientes?.novos)} />
+      <Kpi rotulo={`${cap(r.vocab.clientes)} novos`} valor={num(i.pacientes?.novos)} nota={n(i.pacientes?.novos, a.pacientes?.novos)} />
       <Kpi rotulo="Ticket médio dos novos" valor={brl(i.pacientes?.ticketNovos)} nota={n(i.pacientes?.ticketNovos, a.pacientes?.ticketNovos)} />
     </div>
   );
@@ -237,7 +238,7 @@ export function SecExperiencia({ r }: { r: ResultadoFechamento }) {
   const i = r.indicadores;
   return (
     <div className="pdf-bloco">
-      <Titulo>Experiência do paciente</Titulo>
+      <Titulo>Experiência do {r.vocab.cliente}</Titulo>
       {i.nps || i.google ? (
         <div className="grid grid-cols-4 gap-2.5">
           {i.nps && <Kpi rotulo="NPS" valor={num(i.nps.nps)} nota={`${i.nps.respostas} respostas`} />}
@@ -298,7 +299,7 @@ export function SecReceitasMensal({ r, nivel }: { r: ResultadoFechamento } & Niv
           </tr>
         </tbody>
       </table>
-      <p className="text-[10px]" style={{ color: CINZA }}>Variação em relação a {mesA}. O ticket médio do total é por paciente atendido; o das categorias, por lançamento.</p>
+      <p className="text-[10px]" style={{ color: CINZA }}>Variação em relação a {mesA}. O ticket médio do total é por {r.vocab.cliente} atendido; o das categorias, por lançamento.</p>
     </>
   );
 }

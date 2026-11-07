@@ -30,6 +30,7 @@ export function FechamentoClient({ inicial }: { inicial: ResultadoFechamento }) 
   const [meta, setMeta] = useState(inicial.fechamento.meta_ajustada ? String(inicial.fechamento.meta_ajustada) : "");
   const [analise, setAnalise] = useState<EstadoAnalise>({ texto: inicial.texto, acoes: inicial.acoes, acompanhamento: inicial.acompanhamento });
   const [salvamento, setSalvamento] = useState<Salvamento>("salvo");
+  const [salvoEm, setSalvoEm] = useState<Date | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const f = r.fechamento;
   const congelado = r.congelado;
@@ -47,6 +48,7 @@ export function FechamentoClient({ inicial }: { inicial: ResultadoFechamento }) 
     setSalvamento("salvando");
     const res = await salvarAnalise({ id: f.id, ...e });
     setSalvamento(res.ok ? "salvo" : "erro");
+    if (res.ok) setSalvoEm(new Date());
     if (!res.ok) toast.error(res.erro);
     return res.ok;
   };
@@ -157,7 +159,7 @@ export function FechamentoClient({ inicial }: { inicial: ResultadoFechamento }) 
 
       {(atual === "analise" || atual === "entrega") && !congelado && (
         <p className="text-right text-xs text-muted-foreground" aria-live="polite">
-          {salvamento === "salvo" ? "Tudo salvo" : salvamento === "salvando" ? "Salvando…" : salvamento === "pendente" ? "Alterações não salvas" : "Erro ao salvar"}
+          {salvamento === "salvo" ? (salvoEm ? `Tudo salvo às ${salvoEm.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}` : "Tudo salvo") : salvamento === "salvando" ? "Salvando…" : salvamento === "pendente" ? "Alterações não salvas" : "Erro ao salvar"}
         </p>
       )}
 

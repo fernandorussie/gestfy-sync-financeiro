@@ -24,7 +24,7 @@ export function NovoFechamento({ clinicas }: { clinicas: { id: string; nome: str
 
   if (!clinicas.length) {
     return (
-      <Card><CardContent className="p-6 text-sm text-muted-foreground">Nenhuma clínica com planilhas configuradas. Use “Configurar” na lista de clínicas abaixo.</CardContent></Card>
+      <Card><CardContent className="p-6 text-sm text-muted-foreground">Nenhum cliente com planilhas configuradas. Use “Configurar” na lista de clientes.</CardContent></Card>
     );
   }
 
@@ -39,7 +39,7 @@ export function NovoFechamento({ clinicas }: { clinicas: { id: string; nome: str
     <Card>
       <CardContent className="flex flex-wrap items-end gap-4 p-5">
         <label className="flex min-w-[220px] flex-1 flex-col gap-1.5 text-sm font-medium">
-          Clínica
+          Cliente
           <select className={campo} value={clinicaId} onChange={(e) => setClinicaId(e.target.value)}>
             {clinicas.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
           </select>

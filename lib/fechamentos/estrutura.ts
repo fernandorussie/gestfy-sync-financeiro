@@ -25,19 +25,19 @@ export interface DefSecao {
 }
 
 export interface ItemSecao { id: string; ativa: boolean; nivel?: string }
-export type EstruturaRelatorio = Partial<Record<TipoRelatorio, ItemSecao[]>>;
+export type EstruturaRelatorio = Partial<Record<TipoRelatorio, ItemSecao[]>> & { secoes?: SecaoPersonalizada[] };
 
 const RESUMO_COMPLETO = (completo: string): NivelSecao[] => [{ id: "resumo", rotulo: "Resumo" }, { id: "completo", rotulo: completo }];
 
 /** Catálogo na ordem do padrão Gestfy. */
 export const CATALOGO: DefSecao[] = [
-  { id: "resultado", titulo: "Resultado do período", descricao: "Boxes com faturamento, despesas, resultado, meta, pacientes e tickets", tipos: ["mensal", "quinzenal"], fixa: true },
+  { id: "resultado", titulo: "Resultado do período", descricao: "Boxes com faturamento, despesas, resultado, meta, atendimentos e tickets", tipos: ["mensal", "quinzenal"], fixa: true },
   { id: "grafico", titulo: "Gráfico de faturamento e despesas", descricao: "Linhas do ano, mês a mês", tipos: ["mensal"] },
   { id: "ritmo", titulo: "Ritmo do mês", descricao: "Faturamento por dia útil, projeção e quanto falta para a meta", tipos: ["quinzenal"], fixa: true },
   { id: "caixaMes", titulo: "Caixa do mês", descricao: "Despesas pagas, média de 3 meses, provisionado e saldo projetado", tipos: ["quinzenal"] },
   { id: "funilLeads", titulo: "Funil de leads", descricao: "Leads, agendamentos e conversão", tipos: ["mensal", "quinzenal"], niveis: RESUMO_COMPLETO("Com origem dos leads"), nivelPadrao: { mensal: "completo", quinzenal: "resumo" } },
   { id: "funilOrcamentos", titulo: "Funil de orçamentos", descricao: "Gerados, fechados, em negociação e conversão", tipos: ["mensal", "quinzenal"], niveis: RESUMO_COMPLETO("Com principais objeções"), nivelPadrao: { mensal: "completo", quinzenal: "resumo" } },
-  { id: "experiencia", titulo: "Experiência do paciente", descricao: "NPS, notas e avaliações no Google", tipos: ["mensal"] },
+  { id: "experiencia", titulo: "Experiência do cliente", descricao: "NPS, notas e avaliações no Google", tipos: ["mensal"] },
   { id: "receitas", titulo: "Receitas detalhadas", descricao: "Categorias com valor, quantidade, ticket e variação", tipos: ["mensal", "quinzenal"], fixa: true, grande: true,
     niveis: [{ id: "com_valor", rotulo: "Só categorias com movimento" }, { id: "todas", rotulo: "Todas as categorias (12 meses)" }], nivelPadrao: { mensal: "todas", quinzenal: "todas" } },
   { id: "despesas", titulo: "Despesas detalhadas", descricao: "Grupos e categorias, com o que mais aumentou", tipos: ["mensal"], fixa: true, grande: true,
@@ -47,14 +47,44 @@ export const CATALOGO: DefSecao[] = [
   { id: "analise", titulo: "Análise e plano de ação", descricao: "Texto do fechamento e ações com responsáveis", tipos: ["mensal", "quinzenal"], grande: true, ativaPadrao: false },
 ];
 
-/** Fonte personalizada cadastrada na clínica: vira uma seção "fonte:<id>". */
-export interface ExtraSecao { id: string; nome: string }
+/**
+ * Seção extra da clínica: a de uma fonte personalizada ("fonte:<id>") ou uma
+ * seção criada no editor ("sec:<id>"), onde entram indicadores escolhidos.
+ */
+export interface ExtraSecao { id: string; nome: string; tipo?: "fonte" | "secao" }
 export const idFonte = (id: string) => `fonte:${id}`;
+export const idSecao = (id: string) => `sec:${id}`;
+const idExtra = (x: ExtraSecao) => (x.tipo === "secao" ? idSecao(x.id) : idFonte(x.id));
+
+/** Seção criada pelo consultor no editor de estrutura. */
+export interface SecaoPersonalizada { id: string; titulo: string }
+
+/**
+ * Seções extras de uma clínica: cada fonte com algum indicador na própria seção,
+ * mais as seções personalizadas. Serve tanto para a configuração quanto para
+ * os resultados (indicadores já calculados).
+ */
+export function extrasDe(
+  fontes: { id: string; nome: string; indicadores: { secao: string; oculto?: boolean }[] }[],
+  secoes: SecaoPersonalizada[] = [],
+): ExtraSecao[] {
+  return [
+    ...fontes.filter((f) => f.indicadores.some((d) => !d.oculto && (d.secao || "fonte") === "fonte")).map((f) => ({ id: f.id, nome: f.nome })),
+    ...secoes.map((x) => ({ id: x.id, nome: x.titulo, tipo: "secao" as const })),
+  ];
+}
+
+export function limparSecoes(x: unknown): SecaoPersonalizada[] {
+  return (Array.isArray(x) ? x : [])
+    .map((s) => ({ id: String((s as SecaoPersonalizada)?.id ?? "").slice(0, 40), titulo: String((s as SecaoPersonalizada)?.titulo ?? "").trim().slice(0, 60) }))
+    .filter((s) => s.id && s.titulo)
+    .slice(0, 10);
+}
 
 function defsExtras(extras: ExtraSecao[]): DefSecao[] {
   return extras.map((x) => ({
-    id: idFonte(x.id), titulo: x.nome, descricao: "Fonte personalizada", tipos: ["mensal", "quinzenal"],
-    niveis: [{ id: "resumo", rotulo: "Só os totais" }, { id: "completo", rotulo: "Com quebras" }], nivelPadrao: { mensal: "completo", quinzenal: "resumo" },
+    id: idExtra(x), titulo: x.nome, descricao: x.tipo === "secao" ? "Seção personalizada" : "Fonte personalizada", tipos: ["mensal", "quinzenal"],
+    niveis: [{ id: "resumo", rotulo: "Só os totais" }, { id: "completo", rotulo: "Com tabelas" }], nivelPadrao: { mensal: "completo", quinzenal: "resumo" },
   }));
 }
 
@@ -103,12 +133,18 @@ export function normalizarEstrutura(salva: unknown, tipo: TipoRelatorio, extras:
   return itens;
 }
 
+/** Limpa a estrutura salva. As seções personalizadas salvas entram nos extras automaticamente. */
 export function limparEstrutura(e: unknown, extras: ExtraSecao[] = []): EstruturaRelatorio {
   const o = (e ?? {}) as Record<string, unknown>;
-  return { mensal: normalizarEstrutura(o.mensal, "mensal", extras), quinzenal: normalizarEstrutura(o.quinzenal, "quinzenal", extras) };
+  const secoes = limparSecoes(o.secoes);
+  const todos = [...extras.filter((x) => x.tipo !== "secao"), ...secoes.map((x) => ({ id: x.id, nome: x.titulo, tipo: "secao" as const }))];
+  return { mensal: normalizarEstrutura(o.mensal, "mensal", todos), quinzenal: normalizarEstrutura(o.quinzenal, "quinzenal", todos), secoes };
 }
 
 export const ehPadrao = (itens: ItemSecao[], tipo: TipoRelatorio, extras: ExtraSecao[] = []) => JSON.stringify(itens) === JSON.stringify(estruturaPadrao(tipo, extras));
+
+/** Seções onde um indicador personalizado pode entrar (além da seção da própria fonte). */
+export const SECOES_DESTINO = ["resultado", "ritmo", "caixaMes", "funilLeads", "funilOrcamentos", "experiencia", "receitas", "despesas"] as const;
 
 /* ---------- páginas ---------- */
 

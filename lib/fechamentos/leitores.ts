@@ -113,8 +113,8 @@ export type CampoVenda = "data" | "paciente" | "primeiraVez" | "valor" | "catego
 
 export const DEF_VENDAS: DefinicaoFonte<CampoVenda> = {
   data: { rotulo: "Data de atendimento", nomes: ["data de atendimento", "data do atendimento", "data"], obrigatorio: true },
-  paciente: { rotulo: "Paciente", nomes: ["paciente", "nome do paciente", "nome paciente", "nome"], obrigatorio: true },
-  primeiraVez: { rotulo: "1ª vez na clínica", nomes: ["1ª vez na clinica?", "1a vez na clinica?", "primeira vez", "paciente novo", "novo?"], contem: ["vez na clinica"] },
+  paciente: { rotulo: "Cliente / paciente", nomes: ["paciente", "nome do paciente", "nome paciente", "cliente", "nome do cliente", "nome"], obrigatorio: true },
+  primeiraVez: { rotulo: "1ª vez (cliente novo)", nomes: ["1ª vez na clinica?", "1a vez na clinica?", "primeira vez", "paciente novo", "novo?"], contem: ["vez na clinica"] },
   valor: { rotulo: "Valor pago", nomes: ["valor pago", "valor recebido", "valor"], obrigatorio: true },
   categoria: { rotulo: "Categoria", nomes: ["categoria", "servico", "procedimento"] },
   grupo: { rotulo: "Grupo de receita", nomes: ["categoria_ajustada", "categoria ajustada", "grupo"] },
@@ -221,7 +221,7 @@ export type CampoOrcamento = "data" | "paciente" | "profissional" | "prescricao"
 
 export const DEF_ORCAMENTOS: DefinicaoFonte<CampoOrcamento> = {
   data: { rotulo: "Data", nomes: ["data", "data da consulta", "data do orcamento"], obrigatorio: true },
-  paciente: { rotulo: "Paciente", nomes: ["nome paciente", "paciente", "nome"] },
+  paciente: { rotulo: "Cliente / paciente", nomes: ["nome paciente", "paciente", "cliente", "nome"] },
   profissional: { rotulo: "Profissional", nomes: ["medico responsavel", "profissional", "medico"] },
   prescricao: { rotulo: "Prescrição de tratamento", nomes: ["prescricao de tratamentos?", "prescricao de tratamento?", "prescricao"], contem: ["prescricao de trat"] },
   status: { rotulo: "Fechamento", nomes: ["fechamento", "status do orcamento", "situacao"], obrigatorio: true },

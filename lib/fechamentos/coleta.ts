@@ -69,7 +69,7 @@ export async function coletar(fontes: FontesFechamento, ler: LerPlanilha): Promi
         linhas: l.registros.length,
       };
       if (l.colunas.faltando.length) {
-        res.erros[nome] = `Coluna não encontrada: ${l.colunas.faltandoRotulos.join(", ")}. Indique a coluna no mapa da clínica.`;
+        res.erros[nome] = `Coluna não encontrada: ${l.colunas.faltandoRotulos.join(", ")}. Indique a coluna na configuração do cliente.`;
         return;
       }
       (res.dados as unknown as Record<string, T[]>)[nome] = l.registros;
@@ -91,7 +91,7 @@ export async function coletar(fontes: FontesFechamento, ler: LerPlanilha): Promi
 export function mensagemDeErro(e: unknown): string {
   const msg = e instanceof Error ? e.message : String(e);
   if (/permission|403|forbidden/i.test(msg)) return "Sem permissão. Compartilhe a planilha com o e-mail da conta de serviço, como Leitor.";
-  if (/unable to parse range|400/i.test(msg)) return "Aba não encontrada. Confira o nome exato da aba no mapa da clínica.";
-  if (/not found|404/i.test(msg)) return "Planilha não encontrada. Confira o link no mapa da clínica.";
+  if (/unable to parse range|400/i.test(msg)) return "Aba não encontrada. Confira o nome exato da aba na configuração do cliente.";
+  if (/not found|404/i.test(msg)) return "Planilha não encontrada. Confira o link na configuração do cliente.";
   return `Não foi possível ler a planilha: ${msg}`;
 }

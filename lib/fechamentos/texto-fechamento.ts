@@ -10,6 +10,7 @@ import type { Alerta } from "./conferencia";
 import type { Decisoes } from "./decisoes";
 import type { Indicadores } from "./indicadores";
 import type { Ritmo } from "./ritmo";
+import { NEUTRO, type Vocabulario } from "./vocabulario";
 
 export interface SecoesTexto {
   observacao: string;
@@ -66,6 +67,8 @@ export interface ContextoTexto {
   decisoes: Decisoes;
   /** Quinzenal: ritmo e projeção do mês. */
   ritmo?: Ritmo | null;
+  /** Palavras do cliente (paciente/cliente, médico/profissional…). Sem informar: neutras. */
+  vocab?: Vocabulario;
 }
 
 /** Formas do nome do período para encaixar nas frases ("em outubro", "na 1ª quinzena de outubro"). */
@@ -116,9 +119,11 @@ export function rascunho(c: ContextoTexto): SecoesTexto {
   const vFat = variacao(fat, fatA);
   const temAnterior = fatA > 0;
 
+  const V = c.vocab ?? NEUTRO;
+
   /* Observação */
   const obs: string[] = [];
-  obs.push(`Fala, Drs.! Segue o ${c.tipo === "mensal" ? "fechamento mensal" : "parcial"} ${A.de} da ${c.clinica}.`);
+  obs.push(`${V.saudacao} Segue o ${c.tipo === "mensal" ? "fechamento mensal" : "parcial"} ${A.de}.`);
   if (vFat !== null) {
     const ating = r ? r.atingimentoProjetado : i.meta?.atingimento ?? null;
     const abertura = vFat <= -0.05 || (ating !== null && ating < 0.9) ? "Tivemos um período de atenção" : vFat >= 0.05 ? "Tivemos um bom período" : "Tivemos um período estável";
@@ -133,9 +138,9 @@ export function rascunho(c: ContextoTexto): SecoesTexto {
   const volumeEstavel = vPac !== null && Math.abs(vPac) < 0.05;
   if (vPac !== null && vTk !== null && i.pacientes && a.pacientes) {
     if (volumeEstavel && Math.abs(vTk) >= 0.05) {
-      obs.push(`O principal ponto é que o volume de pacientes ${a.pacientes.atendidos === i.pacientes.atendidos ? `se manteve em ${i.pacientes.atendidos}` : `praticamente se manteve, passando de ${a.pacientes.atendidos} ${P.em} para ${i.pacientes.atendidos} ${A.em}`}. Entretanto, o ticket médio ${vTk < 0 ? "caiu" : "subiu"} ${pct(Math.abs(vTk))}. Ou seja, ${vFat !== null && vFat < 0 ? "a queda" : "a variação"} do faturamento esteve muito mais relacionada ao valor médio dos atendimentos do que à quantidade de pacientes.`);
+      obs.push(`O principal ponto é que o volume de ${V.clientes} ${a.pacientes.atendidos === i.pacientes.atendidos ? `se manteve em ${i.pacientes.atendidos}` : `praticamente se manteve, passando de ${a.pacientes.atendidos} ${P.em} para ${i.pacientes.atendidos} ${A.em}`}. Entretanto, o ticket médio ${vTk < 0 ? "caiu" : "subiu"} ${pct(Math.abs(vTk))}. Ou seja, ${vFat !== null && vFat < 0 ? "a queda" : "a variação"} do faturamento esteve muito mais relacionada ao valor médio dos atendimentos do que à quantidade de ${V.clientes}.`);
     } else {
-      obs.push(`Atendemos ${i.pacientes.atendidos} pacientes, contra ${a.pacientes.atendidos} ${P.em} (${sinal(vPac)}), com ticket médio de ${brl(i.pacientes.ticketMedio)} (${sinal(vTk)}).`);
+      obs.push(`Atendemos ${i.pacientes.atendidos} ${V.clientes}, contra ${a.pacientes.atendidos} ${P.em} (${sinal(vPac)}), com ticket médio de ${brl(i.pacientes.ticketMedio)} (${sinal(vTk)}).`);
     }
   }
   if (r) {
@@ -191,7 +196,7 @@ export function rascunho(c: ContextoTexto): SecoesTexto {
     const profA = a.faturamento?.porProfissional.find((p) => p.nome.toLowerCase() === prof.nome.toLowerCase());
     const demais = fat - prof.valor, demaisA = profA ? fatA - profA.valor : 0;
     if (profA && temAnterior && profA.pct - prof.pct >= 0.02 && demais > demaisA) {
-      dest.push(`- Demais profissionais: aumentaram sua participação no faturamento. A dependência de ${prof.nome} caiu de ${pct(profA.pct, 0)} para ${pct(prof.pct)}, enquanto a receita dos demais profissionais cresceu de ${brl(demaisA)} para ${brl(demais)}.`);
+      dest.push(`- Demais ${V.profissionais}: aumentaram sua participação no faturamento. A dependência de ${prof.nome} caiu de ${pct(profA.pct, 0)} para ${pct(prof.pct)}, enquanto a receita dos demais ${V.profissionais} cresceu de ${brl(demaisA)} para ${brl(demais)}.`);
     }
   }
 
@@ -222,12 +227,12 @@ export function rascunho(c: ContextoTexto): SecoesTexto {
   if (i.nps && i.nps.respostas) {
     const g = i.google?.avaliacoes ? ` e ${i.google.avaliacoes} avaliações no Google${i.google.nota === 5 ? ", todas com 5 estrelas" : `, nota média ${i.google.nota?.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}`}` : "";
     const positivo = (i.nps.nps ?? 0) >= 75;
-    com.push(`- Experiência do paciente: ${positivo ? "mantivemos uma avaliação positiva, com " : ""}NPS de ${i.nps.nps} em ${i.nps.respostas} respostas${g}.`);
+    com.push(`- Experiência do ${V.cliente}: ${positivo ? "mantivemos uma avaliação positiva, com " : ""}NPS de ${i.nps.nps} em ${i.nps.respostas} respostas${g}.`);
   }
 
   /* Pontos de atenção */
   const at: string[] = [];
-  if (vTk !== null && vTk <= -0.1) at.push(`- Faturamento e ticket: a queda de ${pct(Math.abs(vTk))} no ticket médio impactou diretamente a receita${volumeEstavel ? ", mesmo com praticamente o mesmo volume de pacientes atendidos" : ""}.`);
+  if (vTk !== null && vTk <= -0.1) at.push(`- Faturamento e ticket: a queda de ${pct(Math.abs(vTk))} no ticket médio impactou diretamente a receita${volumeEstavel ? `, mesmo com praticamente o mesmo volume de ${V.clientes} atendidos` : ""}.`);
   const vVend = variacao(i.orcamentos?.valorFechado, a.orcamentos?.valorFechado);
   if (vVend !== null && vVend <= -0.15) at.push(`- Conversão de orçamentos: o valor vendido caiu de ${brl(a.orcamentos!.valorFechado)} para ${brl(i.orcamentos!.valorFechado)}, redução de ${pct(Math.abs(vVend))}.`);
   if (r?.meta && r.atingimentoProjetado !== null && r.atingimentoProjetado < 0.95) at.push(`- Meta do mês: no ritmo atual, a projeção é de ${pct(r.atingimentoProjetado)} da meta. Precisamos de ${brl(r.necessarioPorDia ?? 0)} por dia útil até o fim do mês.`);
@@ -262,7 +267,7 @@ export function textoWhatsApp(p: {
   const linhas: string[] = [];
   linhas.push(`Relatório ${p.tipo === "mensal" ? "Mensal" : "Quinzenal"} de Resultados - ${titulo} (${p.clinica})`, "");
   linhas.push("💰 Faturamento:");
-  linhas.push(`${r ? "Até o dia 15" : "Total da clínica"}: ${brl(i.faturamento?.total ?? 0)}${vFat !== null ? ` (${sinal(vFat)} vs. ${per}/${brl(a.faturamento!.total)})` : ""}`);
+  linhas.push(`${r ? "Até o dia 15" : "Total do mês"}: ${brl(i.faturamento?.total ?? 0)}${vFat !== null ? ` (${sinal(vFat)} vs. ${per}/${brl(a.faturamento!.total)})` : ""}`);
   if (i.pacientes) linhas.push(`📊 Ticket médio: ${brl(i.pacientes.ticketMedio)}${vTk !== null ? ` (${sinal(vTk)} vs. ${per})` : ""}`);
   if (r) {
     linhas.push(`📈 Projeção do mês: ${brl(r.projecaoMes)} (${brl(r.faturamentoPorDia)} por dia útil)`);

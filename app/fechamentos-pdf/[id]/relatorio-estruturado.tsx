@@ -1,8 +1,8 @@
 import { Fragment, type ReactNode } from "react";
 import type { ResultadoFechamento } from "@/lib/fechamentos/servidor";
-import { paginar, type ItemSecao } from "@/lib/fechamentos/estrutura";
+import { extrasDe, paginar, type ItemSecao } from "@/lib/fechamentos/estrutura";
 import { Folha, ROXO, SecAnalise, SecDespesas, SecExperiencia, SecFunilLeadsMensal, SecFunilOrcamentosMensal, SecGrafico, SecReceitasMensal, SecRegimes, SecResultadoMensal, temAnalise } from "./relatorio";
-import { SecFontePersonalizada } from "./secao-personalizada";
+import { ComplementoPdf, SecFontePersonalizada, SecPersonalizada, indicadoresDaSecao } from "./secao-personalizada";
 import { COR_QUINZENAL, SecCaixaMes, SecFunilLeadsQuinzenal, SecFunilOrcamentosQuinzenal, SecReceitasQuinzenal, SecResultadoQuinzenal, SecRitmo } from "./relatorio-quinzenal";
 
 /*
@@ -10,7 +10,16 @@ import { COR_QUINZENAL, SecCaixaMes, SecFunilLeadsQuinzenal, SecFunilOrcamentosQ
  * nível). Sem configuração, a estrutura padrão reproduz o relatório de sempre.
  */
 
-function secao(r: ResultadoFechamento, s: ItemSecao, cor: string): ReactNode {
+/** Seção padrão seguida dos indicadores personalizados colocados nela (e dos órfãos, no resultado). */
+function secao(r: ResultadoFechamento, s: ItemSecao, cor: string, orfaos: string[]): ReactNode {
+  const base = secaoBase(r, s, cor);
+  if (s.id.startsWith("fonte:") || s.id.startsWith("sec:")) return base;
+  const extras = [...indicadoresDaSecao(r, s.id), ...(s.id === "resultado" ? orfaos.flatMap((o) => indicadoresDaSecao(r, o)) : [])];
+  if (!extras.length) return base;
+  return <>{base}<ComplementoPdf r={r} itens={extras} /></>;
+}
+
+function secaoBase(r: ResultadoFechamento, s: ItemSecao, cor: string): ReactNode {
   const q = r.fechamento.tipo === "quinzenal";
   const p = { r, nivel: s.nivel };
   switch (s.id) {
@@ -26,8 +35,13 @@ function secao(r: ResultadoFechamento, s: ItemSecao, cor: string): ReactNode {
     case "regimes": return <SecRegimes {...p} />;
     case "analise": return <SecAnalise r={r} cor={cor} />;
     default: {
+      const fundo = q ? "#FFF3EC" : undefined;
+      if (s.id.startsWith("sec:")) {
+        const titulo = r.secoes.find((x) => `sec:${x.id}` === s.id)?.titulo ?? "";
+        return <SecPersonalizada r={r} titulo={titulo} itens={indicadoresDaSecao(r, s.id)} nivel={s.nivel} cor={cor} fundo={fundo} />;
+      }
       const fonte = s.id.startsWith("fonte:") ? r.personalizadas.find((x) => `fonte:${x.id}` === s.id) : undefined;
-      return fonte ? <SecFontePersonalizada r={r} fonte={fonte} nivel={s.nivel} cor={cor} fundo={q ? "#FFF3EC" : undefined} /> : null;
+      return fonte ? <SecFontePersonalizada r={r} fonte={fonte} nivel={s.nivel} cor={cor} fundo={fundo} /> : null;
     }
   }
 }
@@ -35,16 +49,22 @@ function secao(r: ResultadoFechamento, s: ItemSecao, cor: string): ReactNode {
 const FUNIS = new Set(["funilLeads", "funilOrcamentos"]);
 
 /** Conteúdo de uma página: os dois funis lado a lado quando estão em sequência. */
-function conteudo(r: ResultadoFechamento, secoes: ItemSecao[], cor: string): ReactNode[] {
+function conteudo(r: ResultadoFechamento, secoes: ItemSecao[], cor: string, orfaos: string[]): ReactNode[] {
   const out: ReactNode[] = [];
   for (let k = 0; k < secoes.length; k++) {
     const s = secoes[k], prox = secoes[k + 1];
     if (FUNIS.has(s.id) && prox && FUNIS.has(prox.id)) {
-      out.push(<div key={s.id} className="grid grid-cols-2 gap-8">{secao(r, s, cor)}{secao(r, prox, cor)}</div>);
+      // Funis lado a lado: o complemento de cada um fica embaixo dele, na mesma coluna.
+      out.push(
+        <div key={s.id} className="grid grid-cols-2 gap-8">
+          <div>{secaoBase(r, s, cor)}<ComplementoPdf r={r} itens={indicadoresDaSecao(r, s.id)} colunas={2} /></div>
+          <div>{secaoBase(r, prox, cor)}<ComplementoPdf r={r} itens={indicadoresDaSecao(r, prox.id)} colunas={2} /></div>
+        </div>,
+      );
       k++;
       continue;
     }
-    out.push(<Fragment key={s.id}>{secao(r, s, cor)}</Fragment>);
+    out.push(<Fragment key={s.id}>{secao(r, s, cor, orfaos)}</Fragment>);
   }
   return out;
 }
@@ -59,11 +79,15 @@ export function RelatorioEstruturado({ r, estrutura }: { r: ResultadoFechamento;
   const cor = r.fechamento.tipo === "quinzenal" ? COR_QUINZENAL : ROXO;
   // A página de análise só entra se houver texto ou plano.
   const itens = estrutura.map((s) => (s.id === "analise" && !temAnalise(r) ? { ...s, ativa: false } : s));
+  // Indicador colocado numa seção que não está no relatório (desligada, ou só do mensal) vai para o resultado.
+  const ligadas = new Set(itens.filter((s) => s.ativa).map((s) => s.id));
+  const destinos = new Set(r.personalizadas.flatMap((f) => f.indicadores.map((d) => d.secao)).filter((x) => x !== "fonte"));
+  const orfaos = [...destinos].filter((d) => !ligadas.has(d) && d !== "resultado");
   return (
     <>
-      {paginar(itens, r.fechamento.tipo, r.personalizadas.map((x) => ({ id: x.id, nome: x.nome }))).map((pg) => (
+      {paginar(itens, r.fechamento.tipo, extrasDe(r.personalizadas, r.secoes)).map((pg) => (
         <Folha key={pg.secoes[0].id} r={r} titulo={tituloDaPagina(r, pg.secoes[0], pg.titulo)} cor={cor} compacta={pg.secoes[0].id === "despesas"}>
-          {conteudo(r, pg.secoes, cor)}
+          {conteudo(r, pg.secoes, cor, orfaos)}
         </Folha>
       ))}
     </>

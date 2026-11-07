@@ -8,9 +8,11 @@
  */
 import { calcularRitmo, type Ritmo } from "./ritmo";
 import { limparFicha, type FichaClinica } from "./ficha";
+import { vocabularioDe, type Vocabulario } from "./vocabulario";
+import { gravarMetricas, metricasDoFechamento } from "./metricas";
 import { claudeConfigurado } from "./claude-api";
-import { normalizarEstrutura, type ItemSecao } from "./estrutura";
-import { calcularPersonalizada, lerFontePersonalizada, limparFontePersonalizada, type FontePersonalizada, type LeituraPersonalizada, type ResultadoPersonalizado } from "./fonte-personalizada";
+import { extrasDe, limparSecoes, normalizarEstrutura, type ItemSecao, type SecaoPersonalizada } from "./estrutura";
+import { adaptarResultado, calcularFontes, colunasUsadas, lerFontePersonalizada, limparFontePersonalizada, type FontePersonalizada, type LeituraPersonalizada, type ResultadoPersonalizado } from "./fonte-personalizada";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { readSheetValues } from "@/lib/google/sheets";
 import type { Fechamento, Json } from "@/lib/supabase/types";
@@ -21,6 +23,7 @@ import { calcularIndicadores, resumoAnual, type Indicadores, type LinhaAnual, ty
 import { periodoAnterior } from "./periodo";
 import { textoVazio, type Acao, type Acompanhamento, type TextoFechamento } from "./texto-fechamento";
 
+import { periodoDe } from "./periodo";
 export { periodoDe, periodoAnterior } from "./periodo";
 
 const CACHE_MS = 10 * 60 * 1000;
@@ -65,6 +68,10 @@ export interface ResultadoFechamento {
   estrutura: ItemSecao[];
   /** Números das fontes personalizadas (contratos, cirurgias, recall…). */
   personalizadas: ResultadoPersonalizado[];
+  /** Seções criadas no editor de estrutura (título), onde entram indicadores escolhidos. */
+  secoes: SecaoPersonalizada[];
+  /** Palavras do relatório conforme o segmento do cliente (paciente/cliente, médico/profissional…). */
+  vocab: Vocabulario;
 }
 
 /** O que fica gravado ao concluir: tudo que a tela e o PDF precisam, só totais. */
@@ -80,6 +87,7 @@ interface Retrato {
   /** Estrutura do relatório no momento da conclusão. */
   estrutura?: ItemSecao[];
   personalizadas?: ResultadoPersonalizado[];
+  secoes?: SecaoPersonalizada[];
 }
 
 /* ---------- leitura ---------- */
@@ -144,7 +152,7 @@ export async function calcularFechamento(id: string, opcoes: { releitura?: boole
     db.from("clinicas").select("nome").eq("id", f.clinica_id).maybeSingle(),
     db.from("fechamento_config").select("*").eq("clinica_id", f.clinica_id).maybeSingle(),
   ]);
-  if (!config) throw new Error("A clínica ainda não tem as planilhas configuradas para fechamento.");
+  if (!config) throw new Error("Este cliente ainda não tem as planilhas configuradas para fechamento.");
 
   const decisoes = lerDecisoes(f.decisoes);
   const salvoAcomp = lista<Acompanhamento>(f.acompanhamento);
@@ -158,14 +166,20 @@ export async function calcularFechamento(id: string, opcoes: { releitura?: boole
     acompanhamento: salvoAcomp.length ? salvoAcomp : await acoesDoAnterior(f),
     equipe: lista<string>(config.equipe),
     ficha: limparFicha((config.ficha ?? {}) as Partial<FichaClinica>),
+    vocab: vocabularioDe(limparFicha((config.ficha ?? {}) as Partial<FichaClinica>)),
     iaLigada: claudeConfigurado(),
     estrutura: normalizarEstrutura(((config as { relatorio?: Record<string, unknown> }).relatorio ?? {})[f.tipo], f.tipo, extrasDaConfig(config)),
+    secoes: secoesDaConfig(config),
   };
 
   const congelado = (f.status === "concluido" || f.status === "enviado") && !!f.snapshot;
   if (congelado) {
     const r = f.snapshot as unknown as Retrato;
-    return { ...comuns, ...r, ritmo: r.ritmo ?? null, estrutura: r.estrutura ? normalizarEstrutura(r.estrutura, f.tipo, (r.personalizadas ?? []).map((x) => ({ id: x.id, nome: x.nome }))) : comuns.estrutura, personalizadas: r.personalizadas ?? [], pendentesGraves: gravesPendentes(r.alertas, decisoes).length, congelado: true };
+    // Retratos antigos guardam as fontes no formato anterior; adaptarResultado converte para exibir.
+    const personalizadas = (r.personalizadas ?? []).map(adaptarResultado);
+    const secoes = r.secoes ?? (r.estrutura ? [] : comuns.secoes);
+    const estrutura = r.estrutura ? normalizarEstrutura(r.estrutura, f.tipo, extrasDe(personalizadas, secoes)) : comuns.estrutura;
+    return { ...comuns, ...r, ritmo: r.ritmo ?? null, estrutura, personalizadas, secoes, pendentesGraves: gravesPendentes(r.alertas, decisoes).length, congelado: true };
   }
   const retrato = await calcularRetrato(f, config, decisoes, !!opcoes.releitura);
   await db.from("fechamentos").update({
@@ -184,22 +198,25 @@ const cacheExtras = new Map<string, { em: number; leitura: LeituraPersonalizada 
 export function fontesExtras(json: unknown): FontePersonalizada[] {
   return (Array.isArray(json) ? json : []).map((x) => limparFontePersonalizada(x as Partial<FontePersonalizada>));
 }
-function extrasDaConfig(config: unknown) {
-  return fontesExtras((config as { fontes_extras?: unknown }).fontes_extras).map((x) => ({ id: x.id, nome: x.nome }));
+export function secoesDaConfig(config: unknown): SecaoPersonalizada[] {
+  return limparSecoes(((config as { relatorio?: { secoes?: unknown } }).relatorio ?? {}).secoes);
+}
+export function extrasDaConfig(config: unknown) {
+  return extrasDe(fontesExtras((config as { fontes_extras?: unknown }).fontes_extras), secoesDaConfig(config));
 }
 
-async function calcularPersonalizadas(clinicaId: string, fontes: FontePersonalizada[], periodo: Periodo, anterior: Periodo, releitura: boolean): Promise<ResultadoPersonalizado[]> {
-  const out: ResultadoPersonalizado[] = [];
-  for (const f of fontes) {
-    const chave = `${clinicaId}|${f.id}|${f.sheetId}|${f.aba}|${f.linhaCabecalho ?? ""}|${JSON.stringify(f.colunas)}`;
+async function calcularPersonalizadas(clinicaId: string, fontes: FontePersonalizada[], periodo: Periodo, anterior: Periodo, releitura: boolean, padrao: { atual: Indicadores; anterior: Indicadores }): Promise<ResultadoPersonalizado[]> {
+  const leituras = new Map<string, { leitura: LeituraPersonalizada | null; erro: string | null }>();
+  await Promise.all(fontes.map(async (f) => {
+    const chave = `${clinicaId}|${f.id}|${f.sheetId}|${f.aba}|${f.linhaCabecalho ?? ""}|${f.colunaData}|${colunasUsadas(f).join("|")}`;
     let c = cacheExtras.get(chave);
     if (releitura || !c || Date.now() - c.em > CACHE_MS) {
       c = { em: Date.now(), ...(await lerFontePersonalizada(f, readSheetValues)) };
       cacheExtras.set(chave, c);
     }
-    out.push(calcularPersonalizada(f, c.erro ? null : c.leitura, periodo, anterior, c.erro));
-  }
-  return out;
+    leituras.set(f.id, { leitura: c.erro ? null : c.leitura, erro: c.erro });
+  }));
+  return calcularFontes(fontes, leituras, periodo, anterior, padrao);
 }
 
 function alertasPersonalizadas(rs: ResultadoPersonalizado[]): Alerta[] {
@@ -214,6 +231,67 @@ function alertasPersonalizadas(rs: ResultadoPersonalizado[]): Alerta[] {
 /** Lê uma fonte personalizada isolada (tela de configuração), sem cache. */
 export async function testarFontePersonalizada(f: FontePersonalizada) {
   return lerFontePersonalizada(f, readSheetValues);
+}
+
+export interface PreviaFonte {
+  erro: string | null;
+  leitura: {
+    linhas: number; linhaCabecalho: number; cabecalho: string[]; colunas: { ref: string; letra: string; cabecalho: string }[];
+    ignoradas: { linha: number; motivo: string }[]; totalIgnoradas: number;
+    /** Valores que aparecem nas colunas usadas (sem as de dado pessoal), para sugerir nos filtros. */
+    valores: Record<string, string[]>;
+    /** Últimas linhas, só com as colunas usadas e sem as de dado pessoal. */
+    amostra: { data: string; c: Record<string, string> }[];
+    /** Meses com linhas, do mais recente para o mais antigo. */
+    meses: string[];
+  } | null;
+  periodo: Periodo | null;
+  resultado: ResultadoPersonalizado | null;
+}
+
+/**
+ * Prévia de uma fonte na configuração: lê a planilha e calcula os indicadores
+ * num mês (o pedido, ou o último com linhas) contra o mês anterior. As fórmulas
+ * podem usar as outras fontes da tela e os indicadores padrão do cliente.
+ */
+export async function previaFontePersonalizada(clinicaId: string, alvo: FontePersonalizada, outras: FontePersonalizada[], mes?: string): Promise<PreviaFonte> {
+  const r = await lerFontePersonalizada(alvo, readSheetValues);
+  if (!r.leitura) return { erro: r.erro, leitura: null, periodo: null, resultado: null };
+  const l = r.leitura;
+  const pessoais = new Set(alvo.pessoais.map((x) => x.toLowerCase()));
+  const publica = (ref: string) => !pessoais.has(ref.toLowerCase()) && !pessoais.has((l.colunas.find((c) => c.ref === ref)?.cabecalho ?? "").toLowerCase());
+  const refs = l.colunas.map((c) => c.ref).filter((ref) => ref !== (alvo.colunaData || "~data") && publica(ref));
+  const valores: Record<string, string[]> = {};
+  for (const ref of refs) valores[ref] = [...new Set(l.linhas.map((x) => String(x.c[ref] ?? "").trim()).filter(Boolean))].slice(0, 25);
+  const meses = [...new Set(l.linhas.map((x) => x.data.slice(0, 7)))].sort().reverse();
+  const leitura = {
+    linhas: l.linhas.length, linhaCabecalho: l.linhaCabecalho, cabecalho: l.cabecalho.filter(Boolean).slice(0, 60), colunas: l.colunas,
+    ignoradas: l.ignoradas.slice(0, 5), totalIgnoradas: l.ignoradas.length, valores, meses,
+    amostra: l.linhas.slice(-5).map((x) => ({ data: x.data, c: Object.fromEntries(refs.map((ref) => [ref, String(x.c[ref] ?? "")])) })),
+  };
+  const m = mes && /^\d{4}-\d{2}$/.test(mes) ? mes : meses[0];
+  if (!m || r.erro) return { erro: r.erro, leitura, periodo: null, resultado: null };
+  const periodo = periodoDe(m, "mensal", 1);
+  const anterior = periodoAnterior(periodo, "mensal");
+
+  // Outras fontes (para fórmulas) e indicadores padrão, só quando alguma fórmula usa.
+  const formulas = alvo.indicadores.filter((d) => d.tipo === "formula").flatMap((d) => d.termos);
+  const usadas = outras.filter((o) => o.id !== alvo.id && o.indicadores.some((d) => formulas.includes(d.id) || formulas.some((t) => t.startsWith(`${o.id}.`))));
+  const leituras = new Map<string, { leitura: LeituraPersonalizada | null; erro: string | null }>([[alvo.id, { leitura: l, erro: null }]]);
+  for (const o of usadas) leituras.set(o.id, await lerFontePersonalizada(o, readSheetValues));
+  let padrao: { atual: Indicadores | null; anterior: Indicadores | null } = { atual: null, anterior: null };
+  if (formulas.some((t) => t.startsWith("padrao:"))) {
+    const { data: config } = await getSupabaseAdmin().from("fechamento_config").select("fontes, regras").eq("clinica_id", clinicaId).maybeSingle();
+    if (config?.fontes && Object.keys(config.fontes as object).length) {
+      const { coleta } = await coletarClinica(clinicaId, config.fontes as unknown as FontesFechamento, false);
+      const regras = (config.regras ?? {}) as unknown as RegrasClinica;
+      padrao = { atual: calcularIndicadores(coleta.dados, periodo, { regras }), anterior: calcularIndicadores(coleta.dados, anterior, { regras }) };
+    }
+  }
+  const todos = calcularFontes([alvo, ...usadas], leituras, periodo, anterior, padrao);
+  // Grupos por coluna de dado pessoal não aparecem.
+  const resultado = todos[0];
+  return { erro: null, leitura, periodo, resultado };
 }
 
 async function calcularRetrato(
@@ -254,7 +332,7 @@ async function calcularRetrato(
   const [ano, mes] = f.fim.split("-").map(Number);
   const anual = resumoAnual(coleta.dados, ano, mes);
   const nomes = ["vendas", "despesas", "orcamentos", "leads", "nps", "avaliacoes"] as const;
-  const personalizadas = await calcularPersonalizadas(f.clinica_id, fontesExtras(config.fontes_extras), periodo, periodoAnterior(periodo, f.tipo), releitura);
+  const personalizadas = await calcularPersonalizadas(f.clinica_id, fontesExtras(config.fontes_extras), periodo, periodoAnterior(periodo, f.tipo), releitura, { atual: indicadores, anterior });
   alertas.push(...alertasPersonalizadas(personalizadas));
   return {
     alertas, indicadores, anterior, anual, metaMensal, ritmo, personalizadas,
@@ -272,7 +350,9 @@ export async function concluirFechamento(id: string): Promise<void> {
   if (r.congelado) return;
   if (r.pendentesGraves) throw new Error("Ainda há alertas graves sem decisão na conferência.");
   if (r.fontes.some((x) => x.erro && (x.fonte === "vendas" || x.fonte === "despesas"))) throw new Error("Vendas ou despesas não foram lidas. Corrija antes de concluir.");
-  const retrato: Retrato = { alertas: r.alertas, indicadores: r.indicadores, anterior: r.anterior, anual: r.anual, fontes: r.fontes, metaMensal: r.metaMensal, lidoEm: r.lidoEm, ritmo: r.ritmo, estrutura: r.estrutura, personalizadas: r.personalizadas };
+  const retrato: Retrato = { alertas: r.alertas, indicadores: r.indicadores, anterior: r.anterior, anual: r.anual, fontes: r.fontes, metaMensal: r.metaMensal, lidoEm: r.lidoEm, ritmo: r.ritmo, estrutura: r.estrutura, personalizadas: r.personalizadas, secoes: r.secoes };
   const agora = new Date().toISOString();
   await db.from("fechamentos").update({ status: "concluido", snapshot: retrato as unknown as Json, acompanhamento: r.acompanhamento as unknown as Json, concluido_em: agora, atualizado_em: agora }).eq("id", id);
+  // Base padronizada para comparativos e benchmarking (ignora se a tabela ainda não existe).
+  await gravarMetricas(db, r.fechamento, metricasDoFechamento(r.indicadores, r.personalizadas));
 }

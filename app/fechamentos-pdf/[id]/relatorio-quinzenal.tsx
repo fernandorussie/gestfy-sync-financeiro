@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { ResultadoFechamento } from "@/lib/fechamentos/servidor";
+import { cap } from "@/lib/fechamentos/vocabulario";
 import type { Ritmo } from "@/lib/fechamentos/ritmo";
 import { brl, brl0, num, pct } from "../../(app)/fechamentos/_components/formato";
 import { Cabecalho, categoriasReceita, CINZA, Kpi, LINHA, Linhas, contagens, mesDe, td, Titulo, Var, VERMELHO } from "./relatorio";
@@ -68,9 +69,9 @@ export function SecResultadoQuinzenal({ r }: Props) {
   return (
     <div className="grid grid-cols-4 gap-2.5">
       <Kpi fundo={FUNDO} rotulo="Faturamento até o dia 15" valor={brl0(i.faturamento?.total)} nota={n(i.faturamento?.total, a.faturamento?.total)} />
-      <Kpi fundo={FUNDO} rotulo="Pacientes atendidos" valor={num(i.pacientes?.atendidos)} nota={n(i.pacientes?.atendidos, a.pacientes?.atendidos)} />
+      <Kpi fundo={FUNDO} rotulo={`${cap(r.vocab.clientes)} atendidos`} valor={num(i.pacientes?.atendidos)} nota={n(i.pacientes?.atendidos, a.pacientes?.atendidos)} />
       <Kpi fundo={FUNDO} rotulo="Ticket médio" valor={brl(i.pacientes?.ticketMedio)} nota={n(i.pacientes?.ticketMedio, a.pacientes?.ticketMedio)} />
-      <Kpi fundo={FUNDO} rotulo="Pacientes novos" valor={num(i.pacientes?.novos)} nota={n(i.pacientes?.novos, a.pacientes?.novos)} />
+      <Kpi fundo={FUNDO} rotulo={`${cap(r.vocab.clientes)} novos`} valor={num(i.pacientes?.novos)} nota={n(i.pacientes?.novos, a.pacientes?.novos)} />
     </div>
   );
 }

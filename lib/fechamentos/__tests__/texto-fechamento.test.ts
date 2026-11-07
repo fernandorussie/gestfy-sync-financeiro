@@ -1,3 +1,4 @@
+import { vocabularioDe, NEUTRO } from "../vocabulario";
 import { describe, it, expect } from "vitest";
 import { conferir } from "../conferencia";
 import { decidir, decisoesVazias } from "../decisoes";
@@ -21,10 +22,12 @@ const pontuais = alertas.find((a) => a.regra === "pagamentos-pontuais")!;
 const decisoes = decidir(decisoesVazias(), pontuais, "aplicar");
 
 describe("rascunho do texto", () => {
-  const r = rascunho({ clinica: "Claros Clinic", tipo: "mensal", indicadores, anterior, alertas, decisoes });
+  // Claros: clínica médica (pacientes, "Fala, Drs.!").
+  const clinica = vocabularioDe({ segmentoTipo: "clinica" });
+  const r = rascunho({ clinica: "Claros Clinic", tipo: "mensal", indicadores, anterior, alertas, decisoes, vocab: clinica });
 
   it("observação no formato dos reports: queda, meta e volume × ticket", () => {
-    expect(r.observacao).toContain("Fala, Drs.! Segue o fechamento mensal de outubro da Claros Clinic.");
+    expect(r.observacao).toContain("Fala, Drs.! Segue o fechamento mensal de outubro.");
     expect(r.observacao).toContain("O faturamento caiu de R$ 152.945,00 em setembro para R$ 117.650,00 em outubro, uma redução de 23,1%.");
     expect(r.observacao).toContain("Atingimos 78,4% da meta de R$ 150.000,00, ficando R$ 32.350,00 abaixo do objetivo.");
     expect(r.observacao).toContain("Tivemos um período de atenção.");
@@ -57,7 +60,7 @@ describe("texto do WhatsApp", () => {
 
   it("cabeçalho com faturamento, ticket, meta, saídas e saldo", () => {
     expect(t.startsWith("Relatório Mensal de Resultados - Outubro/2026 (Claros Clinic)")).toBe(true);
-    expect(t).toContain("Total da clínica: R$ 117.650,00 (−23,1% vs. setembro/R$ 152.945,00)");
+    expect(t).toContain("Total do mês: R$ 117.650,00 (−23,1% vs. setembro/R$ 152.945,00)");
     expect(t).toContain("🎯 Meta: R$ 150.000,00 | Atingimento: 78,4%");
     expect(t).toContain("💳 Saídas no período: R$ 110.850,14");
     expect(t).toContain("💵 Saldo de caixa no período: R$ 6.799,86");
@@ -68,5 +71,14 @@ describe("texto do WhatsApp", () => {
     expect(t).not.toContain("Principais destaques");
     expect(t).toContain("🎯 Plano de Ação para Novembro");
     expect(t).toContain("1. Follow-up dos orçamentos em aberto\n- Responsável: Recepção + Gestfy · até 20/11\n> Ação: Ligar para os 3 orçamentos em negociação.");
+  });
+});
+
+describe("linguagem neutra", () => {
+  it("sem segmento: cliente/profissional e saudação neutra", () => {
+    const fx = rascunho({ clinica: "Shopping X", tipo: "mensal", indicadores, anterior, alertas, decisoes: decisoesVazias(), vocab: NEUTRO });
+    const tudo = Object.values(fx).join("\n");
+    expect(fx.observacao.startsWith("Olá, pessoal!")).toBe(true);
+    expect(tudo).not.toMatch(/paciente|Drs\./i);
   });
 });

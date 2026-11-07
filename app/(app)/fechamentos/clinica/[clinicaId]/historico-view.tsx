@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FileDown, Settings2 } from "lucide-react";
+import { FileDown, LineChart, Settings2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { agruparPeriodos, concluido, evolucaoMensal, indicadoresDe, type LinhaFechamento, type PontoEvolucao } from "@/lib/fechamentos/historico";
 import type { Acao } from "@/lib/fechamentos/texto-fechamento";
@@ -50,7 +50,10 @@ export function HistoricoView({ clinica, linhas, configurada, erro }: { clinica:
           <p className="text-sm text-muted-foreground"><Link href="/fechamentos" className="hover:underline">Fechamentos</Link> / Histórico</p>
           <h1 className="text-2xl font-semibold">{clinica.nome}</h1>
         </div>
-        <Link href={`/fechamentos/configurar/${clinica.id}`} className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-muted"><Settings2 className="h-4 w-4" />Planilhas</Link>
+        <div className="flex flex-wrap gap-2">
+          <Link href={`/fechamentos/clinica/${clinica.id}/comparativos`} className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-muted"><LineChart className="h-4 w-4" />Comparativos</Link>
+          <Link href={`/fechamentos/configurar/${clinica.id}`} className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-muted"><Settings2 className="h-4 w-4" />Configurar</Link>
+        </div>
       </div>
 
       {erro && <div className="rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm"><b>Não foi possível ler o banco de dados:</b> {erro}</div>}
@@ -78,7 +81,7 @@ export function HistoricoView({ clinica, linhas, configurada, erro }: { clinica:
                     <th className="py-2 text-right font-medium">Despesas</th>
                     <th className="py-2 text-right font-medium">Resultado</th>
                     <th className="py-2 text-right font-medium">Meta</th>
-                    <th className="py-2 text-right font-medium">Pacientes</th>
+                    <th className="py-2 text-right font-medium">Atendidos</th>
                     <th className="py-2 text-right font-medium">Ticket</th>
                     <th className="py-2 text-right font-medium">Novos</th>
                     <th className="py-2 text-right font-medium">Conv. leads</th>
@@ -121,7 +124,7 @@ export function HistoricoView({ clinica, linhas, configurada, erro }: { clinica:
           <CardHeader className="pb-3"><CardTitle className="text-base">Todos os fechamentos</CardTitle></CardHeader>
           <CardContent className="p-0">
             {periodos.length === 0 ? (
-              <p className="px-6 pb-6 text-sm text-muted-foreground">Nenhum fechamento desta clínica ainda.</p>
+              <p className="px-6 pb-6 text-sm text-muted-foreground">Nenhum fechamento deste cliente ainda.</p>
             ) : (
               <ul className="divide-y">
                 {periodos.map((p) => {

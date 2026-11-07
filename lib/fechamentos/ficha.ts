@@ -1,16 +1,42 @@
 /**
- * Ficha da clínica: o que o Claude precisa saber do cliente além dos números.
- * Os atributos estruturados (cidade, UF, segmento, especialidades, modelo)
- * também preparam o benchmarking futuro entre clínicas.
+ * Perfil do cliente (antes "ficha da clínica"): o que o Claude precisa saber do
+ * cliente além dos números, o segmento e o vocabulário do relatório.
+ * Os atributos estruturados (cidade, UF, segmento, áreas de atuação, modelo,
+ * porte) também preparam o benchmarking futuro entre clientes.
+ * O nome do tipo continua FichaClinica para não mexer no banco (coluna "ficha").
  */
+import { SEGMENTOS, segmentoDoTexto, type SegmentoId, type Vocabulario } from "./vocabulario";
 
 export type ModeloNegocio = "" | "particular" | "convenio" | "misto";
+export type Porte = "" | "ate50" | "50a150" | "150a400" | "400a1000" | "acima1000";
+
+export const PORTES: Record<Exclude<Porte, "">, string> = {
+  ate50: "Até R$ 50 mil/mês", "50a150": "R$ 50 a 150 mil/mês", "150a400": "R$ 150 a 400 mil/mês", "400a1000": "R$ 400 mil a 1 milhão/mês", acima1000: "Acima de R$ 1 milhão/mês",
+};
+
+/** Faixa de porte pelo faturamento médio mensal (base para o benchmarking). */
+export function porteDoFaturamento(media: number | null | undefined): Porte {
+  if (!media || media <= 0) return "";
+  if (media < 50_000) return "ate50";
+  if (media < 150_000) return "50a150";
+  if (media < 400_000) return "150a400";
+  if (media < 1_000_000) return "400a1000";
+  return "acima1000";
+}
 
 export interface FichaClinica {
   cidade: string;
   uf: string;
+  /** Tipo de negócio (define o vocabulário padrão). */
+  segmentoTipo: SegmentoId | "";
+  /** Descrição livre do segmento ("Clínica de dermatologia"). */
   segmento: string;
+  /** Áreas de atuação (especialidades, linhas de produto…). */
   especialidades: string;
+  /** Ajustes nas palavras do relatório (vazio = as do segmento). */
+  vocabulario: Partial<Vocabulario>;
+  /** Porte informado; vazio = calculado pelo faturamento quando precisar. */
+  porte: Porte;
   modelo: ModeloNegocio;
   perfil: string;
   prioridades: string;
@@ -21,12 +47,12 @@ export interface FichaClinica {
 }
 
 export const fichaVazia = (): FichaClinica => ({
-  cidade: "", uf: "", segmento: "", especialidades: "", modelo: "", perfil: "", prioridades: "", pessoas: "", estilo: "", evitar: "", atualizadoEm: null,
+  cidade: "", uf: "", segmentoTipo: "", segmento: "", especialidades: "", vocabulario: {}, porte: "", modelo: "", perfil: "", prioridades: "", pessoas: "", estilo: "", evitar: "", atualizadoEm: null,
 });
 
 export const MODELOS: Record<Exclude<ModeloNegocio, "">, string> = { particular: "Particular", convenio: "Convênio", misto: "Misto (particular e convênio)" };
 
-export const LIMITES_FICHA: Record<Exclude<keyof FichaClinica, "atualizadoEm">, number> = {
+export const LIMITES_FICHA: Record<Exclude<keyof FichaClinica, "atualizadoEm" | "segmentoTipo" | "vocabulario" | "porte">, number> = {
   cidade: 80, uf: 2, segmento: 120, especialidades: 400, modelo: 12, perfil: 3000, prioridades: 3000, pessoas: 2000, estilo: 1500, evitar: 1500,
 };
 
@@ -38,7 +64,10 @@ export function limparFicha(f: Partial<FichaClinica> | null | undefined): FichaC
     ...base,
     cidade: s(f?.cidade, LIMITES_FICHA.cidade).trim(),
     uf: s(f?.uf, 2).toUpperCase().replace(/[^A-Z]/g, ""),
+    segmentoTipo: SEGMENTOS.find((x) => x.id === f?.segmentoTipo)?.id ?? "",
     segmento: s(f?.segmento, LIMITES_FICHA.segmento),
+    vocabulario: Object.fromEntries(Object.entries((f?.vocabulario ?? {}) as Record<string, unknown>).filter(([k, v]) => k !== "genero" && typeof v === "string" && v.trim()).map(([k, v]) => [k, s(v, 40).trim()])),
+    porte: (Object.keys(PORTES) as Porte[]).find((x) => x === f?.porte) ?? "",
     especialidades: s(f?.especialidades, LIMITES_FICHA.especialidades),
     modelo,
     perfil: s(f?.perfil, LIMITES_FICHA.perfil),
@@ -85,7 +114,7 @@ export function separarSecoes<K extends string>(texto: string, rotulos: Record<K
 const ROTULOS_FICHA = {
   local: ["CIDADE"],
   segmento: ["SEGMENTO"],
-  especialidades: ["ESPECIALIDADES"],
+  especialidades: ["AREAS DE ATUACAO", "ESPECIALIDADES"],
   modelo: ["MODELO"],
   perfil: ["PERFIL"],
   prioridades: ["PRIORIDADES"],
@@ -94,20 +123,20 @@ const ROTULOS_FICHA = {
   evitar: ["ASSUNTOS A EVITAR", "EVITAR"],
 } as const;
 
-export function pedidoFicha(clinica: string): string {
+export function pedidoFicha(cliente: string): string {
   return [
-    `Preciso de uma ficha da ${clinica} para o sistema de fechamentos financeiros da Gestfy.`,
-    "Use tudo o que você sabe sobre a clínica neste projeto (instruções, arquivos e conversas).",
-    "Regras: tópicos curtos e objetivos; não inclua dados de pacientes; se não souber um item, escreva \"não informado\".",
+    `Preciso do perfil do cliente ${cliente} para o sistema de fechamentos financeiros da Gestfy.`,
+    "Use tudo o que você sabe sobre este cliente neste projeto (instruções, arquivos e conversas).",
+    "Regras: tópicos curtos e objetivos; não inclua dados pessoais dos clientes dele; se não souber um item, escreva \"não informado\".",
     "Responda somente neste formato, mantendo os títulos exatamente assim:",
     "",
     "### CIDADE/UF",
-    "### SEGMENTO",
-    "### ESPECIALIDADES",
-    "### MODELO DE NEGÓCIO (particular, convênio ou misto)",
+    "### SEGMENTO (tipo de negócio)",
+    "### ÁREAS DE ATUAÇÃO (especialidades, linhas de serviço ou produto)",
+    "### MODELO DE NEGÓCIO (para saúde: particular, convênio ou misto; outros negócios: descreva em uma linha)",
     "### PERFIL E POSICIONAMENTO",
     "### PRIORIDADES E METAS DO MOMENTO",
-    "### PESSOAS E PAPÉIS (sócios, médicos, gestores, recepção, marketing)",
+    "### PESSOAS E PAPÉIS (sócios, gestores, equipe, marketing)",
     "### COMO ESCREVER PARA ESTE CLIENTE (tom, tratamento, o que valorizam)",
     "### ASSUNTOS A EVITAR",
   ].join("\n");
@@ -131,5 +160,6 @@ export function lerFichaGerada(texto: string, atual: FichaClinica): { ficha: Fic
     const t = v(secoes[k]);
     if (t) { ficha[k] = t; achados++; }
   }
+  if (!ficha.segmentoTipo && ficha.segmento) ficha.segmentoTipo = segmentoDoTexto(ficha.segmento);
   return { ficha: limparFicha(ficha), achados };
 }
