@@ -94,7 +94,7 @@ describe("comparativos pela base (planilhas)", () => {
     // A fixture tem as vendas de outubro e despesas do ano: dezembro/2025 não tem nada.
     const m = mesesDaBase(dados, {}, ["2025-12", "2026-10"]);
     expect(m.map((x) => x.mes)).toEqual(["2026-10"]);
-    expect(m[0].indicadores.faturamento.total).toBe(117650);
+    expect(m[0].indicadores.faturamento!.total).toBe(117650);
     expect(m[0].periodoAnterior).toEqual({ inicio: "2026-09-01", fim: "2026-09-30" });
   });
 });
