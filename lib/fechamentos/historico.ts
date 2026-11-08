@@ -5,7 +5,8 @@
  * Números: de um fechamento concluído vêm do retrato congelado (snapshot);
  * de um em andamento, do último cálculo salvo (pode mudar até concluir).
  */
-import type { Indicadores, LinhaAnual } from "./indicadores";
+import { calcularIndicadores, type DadosFechamento, type Indicadores, type LinhaAnual, type RegrasClinica } from "./indicadores";
+import { periodoAnterior, periodoDe } from "./periodo";
 import { adaptarResultado, type Formato, type Melhor, type ResultadoPersonalizado } from "./fonte-personalizada";
 import { METRICAS_PADRAO, metricasDoFechamento } from "./metricas";
 
@@ -115,8 +116,13 @@ export function situacaoCliente(fontes: unknown): { situacao: SituacaoCliente; f
 
 /* ---------- comparativos ---------- */
 
-export interface PontoSerie { mes: string; valor: number; definitivo: boolean; id: string }
+/** De onde veio o número do mês: fechamento concluído (congelado), planilha (calculado na hora) ou fechamento em andamento. */
+export type OrigemPonto = "fechamento" | "planilha" | "andamento";
+export interface PontoSerie { mes: string; valor: number; definitivo: boolean; id: string; origem?: OrigemPonto }
 export interface SerieComparativo { id: string; rotulo: string; formato: Formato; melhor: Melhor; pontos: PontoSerie[]; personalizada: boolean }
+
+/** Mês calculado direto das planilhas do cliente (sem fechamento). */
+export interface MesBase { mes: string; indicadores: Indicadores; personalizadas: ResultadoPersonalizado[] }
 
 /** Personalizadas do fechamento: só de concluídos (o cálculo em andamento não fica salvo). */
 function personalizadasDe(l: LinhaFechamento): ResultadoPersonalizado[] {
@@ -124,16 +130,29 @@ function personalizadasDe(l: LinhaFechamento): ResultadoPersonalizado[] {
   return concluido(l) && Array.isArray(snap?.personalizadas) ? snap!.personalizadas.map(adaptarResultado) : [];
 }
 
-/** Uma série por indicador (padrão e personalizados), com um ponto por mês, dos fechamentos mensais. */
-export function seriesComparativas(periodos: PeriodoHistorico[], meses = 12): SerieComparativo[] {
-  const mensais = periodos.filter((p) => p.tipo === "mensal").sort((a, b) => a.inicio.localeCompare(b.inicio)).slice(-meses);
+/**
+ * Uma série por indicador (padrão e personalizados), um ponto por mês.
+ * Mês com fechamento mensal concluído usa os números congelados dele (com os
+ * ajustes da conferência); os demais vêm da base (planilhas). Sem base, um
+ * fechamento em andamento usa o último cálculo salvo.
+ */
+export function seriesComparativas(periodos: PeriodoHistorico[], meses = 12, base: MesBase[] = []): SerieComparativo[] {
+  const mensais = new Map(periodos.filter((p) => p.tipo === "mensal").map((p) => [p.inicio.slice(0, 7), p]));
+  const daBase = new Map(base.map((b) => [b.mes, b]));
+  const todos = [...new Set([...mensais.keys(), ...daBase.keys()])].sort().slice(-meses);
   const series = new Map<string, SerieComparativo>();
   for (const m of METRICAS_PADRAO) series.set(m.id, { id: m.id, rotulo: m.rotulo, formato: m.formato, melhor: m.melhor, pontos: [], personalizada: false });
-  for (const p of mensais) {
-    for (const x of metricasDoFechamento(indicadoresDe(p.atual), personalizadasDe(p.atual))) {
+  for (const mes of todos) {
+    const p = mensais.get(mes);
+    const b = daBase.get(mes);
+    const fechado = p && concluido(p.atual);
+    const fonte = fechado ? { ind: indicadoresDe(p!.atual), pers: personalizadasDe(p!.atual), origem: "fechamento" as const }
+      : b ? { ind: b.indicadores, pers: b.personalizadas, origem: "planilha" as const }
+      : { ind: indicadoresDe(p!.atual), pers: [], origem: "andamento" as const };
+    for (const x of metricasDoFechamento(fonte.ind, fonte.pers)) {
       const s = series.get(x.indicador) ?? { id: x.indicador, rotulo: x.rotulo, formato: x.formato, melhor: x.melhor, pontos: [], personalizada: true };
       s.rotulo = x.rotulo; // o nome mais recente
-      s.pontos.push({ mes: p.inicio.slice(0, 7), valor: x.valor, definitivo: concluido(p.atual), id: p.atual.id });
+      s.pontos.push({ mes, valor: x.valor, definitivo: fonte.origem === "fechamento", id: p?.atual.id ?? "", origem: fonte.origem });
       series.set(x.indicador, s);
     }
   }
@@ -156,4 +175,15 @@ export function anoCaixaCompetencia(periodos: PeriodoHistorico[]): { ano: string
   const p = periodos.filter((x) => x.tipo === "mensal" && concluido(x.atual)).sort((a, b) => b.inicio.localeCompare(a.inicio))[0];
   const anual = (p?.atual.snapshot as { anual?: LinhaAnual[] } | null)?.anual;
   return p && anual?.length ? { ano: p.inicio.slice(0, 4), linhas: anual.filter((m) => m.entradas || m.saidasCaixa || m.saidasCompetencia) } : null;
+}
+
+/** Indicadores de cada mês a partir dos dados lidos (puro, testável). Meses sem lançamento ficam de fora. */
+export function mesesDaBase(dados: DadosFechamento, regras: RegrasClinica, meses: string[]) {
+  return meses.flatMap((mes) => {
+    const periodo = periodoDe(mes, "mensal", 1);
+    const periodoAnt = periodoAnterior(periodo, "mensal");
+    const indicadores = calcularIndicadores(dados, periodo, { regras });
+    if (!indicadores.faturamento?.total && !indicadores.despesas?.total) return [];
+    return [{ mes, periodo, periodoAnterior: periodoAnt, indicadores, anterior: calcularIndicadores(dados, periodoAnt, { regras }) }];
+  });
 }

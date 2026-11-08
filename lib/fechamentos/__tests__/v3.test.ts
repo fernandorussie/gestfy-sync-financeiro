@@ -44,6 +44,17 @@ describe("comparativos e métricas", () => {
     expect([st.maior.mes, st.menor.mes, Math.round(st.media)]).toEqual(["2026-09", "2026-10", 107]);
   });
 
+  it("meses sem fechamento vêm da base (planilhas); concluído prevalece sobre a base", () => {
+    const p = agruparPeriodos([linha("2026-09", 120, "concluido"), linha("2026-10", 90, "analise")]);
+    const base = ["2026-07", "2026-08", "2026-09", "2026-10"].map((mes, k) => ({ mes, indicadores: ind(1000 + k), personalizadas: [] }));
+    const fat = seriesComparativas(p, 12, base).find((x) => x.id === "faturamento")!.pontos;
+    expect(fat.map((x) => [x.mes, x.valor, x.origem])).toEqual([
+      ["2026-07", 1000, "planilha"], ["2026-08", 1001, "planilha"], ["2026-09", 120, "fechamento"], ["2026-10", 1003, "planilha"],
+    ]);
+    expect(fat[3].id).toBe("2026-10-1"); // mês com fechamento em andamento continua clicável
+    expect(seriesComparativas(p, 2, base)[0].pontos.map((x) => x.mes)).toEqual(["2026-09", "2026-10"]);
+  });
+
   it("métricas padronizadas ignoram vazios e agrupados", () => {
     const m = metricasDoFechamento(ind(100), [{ id: "f", nome: "X", comparavel: "recall", linhasLidas: 0, ignoradas: 0, erro: null, indicadores: [
       { id: "a", nome: "Contatos", formato: "numero", melhor: "maior", secao: "fonte", atual: 5, anterior: null, descricao: "" },
@@ -72,5 +83,18 @@ describe("verificador do banco", () => {
     expect(faltaColunaOuTabela({ message: "column fechamentos.snapshot does not exist", code: "42703" })).toBe(true);
     expect(faltaColunaOuTabela({ message: "Could not find the table 'public.fechamento_metricas'", code: "PGRST205" })).toBe(true);
     expect(faltaColunaOuTabela({ message: "permission denied" })).toBe(false);
+  });
+});
+
+describe("comparativos pela base (planilhas)", () => {
+  it("calcula cada mês com dados e pula os vazios", async () => {
+    const { carregarClaros } = await import("./carregar-fixture");
+    const { mesesDaBase } = await import("../historico");
+    const { dados } = carregarClaros();
+    // A fixture tem as vendas de outubro e despesas do ano: dezembro/2025 não tem nada.
+    const m = mesesDaBase(dados, {}, ["2025-12", "2026-10"]);
+    expect(m.map((x) => x.mes)).toEqual(["2026-10"]);
+    expect(m[0].indicadores.faturamento.total).toBe(117650);
+    expect(m[0].periodoAnterior).toEqual({ inicio: "2026-09-01", fim: "2026-09-30" });
   });
 });

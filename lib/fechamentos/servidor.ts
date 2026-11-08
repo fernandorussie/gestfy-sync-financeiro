@@ -11,6 +11,7 @@ import { limparFicha, type FichaClinica } from "./ficha";
 import { vocabularioDe, type Vocabulario } from "./vocabulario";
 import { gravarMetricas, metricasDoFechamento } from "./metricas";
 import { claudeConfigurado } from "./claude-api";
+import { mesesDaBase } from "./historico";
 import { extrasDe, limparSecoes, normalizarEstrutura, type ItemSecao, type SecaoPersonalizada } from "./estrutura";
 import { adaptarResultado, calcularFontes, colunasUsadas, lerFontePersonalizada, limparFontePersonalizada, type FontePersonalizada, type LeituraPersonalizada, type ResultadoPersonalizado } from "./fonte-personalizada";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
@@ -356,3 +357,48 @@ export async function concluirFechamento(id: string): Promise<void> {
   // Base padronizada para comparativos e benchmarking (ignora se a tabela ainda não existe).
   await gravarMetricas(db, r.fechamento, metricasDoFechamento(r.indicadores, r.personalizadas));
 }
+
+/* ---------- comparativos direto da base (planilhas) ---------- */
+
+export interface MesDaBase { mes: string; indicadores: Indicadores; personalizadas: ResultadoPersonalizado[] }
+
+export interface DadosDaBase {
+  meses: MesDaBase[];
+  /** Caixa x competência do ano do último mês da janela. */
+  ano: { ano: string; linhas: LinhaAnual[] } | null;
+  erro: string | null;
+}
+
+/**
+ * Indicadores mês a mês calculados direto das planilhas do cliente (com as
+ * regras salvas da conferência), para os comparativos não dependerem de
+ * fechamentos feitos. Considera os últimos `quantos` meses completos.
+ * Meses sem nenhum lançamento ficam de fora.
+ */
+export async function dadosDaBase(clinicaId: string, quantos = 24, hoje = new Date()): Promise<DadosDaBase> {
+  const { data: config } = await getSupabaseAdmin().from("fechamento_config").select("*").eq("clinica_id", clinicaId).maybeSingle();
+  const fontes = (config?.fontes ?? {}) as unknown as FontesFechamento;
+  if (!fontes.vendas || !fontes.despesas) return { meses: [], ano: null, erro: "Cliente sem as planilhas de vendas e despesas configuradas." };
+  const { coleta } = await coletarClinica(clinicaId, fontes, false);
+  const erroBase = coleta.erros.vendas ?? coleta.erros.despesas;
+  if (erroBase) return { meses: [], ano: null, erro: erroBase };
+  const regras = (config?.regras ?? {}) as unknown as RegrasClinica;
+  const extras = fontesExtras((config as { fontes_extras?: unknown } | null)?.fontes_extras);
+
+  // Janela: do mês anterior ao atual para trás (o mês corrente ainda não fechou).
+  const meses: string[] = [];
+  for (let k = quantos; k >= 1; k--) {
+    const d = new Date(Date.UTC(hoje.getFullYear(), hoje.getMonth() - k, 1));
+    meses.push(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`);
+  }
+  const out: MesDaBase[] = [];
+  for (const m of mesesDaBase(coleta.dados, regras, meses)) {
+    const personalizadas = extras.length ? await calcularPersonalizadas(clinicaId, extras, m.periodo, m.periodoAnterior, false, { atual: m.indicadores, anterior: m.anterior }) : [];
+    out.push({ mes: m.mes, indicadores: m.indicadores, personalizadas });
+  }
+  const ultimo = meses[meses.length - 1];
+  const ano = Number(ultimo.slice(0, 4)), mesN = Number(ultimo.slice(5, 7));
+  const linhas = resumoAnual(coleta.dados, ano, mesN).filter((m) => m.entradas || m.saidasCaixa || m.saidasCompetencia);
+  return { meses: out, ano: linhas.length ? { ano: String(ano), linhas } : null, erro: null };
+}
+

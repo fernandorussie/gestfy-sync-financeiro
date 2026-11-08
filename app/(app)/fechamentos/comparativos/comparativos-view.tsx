@@ -30,7 +30,7 @@ function Linha({ pontos, formato, media }: { pontos: PontoSerie[]; formato: Seri
       {pontos.map((p, n) => (
         <g key={p.mes}>
           <circle cx={x(n)} cy={y(p.valor)} r={4.5} strokeWidth={2} className={p.definitivo ? "fill-primary stroke-primary" : "fill-background stroke-primary"}>
-            <title>{`${rotMes(p.mes)}: ${formatarIndicador(p.valor, formato)}${p.definitivo ? "" : " (em andamento)"}`}</title>
+            <title>{`${rotMes(p.mes)}: ${formatarIndicador(p.valor, formato)} (${ORIGEM[p.origem ?? (p.definitivo ? "fechamento" : "andamento")]})`}</title>
           </circle>
           {pontos.length <= 12 && <text x={x(n)} y={y(p.valor) - 9} textAnchor="middle" className="fill-foreground text-[10.5px] font-medium">{formatarIndicador(p.valor, formato).replace("R$ ", "")}</text>}
           <text x={x(n)} y={H - 6} textAnchor="middle" className="fill-muted-foreground text-[11px]">{rotMes(p.mes)}</text>
@@ -53,12 +53,14 @@ function Stat({ rotulo, valor, nota }: { rotulo: string; valor: string; nota?: s
 /** Indicadores que mudam conforme o regime (a receita é sempre pela data de atendimento). */
 const COM_REGIME = new Set(["despesas", "resultado", "margem"]);
 
-/** Série por competência, a partir do resumo anual do último fechamento mensal concluído. */
+const ORIGEM = { fechamento: "fechamento concluído", planilha: "calculado das planilhas", andamento: "fechamento em andamento" } as const;
+
+/** Série por competência, a partir do resumo anual das planilhas do cliente. */
 function serieCompetencia(base: SerieComparativo, ano: { linhas: LinhaAnual[] } | null): PontoSerie[] {
   return (ano?.linhas ?? []).map((m) => {
     const res = m.entradas - m.saidasCompetencia;
     const valor = base.id === "despesas" ? m.saidasCompetencia : base.id === "resultado" ? res : m.entradas ? Math.round((res / m.entradas) * 1000) / 10 : 0;
-    return { mes: m.mes, valor, definitivo: true, id: "" };
+    return { mes: m.mes, valor, definitivo: false, id: "", origem: "planilha" as const };
   });
 }
 
@@ -127,8 +129,8 @@ export function ComparativosView({ series, ano, rotulos }: { series: SerieCompar
         {pontos.length > 1 ? <Linha pontos={pontos} formato={serie.formato} media={st!.media} /> : <p className="text-sm text-muted-foreground">Só um mês com esse indicador. O gráfico aparece a partir de dois.</p>}
         <p className="text-xs text-muted-foreground">
           {temRegime && regime === "competencia"
-            ? `Competência: despesas pelo mês a que se referem, do resumo anual de ${ano!.ano} guardado no último fechamento mensal concluído.`
-            : <>Fechamentos mensais, versão mais recente de cada mês{temRegime ? ", regime de caixa" : ""}. Ponto vazio = mês em andamento. {serie.personalizada ? "Indicadores personalizados entram só a partir de fechamentos concluídos. " : ""}Clique num mês abaixo para abrir o fechamento.</>}
+            ? `Competência: despesas pelo mês a que se referem, calculadas das planilhas do cliente (${ano!.ano}).`
+            : <>Ponto cheio = mês com fechamento concluído (números do fechamento, com os ajustes da conferência). Ponto vazado = calculado direto das planilhas do cliente{temRegime ? ", regime de caixa" : ""}. Meses com fechamento abrem ao clicar abaixo.</>}
         </p>
         <div className="flex flex-wrap gap-1.5 text-xs">
           {pontos.map((p) => p.id
