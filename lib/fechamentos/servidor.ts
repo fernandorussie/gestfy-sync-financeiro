@@ -19,7 +19,7 @@ import { readSheetValues } from "@/lib/google/sheets";
 import type { Fechamento, Json } from "@/lib/supabase/types";
 import { coletar, type FontesFechamento, type ResultadoColeta } from "./coleta";
 import { conferir, type Alerta } from "./conferencia";
-import { ajustesDasDecisoes, decisoesVazias, gravesPendentes, gruposEscolhidos, metaEscolhida, type Decisoes } from "./decisoes";
+import { ajustesDasDecisoes, decisoesVazias, gravesPendentes, gruposEscolhidos, entradasEscolhidas, metaEscolhida, type Decisoes } from "./decisoes";
 import { calcularIndicadores, resumoAnual, type Indicadores, type LinhaAnual, type Periodo, type RegrasClinica } from "./indicadores";
 import { periodoAnterior } from "./periodo";
 import { textoVazio, type Acao, type Acompanhamento, type TextoFechamento } from "./texto-fechamento";
@@ -304,7 +304,11 @@ async function calcularRetrato(
   const fontes = config.fontes as unknown as FontesFechamento;
   const { coleta, em } = await coletarClinica(f.clinica_id, fontes, releitura);
   const regrasBase = (config.regras ?? {}) as unknown as RegrasClinica;
-  const regras: RegrasClinica = { ...regrasBase, categoriasDespesa: { ...(regrasBase.categoriasDespesa ?? {}), ...gruposEscolhidos(decisoes) } };
+  const regras: RegrasClinica = {
+    ...regrasBase,
+    categoriasDespesa: { ...(regrasBase.categoriasDespesa ?? {}), ...gruposEscolhidos(decisoes) },
+    categoriasEntrada: { ...(regrasBase.categoriasEntrada ?? {}), ...entradasEscolhidas(decisoes) },
+  };
   const ajustes = ajustesDasDecisoes(decisoes);
   const periodo: Periodo = { inicio: f.inicio, fim: f.fim };
 
@@ -331,8 +335,8 @@ async function calcularRetrato(
   }
   const anterior = calcularIndicadores(coleta.dados, periodoAnterior(periodo, f.tipo), { regras });
   const [ano, mes] = f.fim.split("-").map(Number);
-  const anual = resumoAnual(coleta.dados, ano, mes);
-  const nomes = ["vendas", "despesas", "orcamentos", "leads", "nps", "avaliacoes"] as const;
+  const anual = resumoAnual(coleta.dados, ano, mes, regras);
+  const nomes = ["vendas", "despesas", "entradas", "orcamentos", "leads", "nps", "avaliacoes"] as const;
   const personalizadas = await calcularPersonalizadas(f.clinica_id, fontesExtras(config.fontes_extras), periodo, periodoAnterior(periodo, f.tipo), releitura, { atual: indicadores, anterior });
   alertas.push(...alertasPersonalizadas(personalizadas));
   return {
@@ -398,7 +402,7 @@ export async function dadosDaBase(clinicaId: string, quantos = 24, hoje = new Da
   }
   const ultimo = meses[meses.length - 1];
   const ano = Number(ultimo.slice(0, 4)), mesN = Number(ultimo.slice(5, 7));
-  const linhas = resumoAnual(coleta.dados, ano, mesN).filter((m) => m.entradas || m.saidasCaixa || m.saidasCompetencia);
+  const linhas = resumoAnual(coleta.dados, ano, mesN, regras).filter((m) => m.entradas || m.recebido || m.saidasCaixa || m.saidasCompetencia);
   return { meses: out, ano: linhas.length ? { ano: String(ano), linhas } : null, erro: null };
 }
 

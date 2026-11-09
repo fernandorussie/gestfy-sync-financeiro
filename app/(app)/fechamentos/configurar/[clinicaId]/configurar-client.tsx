@@ -5,7 +5,7 @@ import { CheckCircle2, Loader2, PlayCircle, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { DefinicaoFonte } from "@/lib/fechamentos/colunas";
 import type { FontesFechamento } from "@/lib/fechamentos/coleta";
-import { DEF_DESPESAS, DEF_LEADS, DEF_NPS, DEF_ORCAMENTOS, DEF_VENDAS } from "@/lib/fechamentos/leitores";
+import { DEF_DESPESAS, DEF_ENTRADAS, DEF_LEADS, DEF_NPS, DEF_ORCAMENTOS, DEF_VENDAS } from "@/lib/fechamentos/leitores";
 import { testarLeitura } from "../../actions";
 
 /*
@@ -13,13 +13,14 @@ import { testarLeitura } from "../../actions";
  * O corpo de cada uma aparece dentro do card expandido da lista de fontes.
  */
 
-export type NomePadrao = "vendas" | "despesas" | "orcamentos" | "leads" | "nps";
+export type NomePadrao = "vendas" | "despesas" | "entradas" | "orcamentos" | "leads" | "nps";
 export type CfgPadrao = { sheetId: string; aba: string; colunas?: Record<string, string>; linhaCabecalho?: number };
 export type EstadoConexao = { tipo: "ok"; texto: string } | { tipo: "erro"; texto: string } | null;
 
 export const FONTES_PADRAO: { nome: NomePadrao; titulo: string; ajuda: string; def: DefinicaoFonte<string>; obrigatoria?: boolean }[] = [
   { nome: "vendas", titulo: "Vendas", ajuda: "Faturamento, atendimentos e grupos de receita", def: DEF_VENDAS, obrigatoria: true },
-  { nome: "despesas", titulo: "Despesas", ajuda: "Saídas por grupo e categoria", def: DEF_DESPESAS, obrigatoria: true },
+  { nome: "despesas", titulo: "Despesas", ajuda: "Saídas pagas, por grupo e categoria", def: DEF_DESPESAS, obrigatoria: true },
+  { nome: "entradas", titulo: "Entradas de caixa", ajuda: "Recebimentos efetivos. Opcional: sem ela, o resultado aparece como “Faturamento x Despesas”", def: DEF_ENTRADAS },
   { nome: "orcamentos", titulo: "Orçamentos", ajuda: "Orçamentos gerados e fechados", def: DEF_ORCAMENTOS },
   { nome: "leads", titulo: "Leads / CRM", ajuda: "Funil de leads, origem e objeções", def: DEF_LEADS },
   { nome: "nps", titulo: "NPS", ajuda: "Pesquisa de satisfação", def: DEF_NPS },

@@ -4,9 +4,10 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { estatisticas, type PontoSerie, type SerieComparativo } from "@/lib/fechamentos/historico";
-import type { LinhaAnual } from "@/lib/fechamentos/indicadores";
+import { regimesAnuais, type LinhaAnual } from "@/lib/fechamentos/indicadores";
+import { TabelaRegimes } from "../[id]/_components/indicadores";
 import { formatarIndicador, variacaoIndicador } from "@/lib/fechamentos/formato-indicador";
-import { brl0, mesAbrev } from "../_components/formato";
+import { mesAbrev } from "../_components/formato";
 
 const rotMes = (m: string) => `${mesAbrev(m)}/${m.slice(2, 4)}`;
 
@@ -142,43 +143,9 @@ export function ComparativosView({ series, ano, rotulos }: { series: SerieCompar
       <section className="space-y-3 rounded-lg border bg-card p-5">
         <div>
           <h2 className="font-semibold">Caixa x competência{ano ? ` em ${ano.ano}` : ""}</h2>
-          <p className="text-sm text-muted-foreground">Caixa: despesa no mês em que foi paga. Competência: no mês a que se refere. Mostra se o resultado do mês foi puxado por pagamentos de outros meses.</p>
+          <p className="text-sm text-muted-foreground">Caixa: o que entrou e saiu no mês. Competência: faturamento e despesas do mês a que se referem. Mostra se o resultado do mês foi puxado por pagamentos de outros meses.</p>
         </div>
-        {!ano ? <p className="text-sm text-muted-foreground">Aparece depois do primeiro fechamento mensal concluído.</p> : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-sm">
-              <thead className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
-                <tr><th className="py-2 font-medium">Mês</th><th className="py-2 text-right font-medium">Entradas</th><th className="py-2 text-right font-medium">Saídas (caixa)</th><th className="py-2 text-right font-medium">Saldo caixa</th><th className="py-2 text-right font-medium">Saídas (competência)</th><th className="py-2 text-right font-medium">Saldo competência</th><th className="py-2 text-right font-medium">Diferença</th></tr>
-              </thead>
-              <tbody>
-                {ano.linhas.map((m) => {
-                  const sc = m.entradas - m.saidasCaixa, sp = m.entradas - m.saidasCompetencia;
-                  return (
-                    <tr key={m.mes} className="border-b last:border-0">
-                      <td className="py-1.5 capitalize">{rotMes(m.mes)}</td>
-                      <td className="py-1.5 text-right tabular-nums">{brl0(m.entradas)}</td>
-                      <td className="py-1.5 text-right tabular-nums">{brl0(m.saidasCaixa)}</td>
-                      <td className={`py-1.5 text-right tabular-nums ${sc < 0 ? "text-red-600 dark:text-red-400" : ""}`}>{brl0(sc)}</td>
-                      <td className="py-1.5 text-right tabular-nums">{brl0(m.saidasCompetencia)}</td>
-                      <td className={`py-1.5 text-right tabular-nums ${sp < 0 ? "text-red-600 dark:text-red-400" : ""}`}>{brl0(sp)}</td>
-                      <td className="py-1.5 text-right tabular-nums text-muted-foreground">{brl0(sc - sp)}</td>
-                    </tr>
-                  );
-                })}
-                {(() => {
-                  const t = ano.linhas.reduce((a, m) => ({ e: a.e + m.entradas, c: a.c + m.saidasCaixa, p: a.p + m.saidasCompetencia }), { e: 0, c: 0, p: 0 });
-                  return (
-                    <tr className="bg-muted/60 font-semibold">
-                      <td className="py-2">Ano</td><td className="py-2 text-right tabular-nums">{brl0(t.e)}</td><td className="py-2 text-right tabular-nums">{brl0(t.c)}</td>
-                      <td className="py-2 text-right tabular-nums">{brl0(t.e - t.c)}</td><td className="py-2 text-right tabular-nums">{brl0(t.p)}</td><td className="py-2 text-right tabular-nums">{brl0(t.e - t.p)}</td>
-                      <td className="py-2 text-right tabular-nums text-muted-foreground">{brl0(t.p - t.c)}</td>
-                    </tr>
-                  );
-                })()}
-              </tbody>
-            </table>
-          </div>
-        )}
+        {!ano ? <p className="text-sm text-muted-foreground">Sem lançamentos no ano para este cliente.</p> : <TabelaRegimes reg={regimesAnuais(ano.linhas)} />}
       </section>
     </div>
   );

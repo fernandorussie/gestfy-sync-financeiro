@@ -1,7 +1,7 @@
 "use client";
 
-import type { ReactNode } from "react";
-import type { GrupoDespesa, ItemContagem, ItemValor } from "@/lib/fechamentos/indicadores";
+import { Fragment, type ReactNode } from "react";
+import { regimesAnuais, rotuloResultado, type GrupoDespesa, type Indicadores, type ItemContagem, type ItemValor, type LinhaRegime } from "@/lib/fechamentos/indicadores";
 import type { ResultadoFechamento } from "@/lib/fechamentos/servidor";
 import { cap } from "@/lib/fechamentos/vocabulario";
 import { brl, brl0, mesAbrev, num, pct } from "../../_components/formato";
@@ -63,7 +63,8 @@ const contagens = (xs: ItemContagem[], n = 99) => xs.slice(0, n).map((x) => ({ n
 
 function GraficoAno({ r }: { r: ResultadoFechamento }) {
   const linhas = r.anual;
-  const max = Math.max(1, ...linhas.map((l) => Math.max(l.entradas, l.saidasCaixa)));
+  const real = linhas.some((l) => l.recebido != null);
+  const max = Math.max(1, ...linhas.map((l) => Math.max(l.entradas, l.saidasCaixa, l.recebido ?? 0)));
   const W = 640, H = 200, L = 8, B = 22, T = 18, passo = (W - 2 * L) / linhas.length;
   const y = (v: number) => T + (1 - v / max) * (H - T - B);
   return (
@@ -80,6 +81,8 @@ function GraficoAno({ r }: { r: ResultadoFechamento }) {
       })}
       <polyline fill="none" strokeWidth={2} className="stroke-accent" points={linhas.map((l, i) => `${L + i * passo + passo / 2},${y(l.saidasCaixa)}`).join(" ")} />
       {linhas.map((l, i) => <circle key={l.mes} cx={L + i * passo + passo / 2} cy={y(l.saidasCaixa)} r={3} className="fill-accent"><title>{`Despesas ${mesAbrev(l.mes)}: ${brl0(l.saidasCaixa)}`}</title></circle>)}
+      {real && <polyline fill="none" strokeWidth={2} strokeDasharray="5 3" className="stroke-emerald-600 dark:stroke-emerald-400" points={linhas.map((l, i) => `${L + i * passo + passo / 2},${y(l.recebido ?? 0)}`).join(" ")} />}
+      {real && linhas.map((l, i) => <circle key={`r${l.mes}`} cx={L + i * passo + passo / 2} cy={y(l.recebido ?? 0)} r={3} className="fill-emerald-600 dark:fill-emerald-400"><title>{`Entradas ${mesAbrev(l.mes)}: ${brl0(l.recebido)}`}</title></circle>)}
     </svg>
   );
 }
@@ -88,14 +91,18 @@ export function PainelIndicadores({ r }: { r: ResultadoFechamento }) {
   const i = r.indicadores, a = r.anterior;
   const rot = r.fechamento.tipo === "mensal" ? "mês anterior" : "mesmo período do mês anterior";
   const ritmo = r.ritmo;
-  const somaAno = (k: "entradas" | "saidasCaixa" | "saidasCompetencia") => r.anual.reduce((s, l) => s + l[k], 0);
+  const reg = regimesAnuais(r.anual);
+  const real = !!i.caixa?.real;
+  const rotRes = rotuloResultado(i.caixa);
+  const notaRes = i.caixa?.margem != null ? `${pct(i.caixa.margem)} ${real ? "das entradas" : "do faturamento"}` : "";
 
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Kpi rotulo="Faturamento (entradas)" valor={brl0(i.faturamento?.total)}><Variacao atual={i.faturamento?.total} anterior={a.faturamento?.total} rotulo={rot} /></Kpi>
-        <Kpi rotulo="Despesas (saídas)" valor={brl0(i.despesas?.total)}><Variacao atual={i.despesas?.total} anterior={a.despesas?.total} inverso rotulo={rot} /></Kpi>
-        <Kpi rotulo="Resultado de caixa" valor={brl0(i.caixa?.resultado)}>{i.caixa?.margem != null ? `${pct(i.caixa.margem)} da receita` : ""}</Kpi>
+        <Kpi rotulo="Faturamento" valor={brl0(i.faturamento?.total)}><Variacao atual={i.faturamento?.total} anterior={a.faturamento?.total} rotulo={rot} /></Kpi>
+        {real && <Kpi rotulo="Entradas (recebido)" valor={brl0(i.entradas?.total)}><Variacao atual={i.entradas?.total} anterior={a.entradas?.total} rotulo={rot} /></Kpi>}
+        <Kpi rotulo="Despesas pagas (saídas)" valor={brl0(i.despesas?.total)}><Variacao atual={i.despesas?.total} anterior={a.despesas?.total} inverso rotulo={rot} /></Kpi>
+        <Kpi rotulo={rotRes} valor={brl0(i.caixa?.resultado)}>{notaRes}</Kpi>
         {ritmo ? (
           <Kpi rotulo="Meta: projeção do mês" valor={ritmo.atingimentoProjetado !== null ? pct(ritmo.atingimentoProjetado) : "—"} destaque>{ritmo.meta ? `realizado ${pct(ritmo.atingimento)} de ${brl0(ritmo.meta)}` : "sem meta definida"}</Kpi>
         ) : (
@@ -103,8 +110,8 @@ export function PainelIndicadores({ r }: { r: ResultadoFechamento }) {
         )}
         <Kpi rotulo={`${cap(r.vocab.clientes)} atendidos`} valor={num(i.pacientes?.atendidos)}><Variacao atual={i.pacientes?.atendidos} anterior={a.pacientes?.atendidos} rotulo={rot} /></Kpi>
         <Kpi rotulo="Ticket médio" valor={brl(i.pacientes?.ticketMedio)}><Variacao atual={i.pacientes?.ticketMedio} anterior={a.pacientes?.ticketMedio} rotulo={rot} /></Kpi>
-        <Kpi rotulo={`${cap(r.vocab.clientes)} novos`} valor={num(i.pacientes?.novos)}>{i.pacientes?.atendidos ? `${pct(i.pacientes.novos / i.pacientes.atendidos, 0)} dos atendidos` : ""}</Kpi>
-        <Kpi rotulo="Ticket médio dos novos" valor={brl(i.pacientes?.ticketNovos)}>{brl0(i.pacientes?.faturamentoNovos)} com novos</Kpi>
+        <Kpi rotulo={`${cap(r.vocab.clientes)} novos`} valor={num(i.pacientes?.novos)}>{i.pacientes?.atendidos ? `${pct(i.pacientes.novos / i.pacientes.atendidos, 0)} dos atendidos` : ""}{real && i.pacientes ? ` · ticket ${brl0(i.pacientes.ticketNovos)}` : ""}</Kpi>
+        {!real && <Kpi rotulo="Ticket médio dos novos" valor={brl(i.pacientes?.ticketNovos)}>{brl0(i.pacientes?.faturamentoNovos)} com novos</Kpi>}
       </div>
 
       {ritmo && (
@@ -122,7 +129,7 @@ export function PainelIndicadores({ r }: { r: ResultadoFechamento }) {
         </Secao>
       )}
 
-      <Secao titulo={`Faturamento em ${r.periodo.fim.slice(0, 4)}`} extra={<span className="text-xs text-muted-foreground"><span className="mr-1 inline-block h-2.5 w-2.5 rounded-sm bg-primary align-[-1px]" />Faturamento <span className="ml-3 mr-1 inline-block h-2.5 w-2.5 rounded-full bg-accent align-[-1px]" />Despesas pagas</span>}>
+      <Secao titulo={`${r.anual.some((l) => l.recebido != null) ? "Faturamento, entradas e despesas" : "Faturamento e despesas"} em ${r.periodo.fim.slice(0, 4)}`} extra={<span className="text-xs text-muted-foreground"><span className="mr-1 inline-block h-2.5 w-2.5 rounded-sm bg-primary align-[-1px]" />Faturamento <span className="ml-3 mr-1 inline-block h-2.5 w-2.5 rounded-full bg-accent align-[-1px]" />Despesas pagas{r.anual.some((l) => l.recebido != null) && <><span className="ml-3 mr-1 inline-block h-2.5 w-2.5 rounded-full bg-emerald-600 align-[-1px]" />Entradas</>}</span>}>
         <GraficoAno r={r} />
       </Secao>
 
@@ -226,21 +233,10 @@ export function PainelIndicadores({ r }: { r: ResultadoFechamento }) {
         </div>
       </Secao>
 
-      <Secao titulo={`Resultado anual ${r.periodo.fim.slice(0, 4)}: caixa e competência`}>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase tracking-wide text-muted-foreground">
-              <tr><th className="py-2 font-medium">Mês</th><th className="py-2 text-right font-medium">Entradas</th><th className="py-2 text-right font-medium">Saídas (caixa)</th><th className="py-2 text-right font-medium">Saldo (caixa)</th><th className="py-2 text-right font-medium">Gastos (competência)</th><th className="py-2 text-right font-medium">Saldo (competência)</th></tr>
-            </thead>
-            <tbody>
-              {r.anual.map((l) => (
-                <tr key={l.mes} className="border-t"><td className="py-1.5">{mesAbrev(l.mes)}/{l.mes.slice(2, 4)}</td><td className="py-1.5 text-right tabular-nums">{brl0(l.entradas)}</td><td className="py-1.5 text-right tabular-nums">{brl0(l.saidasCaixa)}</td><td className="py-1.5 text-right tabular-nums">{brl0(l.entradas - l.saidasCaixa)}</td><td className="py-1.5 text-right tabular-nums">{brl0(l.saidasCompetencia)}</td><td className="py-1.5 text-right tabular-nums">{brl0(l.entradas - l.saidasCompetencia)}</td></tr>
-              ))}
-              <tr className="border-t bg-muted/60 font-semibold"><td className="py-2">Total</td><td className="py-2 text-right tabular-nums">{brl0(somaAno("entradas"))}</td><td className="py-2 text-right tabular-nums">{brl0(somaAno("saidasCaixa"))}</td><td className="py-2 text-right tabular-nums">{brl0(somaAno("entradas") - somaAno("saidasCaixa"))}</td><td className="py-2 text-right tabular-nums">{brl0(somaAno("saidasCompetencia"))}</td><td className="py-2 text-right tabular-nums">{brl0(somaAno("entradas") - somaAno("saidasCompetencia"))}</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <p className="mt-2 text-xs text-muted-foreground">Na competência, cada despesa entra no mês de competência informado na planilha. A receita segue a data de atendimento nos dois regimes.</p>
+      {i.entradas && <SecaoEntradas e={i.entradas} />}
+
+      <Secao titulo={`Caixa x competência ${r.periodo.fim.slice(0, 4)}`}>
+        <TabelaRegimes reg={reg} />
       </Secao>
     </div>
   );
@@ -254,6 +250,74 @@ function GrupoDespesaLinhas({ g }: { g: GrupoDespesa }) {
       {!soCategoriaIgual && g.categorias.map((c) => (
         <tr key={c.nome} className="border-t"><td className="py-1.5 pl-6">{c.nome}</td><td className="py-1.5 text-right tabular-nums">{brl(c.valor)}</td><td className="py-1.5 text-right tabular-nums text-muted-foreground">{pct(c.pct)}</td></tr>
       ))}
+    </>
+  );
+}
+
+const ROT_GRUPO: Record<string, string> = { operacional: "Operacionais", nao_operacional: "Não operacionais", fora: "Fora do resultado" };
+
+function SecaoEntradas({ e }: { e: NonNullable<Indicadores["entradas"]> }) {
+  const grupos = (["operacional", "nao_operacional", "fora"] as const).map((g) => ({ g, itens: e.porCategoria.filter((c) => c.grupo === g) })).filter((x) => x.itens.length);
+  const totalDe = { operacional: e.operacionais, nao_operacional: e.naoOperacionais, fora: e.foraDoResultado };
+  return (
+    <Secao titulo="Entradas de caixa por categoria" extra={<span className="text-xs text-muted-foreground">{e.lancamentos} recebimentos</span>}>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="text-left text-xs uppercase tracking-wide text-muted-foreground"><tr><th className="py-2 font-medium">Grupo / categoria</th><th className="py-2 text-right font-medium">Valor</th><th className="py-2 text-right font-medium">%</th></tr></thead>
+          <tbody>
+            {grupos.map(({ g, itens }) => (
+              <Fragment key={g}>
+                <tr className={`border-t font-semibold ${g === "fora" ? "text-muted-foreground" : ""}`}><td className="py-1.5">{ROT_GRUPO[g]}</td><td className="py-1.5 text-right tabular-nums">{brl(totalDe[g])}</td><td className="py-1.5 text-right">{g === "fora" ? "" : pct(e.total ? totalDe[g] / e.total : 0, 0)}</td></tr>
+                {itens.map((c) => <tr key={c.nome} className="text-muted-foreground"><td className="py-1 pl-4">{c.nome}</td><td className="py-1 text-right tabular-nums">{brl(c.valor)}</td><td className="py-1 text-right">{g === "fora" ? "" : pct(c.pct, 0)}</td></tr>)}
+              </Fragment>
+            ))}
+            <tr className="border-t bg-muted/60 font-semibold"><td className="py-2">Total de entradas (no resultado)</td><td className="py-2 text-right tabular-nums">{brl(e.total)}</td><td className="py-2 text-right">100%</td></tr>
+          </tbody>
+        </table>
+      </div>
+      {e.foraDoResultado > 0 && <p className="mt-2 text-xs text-muted-foreground">Transferências, empréstimos e aportes ({brl0(e.foraDoResultado)}) aparecem só como informação: não são receita.</p>}
+    </Secao>
+  );
+}
+
+/** Caixa x competência. Sem fonte de Entradas, a coluna de caixa é "Faturamento x Despesas". */
+export function TabelaRegimes({ reg }: { reg: ReturnType<typeof regimesAnuais> }) {
+  const td = "py-1.5 text-right tabular-nums";
+  const neg = (v: number) => (v < 0 ? " text-red-600 dark:text-red-400" : "");
+  const linha = (l: Omit<LinhaRegime, "mes">) => (
+    <>
+      <td className={td}>{brl0(l.faturamento)}</td>
+      {reg.real && <td className={td}>{brl0(l.entradas)}</td>}
+      <td className={td}>{brl0(l.saidasCaixa)}</td>
+      <td className={td + neg(l.resultadoCaixa)}>{brl0(l.resultadoCaixa)}</td>
+      <td className={td}>{brl0(l.despesasCompetencia)}</td>
+      <td className={td + neg(l.resultadoCompetencia)}>{brl0(l.resultadoCompetencia)}</td>
+    </>
+  );
+  return (
+    <>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="text-left text-xs uppercase tracking-wide text-muted-foreground">
+            <tr>
+              <th className="py-2 font-medium">Mês</th><th className="py-2 text-right font-medium">Faturamento</th>
+              {reg.real && <th className="py-2 text-right font-medium">Entradas</th>}
+              <th className="py-2 text-right font-medium">Despesas pagas</th>
+              <th className="py-2 text-right font-medium">{reg.real ? "Resultado de caixa" : "Faturamento x Despesas"}</th>
+              <th className="py-2 text-right font-medium">Despesas (competência)</th>
+              <th className="py-2 text-right font-medium">Resultado por competência</th>
+            </tr>
+          </thead>
+          <tbody>
+            {reg.linhas.map((l) => <tr key={l.mes} className="border-t"><td className="py-1.5">{mesAbrev(l.mes)}/{l.mes.slice(2, 4)}</td>{linha(l)}</tr>)}
+            <tr className="border-t bg-muted/60 font-semibold"><td className="py-2">Total</td>{linha(reg.total)}</tr>
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">
+        {reg.real ? "Resultado de caixa = entradas recebidas − despesas pagas no mês. " : "Sem a fonte de Entradas, o caixa é aproximado pelo faturamento: Faturamento x Despesas = faturamento − despesas pagas. "}
+        Resultado por competência = faturamento do mês − despesas do mês de competência (sem competência na planilha, vale o mês do pagamento). Só despesas pagas entram.
+      </p>
     </>
   );
 }

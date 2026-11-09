@@ -6,7 +6,8 @@
  * as regras da clínica e os ajustes decididos na conferência; devolve os
  * números prontos para tela, PDF, texto e IA. Não lê planilha nem banco.
  */
-import type { Avaliacao, Despesa, Lead, Orcamento, RespostaNps, Venda } from "./leitores";
+import type { Avaliacao, Despesa, Lead, Orcamento, Recebimento, RespostaNps, Venda } from "./leitores";
+import { grupoDaEntrada, type GrupoEntrada } from "./entradas";
 import { GRUPO_SEM_CLASSIFICACAO, GRUPOS_DESPESA, montarPlano } from "./plano-contas";
 import { centavos, normalizar, type DataISO } from "./texto";
 
@@ -23,6 +24,8 @@ export interface DadosFechamento {
   leads: Lead[] | null;
   nps: RespostaNps[] | null;
   avaliacoes: Avaliacao[] | null;
+  /** Entradas de caixa (recebimentos). Fonte opcional: sem ela, não existe "resultado de caixa". */
+  entradas?: Recebimento[] | null;
 }
 
 /** Regras fixas da clínica, guardadas no mapa dela. */
@@ -37,6 +40,8 @@ export interface RegrasClinica {
   statusFechado?: string[];
   statusEmAberto?: string[];
   statusNaoFechou?: string[];
+  /** Categoria de entrada (normalizada) → grupo, confirmado pelo consultor. */
+  categoriasEntrada?: Record<string, GrupoEntrada>;
 }
 
 export type CampoUnificavel = "profissional" | "unidade" | "pagamento" | "origem" | "interesse" | "objecao" | "grupoReceita";
@@ -96,8 +101,29 @@ export interface Indicadores {
     total: number;
     lancamentos: number;
     porGrupo: GrupoDespesa[];
+    /** Linhas com data de pagamento no período mas marcadas como não pagas: ficam fora do total. */
+    naoPagas?: { quantidade: number; valor: number };
   } | null;
-  caixa: { entradas: number; saidas: number; resultado: number; margem: number | null } | null;
+  /** Entradas de caixa do período (só com a fonte de Entradas). */
+  entradas?: {
+    /** Operacionais + não operacionais: o que entra no resultado de caixa. */
+    total: number;
+    operacionais: number;
+    naoOperacionais: number;
+    /** Transferências, empréstimos, aportes: só informação. */
+    foraDoResultado: number;
+    lancamentos: number;
+    porCategoria: (ItemValor & { grupo: GrupoEntrada })[];
+    /** Linhas sem situação informada (contadas como recebidas). */
+    semSituacao: number;
+    /** Linhas marcadas como em aberto/previstas (fora do total). */
+    emAberto: { quantidade: number; valor: number };
+  } | null;
+  /**
+   * Resultado do período. real = true: Entradas − Saídas (resultado de caixa, com a fonte de Entradas).
+   * real = false: Faturamento − Saídas ("Faturamento x Despesas"); "entradas" aqui é o faturamento.
+   */
+  caixa: { entradas: number; saidas: number; resultado: number; margem: number | null; real?: boolean } | null;
   leads: {
     total: number;
     agendados: number;
@@ -278,7 +304,10 @@ export function calcularIndicadores(
   let despesas: Indicadores["despesas"] = null;
   if (dados.despesas) {
     const plano = montarPlano(regras.categoriasDespesa);
-    const ds = dados.despesas.filter((d) => noPeriodo(d.dataPagamento, periodo));
+    const doPeriodo = dados.despesas.filter((d) => noPeriodo(d.dataPagamento, periodo));
+    // Saída é só o que foi pago: "Pago? Não" / "Em aberto" com data preenchida fica de fora.
+    const ds = doPeriodo.filter((d) => d.pago !== false);
+    const naoPagas = doPeriodo.filter((d) => d.pago === false);
     const total = centavos(ds.reduce((s, d) => s + d.valor, 0));
     const porGrupo = new Map<string, Map<string, number>>();
     if (opcoes.catalogoDesde) {
@@ -307,6 +336,7 @@ export function calcularIndicadores(
     despesas = {
       total,
       lancamentos: ds.length,
+      ...(naoPagas.length ? { naoPagas: { quantidade: naoPagas.length, valor: centavos(naoPagas.reduce((s, d) => s + d.valor, 0)) } } : {}),
       porGrupo: [...porGrupo.entries()]
         .map(([grupo, cats]) => {
           const v = centavos([...cats.values()].reduce((s, x) => s + x, 0));
@@ -321,9 +351,40 @@ export function calcularIndicadores(
     };
   }
 
-  const caixa = faturamento && despesas
-    ? { entradas: faturamento.total, saidas: despesas.total, resultado: centavos(faturamento.total - despesas.total), margem: fracOuNull(faturamento.total - despesas.total, faturamento.total) }
-    : null;
+  /* ---------- entradas (recebimentos) ---------- */
+  let entradas: Indicadores["entradas"] = null;
+  if (dados.entradas) {
+    const doPeriodo = dados.entradas.filter((r) => noPeriodo(r.data, periodo));
+    const validas = doPeriodo.filter((r) => r.recebido !== false);
+    const abertas = doPeriodo.filter((r) => r.recebido === false);
+    const porCat = new Map<string, { nome: string; valor: number; grupo: GrupoEntrada }>();
+    const soma = { operacional: 0, nao_operacional: 0, fora: 0 } as Record<GrupoEntrada, number>;
+    for (const r of validas) {
+      const nome = r.categoria || NAO_INFORMADO;
+      const { grupo } = grupoDaEntrada(nome, regras.categoriasEntrada);
+      soma[grupo] += r.valor;
+      const k = `${grupo}|${normalizar(nome)}`;
+      const it = porCat.get(k) ?? { nome, valor: 0, grupo };
+      it.valor += r.valor;
+      porCat.set(k, it);
+    }
+    const total = centavos(soma.operacional + soma.nao_operacional);
+    entradas = {
+      total, operacionais: centavos(soma.operacional), naoOperacionais: centavos(soma.nao_operacional), foraDoResultado: centavos(soma.fora),
+      lancamentos: validas.length,
+      porCategoria: [...porCat.values()].map((x) => ({ nome: x.nome, valor: centavos(x.valor), pct: frac(x.valor, total), grupo: x.grupo }))
+        .sort((a, b) => (a.grupo === b.grupo ? b.valor - a.valor : ["operacional", "nao_operacional", "fora"].indexOf(a.grupo) - ["operacional", "nao_operacional", "fora"].indexOf(b.grupo))),
+      semSituacao: validas.filter((r) => r.recebido === null).length,
+      emAberto: { quantidade: abertas.length, valor: centavos(abertas.reduce((s, r) => s + r.valor, 0)) },
+    };
+  }
+
+  // Com Entradas: resultado de caixa de verdade. Sem: faturamento − saídas, nunca chamado de caixa.
+  const caixa = entradas && despesas
+    ? { entradas: entradas.total, saidas: despesas.total, resultado: centavos(entradas.total - despesas.total), margem: fracOuNull(entradas.total - despesas.total, entradas.total), real: true }
+    : faturamento && despesas
+      ? { entradas: faturamento.total, saidas: despesas.total, resultado: centavos(faturamento.total - despesas.total), margem: fracOuNull(faturamento.total - despesas.total, faturamento.total), real: false }
+      : null;
 
   /* ---------- leads ---------- */
   let leads: Indicadores["leads"] = null;
@@ -403,7 +464,7 @@ export function calcularIndicadores(
     ? { valor: opcoes.meta, atingimento: faturamento.total / opcoes.meta, falta: centavos(Math.max(0, opcoes.meta - faturamento.total)) }
     : null;
 
-  return { periodo, faturamento, pacientes, despesas, caixa, leads, orcamentos, nps, google, meta };
+  return { periodo, faturamento, pacientes, despesas, entradas, caixa, leads, orcamentos, nps, google, meta };
 }
 
 /* ============================== ANUAL ============================== */
@@ -411,27 +472,39 @@ export function calcularIndicadores(
 export interface LinhaAnual {
   /** "AAAA-MM" */
   mes: string;
+  /** FATURAMENTO do mês (nome antigo mantido para os fechamentos já guardados). */
   entradas: number;
+  /** Entradas de caixa de verdade (recebimentos operacionais + não operacionais). null = cliente sem a fonte. */
+  recebido?: number | null;
   saidasCaixa: number;
   saidasCompetencia: number;
 }
 
+/** Rótulo do resultado: só é "de caixa" quando há fonte de Entradas. */
+export function rotuloResultado(caixa: { real?: boolean } | null | undefined): string {
+  return caixa?.real ? "Resultado de caixa" : "Faturamento x Despesas";
+}
+
 /**
- * Entradas e saídas mês a mês do ano, nos dois regimes.
- * Caixa: despesa pela data de pagamento. Competência: pelo mês de competência
- * (sem competência informada, vale o mês do pagamento). A receita segue a data
- * de atendimento nos dois, porque as planilhas não têm data de recebimento.
+ * Faturamento, recebimentos e saídas mês a mês do ano.
+ * Saídas: só as pagas. Caixa: pela data de pagamento. Competência: pelo mês de
+ * competência (sem ela, o mês do pagamento). O faturamento segue a data da
+ * venda; os recebimentos, a data do recebimento.
  */
-export function resumoAnual(dados: Pick<DadosFechamento, "vendas" | "despesas">, ano: number, ateMes = 12): LinhaAnual[] {
+export function resumoAnual(dados: Pick<DadosFechamento, "vendas" | "despesas" | "entradas">, ano: number, ateMes = 12, regras: RegrasClinica = {}): LinhaAnual[] {
   const linhas: LinhaAnual[] = [];
   for (let m = 1; m <= ateMes; m++) {
     const mes = `${ano}-${String(m).padStart(2, "0")}`;
     const entradas = (dados.vendas ?? []).filter((v) => v.data.startsWith(mes)).reduce((s, v) => s + (v.valor ?? 0), 0);
-    const pagas = (dados.despesas ?? []).filter((d) => d.dataPagamento?.startsWith(mes)).reduce((s, d) => s + d.valor, 0);
-    const comp = (dados.despesas ?? [])
+    const despesasPagas = (dados.despesas ?? []).filter((d) => d.pago !== false);
+    const pagas = despesasPagas.filter((d) => d.dataPagamento?.startsWith(mes)).reduce((s, d) => s + d.valor, 0);
+    const comp = despesasPagas
       .filter((d) => d.dataPagamento && (d.competencia ?? d.dataPagamento.slice(0, 7)) === mes)
       .reduce((s, d) => s + d.valor, 0);
-    linhas.push({ mes, entradas: centavos(entradas), saidasCaixa: centavos(pagas), saidasCompetencia: centavos(comp) });
+    const recebido = dados.entradas
+      ? dados.entradas.filter((r) => r.recebido !== false && r.data.startsWith(mes) && grupoDaEntrada(r.categoria || NAO_INFORMADO, regras.categoriasEntrada).grupo !== "fora").reduce((s, r) => s + r.valor, 0)
+      : null;
+    linhas.push({ mes, entradas: centavos(entradas), recebido: recebido === null ? null : centavos(recebido), saidasCaixa: centavos(pagas), saidasCompetencia: centavos(comp) });
   }
   return linhas;
 }
@@ -440,4 +513,40 @@ export function resumoAnual(dados: Pick<DadosFechamento, "vendas" | "despesas">,
 export function variacao(atual: number | null | undefined, anterior: number | null | undefined): number | null {
   if (atual === null || atual === undefined || !anterior) return null;
   return atual / anterior - 1;
+}
+
+export interface LinhaRegime {
+  mes: string;
+  faturamento: number;
+  /** Recebimentos (null = cliente sem a fonte de Entradas). */
+  entradas: number | null;
+  saidasCaixa: number;
+  /** Com Entradas: entradas − saídas pagas. Sem: faturamento − saídas pagas. */
+  resultadoCaixa: number;
+  despesasCompetencia: number;
+  /** Faturamento do mês − despesas do mês de competência. */
+  resultadoCompetencia: number;
+}
+
+/**
+ * Tabela "Caixa x competência" a partir do resumo anual. Aceita fechamentos
+ * antigos (sem "recebido"): nesse caso o resultado é Faturamento x Despesas.
+ */
+export function regimesAnuais(linhas: LinhaAnual[]): { real: boolean; linhas: LinhaRegime[]; total: Omit<LinhaRegime, "mes"> } {
+  const real = linhas.some((l) => l.recebido != null);
+  const out: LinhaRegime[] = linhas.map((l) => {
+    const base = real ? (l.recebido ?? 0) : l.entradas;
+    return {
+      mes: l.mes, faturamento: l.entradas, entradas: real ? (l.recebido ?? 0) : null, saidasCaixa: l.saidasCaixa,
+      resultadoCaixa: centavos(base - l.saidasCaixa), despesasCompetencia: l.saidasCompetencia, resultadoCompetencia: centavos(l.entradas - l.saidasCompetencia),
+    };
+  });
+  const soma = (f: (l: LinhaRegime) => number) => centavos(out.reduce((s, l) => s + f(l), 0));
+  return {
+    real, linhas: out,
+    total: {
+      faturamento: soma((l) => l.faturamento), entradas: real ? soma((l) => l.entradas ?? 0) : null, saidasCaixa: soma((l) => l.saidasCaixa),
+      resultadoCaixa: soma((l) => l.resultadoCaixa), despesasCompetencia: soma((l) => l.despesasCompetencia), resultadoCompetencia: soma((l) => l.resultadoCompetencia),
+    },
+  };
 }

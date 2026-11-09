@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import type { Alerta, Gravidade } from "@/lib/fechamentos/conferencia";
 import type { Decisao } from "@/lib/fechamentos/decisoes";
 import { GRUPOS_DESPESA } from "@/lib/fechamentos/plano-contas";
+import { GRUPOS_ENTRADA, ROTULO_GRUPO_ENTRADA, type GrupoEntrada } from "@/lib/fechamentos/entradas";
 import type { ResultadoFechamento } from "@/lib/fechamentos/servidor";
 import { brl, dataBR } from "../../_components/formato";
 import type { Decidir } from "./fechamento-client";
@@ -24,7 +25,8 @@ function descreverDecisao(d: Decisao): string {
     case "reclassificar": return `Reclassificado para ${s.categoria} (${s.grupo}). A planilha não muda.`;
     case "unificar": return `Unificado como “${s.para}”. Vale para este fechamento.`;
     case "escolher-meta": return `Meta usada: ${brl(d.escolha?.meta ?? 0)}.`;
-    case "classificar": return `Grupos definidos: ${Object.entries(d.escolha?.grupos ?? {}).map(([c, g]) => `${c} → ${g}`).join("; ")}. Fica salvo para o clieca.`;
+    case "classificar": return `Grupos definidos: ${Object.entries(d.escolha?.grupos ?? {}).map(([c, g]) => `${c} → ${g}`).join("; ")}. Fica salvo para o cliente.`;
+    case "classificar-entradas": return `Entradas classificadas: ${Object.entries(d.escolha?.entradas ?? {}).map(([c, g]) => `${c} → ${ROTULO_GRUPO_ENTRADA[g]}`).join("; ")}. Fica salvo para o cliente.`;
     case "citar-no-texto": return "Será citado no texto do fechamento.";
     default: return "Decidido.";
   }
@@ -60,6 +62,9 @@ function Evidencias({ a }: { a: Alerta }) {
 function Acoes({ a, decidir }: { a: Alerta; decidir: Decidir }) {
   const s = a.sugestao;
   const [grupos, setGrupos] = useState<Record<string, string>>({});
+  // Entradas: já começa com a sugestão do nome (o consultor só ajusta o que estiver errado).
+  const [ents, setEnts] = useState<Record<string, GrupoEntrada | "">>(() =>
+    s?.tipo === "classificar-entradas" ? Object.fromEntries(s.categorias.map((c) => [c, s.sugeridas[c] ?? ""])) : {});
   if (!s) return <Button size="sm" variant="outline" onClick={() => decidir(a.chave, "manter")}>Ciente</Button>;
   switch (s.tipo) {
     case "reclassificar":
@@ -86,6 +91,25 @@ function Acoes({ a, decidir }: { a: Alerta; decidir: Decidir }) {
             </label>
           ))}
           <div><Button size="sm" disabled={!completo} onClick={() => decidir(a.chave, "aplicar", { grupos })}>Salvar grupos</Button></div>
+        </div>
+      );
+    }
+    case "classificar-entradas": {
+      const completo = s.categorias.every((c) => ents[c]);
+      return (
+        <div className="flex w-full flex-col gap-2">
+          {s.categorias.map((c) => (
+            <label key={c} className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="min-w-[200px] font-medium">{c}</span>
+              <select className="h-8 rounded-md border border-input bg-background px-2 text-sm" value={ents[c] ?? ""} onChange={(e) => setEnts({ ...ents, [c]: e.target.value as GrupoEntrada | "" })}>
+                <option value="">Escolha</option>
+                {GRUPOS_ENTRADA.map((g) => <option key={g} value={g}>{ROTULO_GRUPO_ENTRADA[g]}</option>)}
+              </select>
+              {s.sugeridas[c] && <span className="text-xs text-muted-foreground">sugestão pelo nome</span>}
+            </label>
+          ))}
+          <p className="text-xs text-muted-foreground">Operacional e não operacional entram no resultado de caixa. “Fora do resultado” aparece só como informação.</p>
+          <div><Button size="sm" disabled={!completo} onClick={() => decidir(a.chave, "aplicar", { entradas: ents as Record<string, GrupoEntrada> })}>Salvar classificação</Button></div>
         </div>
       );
     }

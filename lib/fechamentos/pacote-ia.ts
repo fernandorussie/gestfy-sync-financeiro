@@ -21,7 +21,7 @@ export interface DadosPacote {
   tipo: "mensal" | "quinzenal";
   indicadores: Indicadores;
   anterior: Indicadores;
-  anual: { mes: string; entradas: number; saidasCaixa: number }[];
+  anual: { mes: string; entradas: number; recebido?: number | null; saidasCaixa: number }[];
   ritmo: Ritmo | null;
   alertas: Alerta[];
   decisoes: Decisoes;
@@ -130,7 +130,12 @@ export function montarPacote(d: DadosPacote, opcoes: { anonimizar?: boolean; des
   sec("Resultado");
   L.push(`- Faturamento: ${fmt(i.faturamento?.total)}${ant(` | anterior ${fmt(a.faturamento?.total)}`)}${vr(i.faturamento?.total, a.faturamento?.total)}`);
   L.push(`- Despesas pagas: ${fmt(i.despesas?.total)}${ant(` | anterior ${fmt(a.despesas?.total)}`)}${vr(i.despesas?.total, a.despesas?.total)}`);
-  L.push(`- Resultado de caixa: ${fmt(i.caixa?.resultado)}${ant(` | anterior ${fmt(a.caixa?.resultado)}`)}`);
+  if (i.caixa?.real && i.entradas) {
+    L.push(`- Entradas de caixa (recebido): ${fmt(i.entradas.total)}${ant(` | anterior ${fmt(a.entradas?.total)}`)}${vr(i.entradas.total, a.entradas?.total)} | operacionais ${fmt(i.entradas.operacionais)}, não operacionais ${fmt(i.entradas.naoOperacionais)}${i.entradas.foraDoResultado ? ` | fora do resultado (transferências, empréstimos, aportes): ${fmt(i.entradas.foraDoResultado)}` : ""}`);
+    L.push(`- Resultado de caixa (entradas − despesas pagas): ${fmt(i.caixa.resultado)}${ant(` | anterior ${fmt(a.caixa?.resultado)}`)}`);
+  } else {
+    L.push(`- Faturamento x Despesas (faturamento − despesas pagas; o cliente não tem fonte de entradas, então NÃO chame isso de resultado de caixa): ${fmt(i.caixa?.resultado)}${ant(` | anterior ${fmt(a.caixa?.resultado)}`)}`);
+  }
   if (d.tipo === "mensal" && i.meta) L.push(`- Meta do mês: ${fmt(i.meta.valor)} | atingimento ${pc(i.meta.atingimento)} | faltaram ${fmt(i.meta.falta)}`);
   if (i.pacientes) {
     L.push(`- ${cap(V.clientes)} atendidos: ${n(i.pacientes.atendidos)}${ant(` | anterior ${n(a.pacientes?.atendidos)}`)}${vr(i.pacientes.atendidos, a.pacientes?.atendidos)}`);
@@ -216,7 +221,7 @@ export function montarPacote(d: DadosPacote, opcoes: { anonimizar?: boolean; des
 
   if (d.anual.filter((m) => m.entradas || m.saidasCaixa).length > 1) {
     sec(`Evolução em ${i.periodo.inicio.slice(0, 4)} (regime de caixa)`);
-    L.push(d.anual.filter((m) => m.entradas || m.saidasCaixa).map((m) => `${nomeDoMes(m.mes + "-01").slice(0, 3)}: fat. ${fmt(m.entradas, 0)} / desp. ${fmt(m.saidasCaixa, 0)}`).join(" · "));
+    L.push(d.anual.filter((m) => m.entradas || m.saidasCaixa).map((m) => `${nomeDoMes(m.mes + "-01").slice(0, 3)}: fat. ${fmt(m.entradas, 0)}${m.recebido != null ? ` / receb. ${fmt(m.recebido, 0)}` : ""} / desp. ${fmt(m.saidasCaixa, 0)}`).join(" · "));
   }
 
   if (d.acompanhamento.length) {

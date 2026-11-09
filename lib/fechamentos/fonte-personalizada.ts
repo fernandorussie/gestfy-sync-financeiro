@@ -101,7 +101,8 @@ export const FORMATOS: { id: Formato; rotulo: string }[] = [
 export const PADRAO_FORMULA: { id: string; rotulo: string; formato: Formato; ler: (i: Indicadores | null | undefined) => number | null }[] = [
   { id: "padrao:faturamento", rotulo: "Faturamento", formato: "moeda", ler: (i) => i?.faturamento?.total ?? null },
   { id: "padrao:despesas", rotulo: "Despesas", formato: "moeda", ler: (i) => i?.despesas?.total ?? null },
-  { id: "padrao:resultado", rotulo: "Resultado de caixa", formato: "moeda", ler: (i) => i?.caixa?.resultado ?? null },
+  { id: "padrao:resultado", rotulo: "Resultado (de caixa ou faturamento x despesas)", formato: "moeda", ler: (i) => i?.caixa?.resultado ?? null },
+  { id: "padrao:entradas", rotulo: "Entradas de caixa", formato: "moeda", ler: (i) => i?.entradas?.total ?? null },
   { id: "padrao:atendidos", rotulo: "Clientes atendidos", formato: "numero", ler: (i) => i?.pacientes?.atendidos ?? null },
   { id: "padrao:novos", rotulo: "Clientes novos", formato: "numero", ler: (i) => i?.pacientes?.novos ?? null },
   { id: "padrao:ticket", rotulo: "Ticket médio", formato: "moeda", ler: (i) => i?.pacientes?.ticketMedio ?? null },

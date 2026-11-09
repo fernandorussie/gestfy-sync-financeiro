@@ -7,6 +7,8 @@
  */
 import type { Alerta, Sugestao } from "./conferencia";
 import type { Ajustes } from "./indicadores";
+import { GRUPOS_ENTRADA, type GrupoEntrada } from "./entradas";
+import { normalizar } from "./texto";
 
 /** aplicar = seguir a sugestão do alerta; manter = deixar como está (vale também para "ciente"). */
 export type AcaoDecisao = "aplicar" | "manter";
@@ -17,7 +19,7 @@ export interface Decisao {
   /** Cópia da sugestão no momento da decisão (o alerta some depois de aplicado). */
   sugestao?: Sugestao;
   /** Para "escolher-meta" e "classificar": o que foi escolhido. */
-  escolha?: { meta?: number; grupos?: Record<string, string> };
+  escolha?: { meta?: number; grupos?: Record<string, string>; entradas?: Record<string, GrupoEntrada> };
   titulo: string;
   em: string;
 }
@@ -67,6 +69,13 @@ export function metaEscolhida(d: Decisoes): number | null {
 export function gruposEscolhidos(d: Decisoes): Record<string, string> {
   const out: Record<string, string> = {};
   for (const x of d.registro) Object.assign(out, x.escolha?.grupos ?? {});
+  return out;
+}
+
+/** Categoria de entrada (normalizada) → grupo, escolhidos na conferência. Vão para as regras da clínica. */
+export function entradasEscolhidas(d: Decisoes): Record<string, GrupoEntrada> {
+  const out: Record<string, GrupoEntrada> = {};
+  for (const x of d.registro) for (const [c, g] of Object.entries(x.escolha?.entradas ?? {})) if (GRUPOS_ENTRADA.includes(g)) out[normalizar(c)] = g;
   return out;
 }
 

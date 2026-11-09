@@ -16,6 +16,7 @@ import {
 } from "./indicadores";
 import { GRUPO_SEM_CLASSIFICACAO, montarPlano, PISTAS_CATEGORIA } from "./plano-contas";
 import { centavos, normalizar } from "./texto";
+import { grupoDaEntrada, type GrupoEntrada } from "./entradas";
 
 export type Gravidade = "grave" | "atencao" | "info";
 export type Fonte = keyof DadosFechamento;
@@ -32,6 +33,7 @@ export interface Evidencia {
 export type Sugestao =
   | { tipo: "reclassificar"; linhas: number[]; categoria: string; grupo: string }
   | { tipo: "classificar"; categorias: string[] }
+  | { tipo: "classificar-entradas"; categorias: string[]; sugeridas: Record<string, GrupoEntrada | null> }
   | { tipo: "unificar"; campo: CampoUnificavel; de: string[]; para: string }
   | { tipo: "escolher-meta"; opcoes: { origem: string; valor: number }[] }
   | { tipo: "citar-no-texto" }
@@ -66,7 +68,7 @@ const ORDEM: Record<Gravidade, number> = { grave: 0, atencao: 1, info: 2 };
 const brl = (v: number) => "R$ " + v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const no = (d: string | null, p: Periodo) => !!d && d >= p.inicio && d <= p.fim;
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
-const NOME_FONTE: Record<Fonte, string> = { vendas: "Vendas", despesas: "Despesas", orcamentos: "Orçamentos", leads: "Leads", nps: "NPS", avaliacoes: "Avaliações Google" };
+const NOME_FONTE: Record<Fonte, string> = { vendas: "Vendas", despesas: "Despesas", orcamentos: "Orçamentos", leads: "Leads", nps: "NPS", avaliacoes: "Avaliações Google", entradas: "Entradas" };
 
 export function conferir(e: EntradaConferencia): Alerta[] {
   const { dados, periodo } = e;
@@ -81,7 +83,7 @@ export function conferir(e: EntradaConferencia): Alerta[] {
 
   /* ---------- fontes e linhas ---------- */
   for (const fonte of Object.keys(NOME_FONTE) as Fonte[]) {
-    const lista = dados[fonte] as { data?: string; dataPagamento?: string | null }[] | null;
+    const lista = dados[fonte] as { data?: string; dataPagamento?: string | null }[] | null | undefined;
     if (!lista) continue;
     const n = lista.filter((r) => no(r.data ?? r.dataPagamento ?? null, periodo)).length;
     if (n === 0) {
@@ -103,6 +105,77 @@ export function conferir(e: EntradaConferencia): Alerta[] {
       evidencias: avisos.slice(0, 20).map((a) => ({ fonte, linha: a.linha, texto: `${a.campo}: ${a.motivo}${a.valor ? ` (“${a.valor}”)` : ""}` })),
       sugestao: { tipo: "corrigir-na-origem" },
     });
+  }
+
+  /* ---------- despesas não pagas ---------- */
+  if (ind.despesas?.naoPagas) {
+    const np = (dados.despesas ?? []).filter((d) => no(d.dataPagamento, periodo) && d.pago === false);
+    alertas.push({
+      chave: `despesa-nao-paga:${np.map((d) => d.linha).join(",")}`, regra: "despesa-nao-paga", gravidade: "atencao", area: "Despesas",
+      titulo: `${plural(np.length, "despesa marcada", "despesas marcadas")} como não paga ficou fora das saídas`,
+      descricao: `Têm data no período, mas a planilha diz que não foram pagas (${brl(ind.despesas.naoPagas.valor)}). Saída de caixa é só o que foi pago. Se já foram pagas, corrija a situação na planilha e leia de novo.`,
+      evidencias: np.slice(0, 30).map(evDesp), total: ind.despesas.naoPagas.valor,
+      sugestao: { tipo: "corrigir-na-origem" },
+    });
+  }
+
+  /* ---------- entradas ---------- */
+  if (dados.entradas) {
+    const doPer = dados.entradas.filter((r) => no(r.data, periodo) && r.recebido !== false);
+    const evEnt = (r: (typeof doPer)[number]): Evidencia => ({ fonte: "entradas", linha: r.linha, texto: [r.categoria, r.descricao].filter(Boolean).join(" · ") || "—", data: r.data, valor: r.valor });
+    const pend = new Map<string, { nome: string; linhas: typeof doPer }>();
+    for (const r of doPer) {
+      const nome = r.categoria || NAO_INFORMADO;
+      if (grupoDaEntrada(nome, regras.categoriasEntrada).confirmado) continue;
+      const k = normalizar(nome);
+      const it = pend.get(k) ?? { nome, linhas: [] };
+      it.linhas.push(r);
+      pend.set(k, it);
+    }
+    if (pend.size) {
+      const cats = [...pend.values()].map((x) => x.nome);
+      const todas = [...pend.values()].flatMap((x) => x.linhas);
+      alertas.push({
+        chave: `entrada-sem-grupo:${[...pend.keys()].sort().join("|")}`, regra: "entrada-sem-grupo", gravidade: "grave", area: "Entradas",
+        titulo: `${plural(cats.length, "categoria de entrada", "categorias de entrada")} para classificar`,
+        descricao: "Diga se cada categoria é receita da operação, não operacional (rendimentos, reembolsos) ou fora do resultado (transferência, empréstimo, aporte). A sugestão vem do nome; a escolha fica salva para o cliente.",
+        evidencias: todas.slice(0, 40).map(evEnt), total: centavos(todas.reduce((s, r) => s + r.valor, 0)),
+        sugestao: { tipo: "classificar-entradas", categorias: cats, sugeridas: Object.fromEntries(cats.map((c) => [c, grupoDaEntrada(c, undefined).sugerido])) },
+      });
+    }
+    if (ind.entradas && ind.entradas.emAberto.quantidade) {
+      alertas.push({
+        chave: "entrada-em-aberto", regra: "entrada-em-aberto", gravidade: "info", area: "Entradas",
+        titulo: `${plural(ind.entradas.emAberto.quantidade, "entrada em aberto ficou", "entradas em aberto ficaram")} fora (${brl(ind.entradas.emAberto.valor)})`,
+        descricao: "Estão marcadas como não recebidas (em aberto, previstas ou canceladas). Entram quando a planilha indicar o recebimento.",
+        evidencias: [], sugestao: { tipo: "citar-no-texto" },
+      });
+    }
+    if (ind.entradas && ind.entradas.semSituacao && ind.entradas.semSituacao < ind.entradas.lancamentos) {
+      // Só avisa quando a coluna existe e algumas linhas vieram em branco (planilha sem a coluna = tudo é recebido).
+      alertas.push({
+        chave: "entrada-sem-situacao", regra: "entrada-sem-situacao", gravidade: "info", area: "Entradas",
+        titulo: `${plural(ind.entradas.semSituacao, "entrada sem situação", "entradas sem situação")} contada como recebida`,
+        descricao: "A coluna de situação está vazia nessas linhas. Se alguma ainda não foi recebida, ajuste na planilha.",
+        evidencias: doPer.filter((r) => r.recebido === null).slice(0, 20).map(evEnt), sugestao: { tipo: "corrigir-na-origem" },
+      });
+    }
+    const vistos = new Map<string, typeof doPer>();
+    for (const r of doPer) {
+      const k = `${r.data}|${r.valor}|${normalizar(r.descricao || r.categoria)}`;
+      vistos.set(k, [...(vistos.get(k) ?? []), r]);
+    }
+    const dup = [...vistos.values()].filter((g) => g.length > 1);
+    if (dup.length) {
+      const linhas = dup.flat();
+      alertas.push({
+        chave: `entrada-duplicada:${linhas.map((r) => r.linha).join(",")}`, regra: "entrada-duplicada", gravidade: "atencao", area: "Entradas",
+        titulo: `${plural(dup.length, "possível duplicidade", "possíveis duplicidades")} nas entradas`,
+        descricao: "Mesma data, mesmo valor e mesma descrição. Pode ser certo (dois pagamentos iguais), mas confira para não somar duas vezes.",
+        evidencias: linhas.slice(0, 30).map(evEnt), total: centavos(dup.reduce((s, g) => s + g[0].valor * (g.length - 1), 0)),
+        sugestao: { tipo: "corrigir-na-origem" },
+      });
+    }
   }
 
   /* ---------- despesas sem grupo ---------- */

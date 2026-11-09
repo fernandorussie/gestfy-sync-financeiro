@@ -17,8 +17,12 @@ const x100 = (v: number | null | undefined) => (v == null ? null : Math.round(v 
 export const METRICAS_PADRAO: DefMetrica[] = [
   { id: "faturamento", rotulo: "Faturamento", formato: "moeda", melhor: "maior", ler: (i) => i.faturamento?.total },
   { id: "despesas", rotulo: "Despesas", formato: "moeda", melhor: "menor", ler: (i) => i.despesas?.total },
-  { id: "resultado", rotulo: "Resultado de caixa", formato: "moeda", melhor: "maior", ler: (i) => i.caixa?.resultado },
-  { id: "margem", rotulo: "Margem de caixa", formato: "percentual", melhor: "maior", ler: (i) => x100(i.caixa?.margem) },
+  // "resultado" e "margem" são sempre faturamento − despesas (comparáveis entre todos os clientes e com fechamentos antigos).
+  { id: "resultado", rotulo: "Faturamento x Despesas", formato: "moeda", melhor: "maior", ler: (i) => (i.faturamento && i.despesas ? Math.round((i.faturamento.total - i.despesas.total) * 100) / 100 : null) },
+  { id: "margem", rotulo: "Margem (faturamento x despesas)", formato: "percentual", melhor: "maior", ler: (i) => (i.faturamento?.total && i.despesas ? x100((i.faturamento.total - i.despesas.total) / i.faturamento.total) : null) },
+  // Só para clientes com a fonte de Entradas.
+  { id: "entradas", rotulo: "Entradas de caixa", formato: "moeda", melhor: "maior", ler: (i) => i.entradas?.total },
+  { id: "resultadoCaixa", rotulo: "Resultado de caixa", formato: "moeda", melhor: "maior", ler: (i) => (i.caixa?.real ? i.caixa.resultado : null) },
   { id: "atingimento", rotulo: "Atingimento da meta", formato: "percentual", melhor: "maior", ler: (i) => x100(i.meta?.atingimento) },
   { id: "atendidos", rotulo: "Atendidos", formato: "numero", melhor: "maior", ler: (i) => i.pacientes?.atendidos },
   { id: "novos", rotulo: "Novos", formato: "numero", melhor: "maior", ler: (i) => i.pacientes?.novos },

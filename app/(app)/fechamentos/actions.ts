@@ -8,6 +8,8 @@ import type { Json } from "@/lib/supabase/types";
 import type { FontesFechamento } from "@/lib/fechamentos/coleta";
 import type { Alerta } from "@/lib/fechamentos/conferencia";
 import { GRUPOS_DESPESA } from "@/lib/fechamentos/plano-contas";
+import { GRUPOS_ENTRADA, type GrupoEntrada } from "@/lib/fechamentos/entradas";
+import { normalizar } from "@/lib/fechamentos/texto";
 import { decidir, desfazer, type AcaoDecisao, type Decisao } from "@/lib/fechamentos/decisoes";
 import { calcularFechamento, concluirFechamento, fontesExtras, lerDecisoes, limparCache, periodoDe, previaFontePersonalizada, testarFonte, type PreviaFonte, type ResultadoFechamento } from "@/lib/fechamentos/servidor";
 import { limparFontePersonalizada, type FontePersonalizada } from "@/lib/fechamentos/fonte-personalizada";
@@ -62,14 +64,16 @@ export async function decidirAlerta(p: { id: string; chave: string; acao: AcaoDe
     if (!alerta) return { ok: false, erro: "Este alerta mudou desde a última leitura. Atualize a página." };
     const gruposValidos = new Set(GRUPOS_DESPESA.map((g) => g.grupo));
     if (p.escolha?.grupos && Object.values(p.escolha.grupos).some((g) => !gruposValidos.has(g))) return { ok: false, erro: "Grupo de despesa inválido." };
+    if (p.escolha?.entradas && Object.values(p.escolha.entradas).some((g) => !GRUPOS_ENTRADA.includes(g))) return { ok: false, erro: "Grupo de entrada inválido." };
     if (p.escolha?.meta !== undefined && !(p.escolha.meta > 0)) return { ok: false, erro: "Meta inválida." };
     const novas = decidir(lerDecisoes(f.decisoes), alerta, p.acao, p.escolha);
     await db.from("fechamentos").update({ decisoes: novas as unknown as Json, atualizado_em: new Date().toISOString() }).eq("id", p.id);
     // Grupo escolhido para categoria fora do plano vale para os próximos fechamentos da clínica.
-    if (p.escolha?.grupos) {
+    if (p.escolha?.grupos || p.escolha?.entradas) {
       const { data: cfg } = await db.from("fechamento_config").select("regras").eq("clinica_id", f.clinica_id).maybeSingle();
-      const regras = (cfg?.regras ?? {}) as { categoriasDespesa?: Record<string, string> };
-      regras.categoriasDespesa = { ...(regras.categoriasDespesa ?? {}), ...p.escolha.grupos };
+      const regras = (cfg?.regras ?? {}) as { categoriasDespesa?: Record<string, string>; categoriasEntrada?: Record<string, GrupoEntrada> };
+      if (p.escolha.grupos) regras.categoriasDespesa = { ...(regras.categoriasDespesa ?? {}), ...p.escolha.grupos };
+      if (p.escolha.entradas) regras.categoriasEntrada = { ...(regras.categoriasEntrada ?? {}), ...Object.fromEntries(Object.entries(p.escolha.entradas).map(([c, g]) => [normalizar(c), g])) };
       await db.from("fechamento_config").update({ regras: regras as unknown as Json, atualizado_em: new Date().toISOString() }).eq("clinica_id", f.clinica_id);
     }
     return { ok: true, dados: await calcularFechamento(p.id) };

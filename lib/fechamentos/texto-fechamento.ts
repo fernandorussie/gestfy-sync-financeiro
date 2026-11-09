@@ -158,7 +158,7 @@ export function rascunho(c: ContextoTexto): SecoesTexto {
     obs.push(p);
   } else if (i.despesas) {
     const pontuais = citar(c, "pagamentos-pontuais");
-    let p = `${pontuais ? "Outro ponto importante foi o caixa. " : ""}Tivemos ${brl(i.despesas.total)} em despesas pagas${temAnterior && a.despesas ? `, contra ${brl(a.despesas.total)} ${P.em}` : ""}, e o resultado de caixa foi de ${brl(i.caixa?.resultado ?? 0)}.`;
+    let p = `${pontuais ? "Outro ponto importante foi o caixa. " : ""}${i.caixa?.real && i.entradas ? `Entraram ${brl(i.entradas.total)} no caixa e tivemos` : "Tivemos"} ${brl(i.despesas.total)} em despesas pagas${temAnterior && a.despesas ? `, contra ${brl(a.despesas.total)} ${P.em}` : ""}, ${i.caixa?.real ? `e o resultado de caixa foi de ${brl(i.caixa.resultado)}` : `e o faturamento menos as despesas pagas ficou em ${brl(i.caixa?.resultado ?? 0)}`}.`;
     if (pontuais?.total) {
       const nat = naturezaPontuais(pontuais);
       p += ` Porém, ${A.sujeito} concentrou pagamentos de ${lista(nat)}, que somaram aproximadamente ${mil(pontuais.total)}. Portanto, esse aumento não representa uma elevação dos custos mensais.`;
@@ -276,7 +276,8 @@ export function textoWhatsApp(p: {
   linhas.push("");
   if (i.despesas) linhas.push(`💳 Saídas ${r ? "pagas até o dia 15" : "no período"}: ${brl(i.despesas.total)}`);
   if (r && r.provisionado !== null && !p.ocultas?.includes("caixaMes")) linhas.push(`🧾 A pagar até o fim do mês (pela média de ${r.mesesMedia.length === 1 ? "1 mês" : `${r.mesesMedia.length} meses`}): ${brl(r.provisionado)}`);
-  if (i.caixa) linhas.push(`💵 Saldo de caixa no período: ${brl(i.caixa.resultado)}`);
+  if (i.caixa?.real && i.entradas) linhas.push(`💰 Entradas ${r ? "recebidas até o dia 15" : "no período"}: ${brl(i.entradas.total)}`);
+  if (i.caixa) linhas.push(i.caixa.real ? `💵 Resultado de caixa (entradas − saídas): ${brl(i.caixa.resultado)}` : `💵 Faturamento x Despesas: ${brl(i.caixa.resultado)}`);
   const secao = (rotuloSecao: string, corpo: string) => { if (corpo.trim()) linhas.push("", rotuloSecao, "", corpo.trim()); };
   secao("Observação:", p.texto.observacao);
   secao("✅ Principais destaques:", p.texto.destaques);

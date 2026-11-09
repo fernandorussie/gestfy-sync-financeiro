@@ -241,3 +241,18 @@ Sem mudança em coleta, cálculos, fontes, relatórios ou banco.
 - **Histórico:** sem formulário de novo fechamento. Filtros por cliente, competência, ano, tipo, situação e versões anteriores; cada linha abre o fechamento inteiro ou direto em Conferência, Indicadores, Análise, Texto (`?etapa=`) e o PDF. `/fechamentos/clinica/[id]` redireciona para o Histórico filtrado. Removidos `historico-view.tsx` e `novo-fechamento.tsx` (criação fica só no painel).
 - **Comparativos:** página própria com seleção de cliente; caixa x competência para despesas, resultado e margem (competência vem do resumo anual do último mensal concluído). `/fechamentos/clinica/[id]/comparativos` redireciona.
 - Conferido localmente com um banco falso (dados fictícios + fixture da Claros): painel, clientes, configuração (abas sem rolagem, cards recolhidos, atalho de pendência), histórico com versões, comparativos com troca de regime, as 4 etapas de um fechamento e o menu recolhendo e expandindo.
+
+## Etapa v3.3 — faturamento, entradas, saídas e resultado separados (09/11)
+
+Regras no motor do GestfySync (não dependem das fórmulas das planilhas-mestre).
+
+- **Despesas = só as pagas.** Linha com data de pagamento mas "Pago? Não" / "Em aberto" fica fora das saídas, do caixa, da competência e da média do quinzenal. Alerta de atenção "despesa marcada como não paga" com quantidade e valor. A coluna de situação aceita Sim/Não, Quitado, Em aberto, Pago, Pendente etc. (`lerSituacao`).
+- **Entradas de caixa:** nova fonte padrão opcional (link, aba, teste, mapeamento de colunas): data do recebimento, valor recebido, situação, categoria, forma, competência, descrição. Lê exportações de sistema (Núcleo VIV: "Data do último pagamento", "Valor total recebido da parcela", "Situação") e planilhas manuais (Gustavo Gurgel: "Data Receb.", "Vl. Receb. R$", "Status Recebido"). Linhas sem valor (saldo em branco) são ignoradas; "em aberto" fica fora.
+- **Grupos de entrada** (`lib/fechamentos/entradas.ts`): operacional, não operacional (rendimentos, reembolsos, juros) e fora do resultado (transferência, empréstimo, aporte, saldo, resgate). Sugestão pelo nome; o consultor confirma na conferência (alerta grave "categorias de entrada para classificar") e a escolha fica em `fechamento_config.regras.categoriasEntrada`. Outros alertas: entradas em aberto, sem situação, possíveis duplicidades (mesma data, valor e descrição).
+- **Resultado:** com Entradas = **Resultado de caixa** (entradas operacionais + não operacionais − despesas pagas; `caixa.real = true`). Sem Entradas = **Faturamento x Despesas** (faturamento − despesas pagas), nunca chamado de caixa. `rotuloResultado()` decide o nome em tela, PDF, WhatsApp, rascunho e pacote do Claude.
+- **Caixa x competência** (`regimesAnuais`, `TabelaRegimes`): Faturamento · Entradas (se houver) · Despesas pagas · Resultado de caixa ou Faturamento x Despesas · Despesas por competência · Resultado por competência (faturamento − despesas do mês de competência). `LinhaAnual.entradas` continua sendo o faturamento (compatível com fechamentos congelados); `recebido` é o novo campo.
+- Indicadores: com Entradas, a 1ª linha é Faturamento · Entradas · Despesas pagas · Resultado de caixa; seção "Entradas de caixa por categoria"; gráfico com a linha de entradas. PDF mensal igual.
+- Métricas: `resultado`/`margem` passam a ser sempre faturamento − despesas (comparáveis entre clientes); novas `entradas` e `resultadoCaixa` (só com a fonte).
+- Fechamentos concluídos antes desta versão não mudam (números congelados); aparecem como "Faturamento x Despesas".
+
+Testes: 223 passando (novo `entradas.test.ts`).

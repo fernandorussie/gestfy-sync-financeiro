@@ -99,6 +99,21 @@ export function lerSimNao(valor: Celula): boolean | null {
   return null;
 }
 
+/**
+ * Situação de pagamento ou recebimento: true = pago/recebido, false = em aberto
+ * ou previsto, null = não informado ou desconhecido. Aceita "Sim/Não" e os
+ * nomes de sistemas financeiros (Quitado, Recebido, Em aberto, Pendente…).
+ */
+export function lerSituacao(valor: Celula): boolean | null {
+  const sn = lerSimNao(valor);
+  if (sn !== null) return sn;
+  const s = normalizar(valor);
+  if (!s) return null;
+  if (/^(pago|paga|quitad[oa]|recebid[oa]|liquidad[oa]|realizad[oa]|baixad[oa]|confirmad[oa]|compensad[oa]|ok)$/.test(s)) return true;
+  if (/^(em aberto|aberto|aberta|pendente|a pagar|a receber|atrasad[oa]|vencid[oa]|previst[oa]|agendad[oa]|cancelad[oa]|estornad[oa])$/.test(s)) return false;
+  return null;
+}
+
 /** Letra de coluna ("A", "AB") → índice começando em 0. */
 export function indiceDaLetra(letra: string): number {
   let idx = 0;

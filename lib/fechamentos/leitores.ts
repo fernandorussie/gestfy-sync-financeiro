@@ -8,7 +8,7 @@
  * testar tudo com dados fixos.
  */
 import { celula, resolverColunas, type DefinicaoFonte, type IndicacaoColuna, type ResultadoColunas } from "./colunas";
-import { lerData, lerSimNao, lerValor, normalizar, textoLimpo, type Celula, type DataISO } from "./texto";
+import { lerData, lerSimNao, lerSituacao, lerValor, normalizar, textoLimpo, type Celula, type DataISO } from "./texto";
 
 export interface AvisoLeitura {
   /** Linha da planilha (1 = primeira linha). */
@@ -168,14 +168,14 @@ export function lerVendas(linhas: Celula[][], op: OpcoesLeitura<CampoVenda> = {}
 export type CampoDespesa = "dataPagamento" | "dataVencimento" | "descricao" | "categoria" | "valor" | "pago" | "periodicidade" | "competencia" | "centroCusto";
 
 export const DEF_DESPESAS: DefinicaoFonte<CampoDespesa> = {
-  dataPagamento: { rotulo: "Data de pagamento", nomes: ["data pgto", "data de pagamento", "data pagamento", "pagamento"], obrigatorio: true },
+  dataPagamento: { rotulo: "Data de pagamento", nomes: ["data pgto", "data de pagamento", "data pagamento", "data do ultimo pagamento", "pagamento"], obrigatorio: true },
   dataVencimento: { rotulo: "Data de vencimento", nomes: ["data vcto", "data de vencimento", "vencimento"] },
   descricao: { rotulo: "Descrição", nomes: ["descricao", "historico", "fornecedor"] },
   categoria: { rotulo: "Categoria", nomes: ["ajuste_categoria", "categoria ajustada", "categoria"], obrigatorio: true },
-  valor: { rotulo: "Valor", nomes: ["valor r$", "valor pago", "valor"], obrigatorio: true },
-  pago: { rotulo: "Pago?", nomes: ["pago?", "pago", "status"] },
+  valor: { rotulo: "Valor", nomes: ["valor r$", "valor pago", "valor total pago da parcela (r$)", "valor pago da parcela (r$)", "valor"], obrigatorio: true },
+  pago: { rotulo: "Pago? / situação", nomes: ["pago?", "pago", "status", "situacao"] },
   periodicidade: { rotulo: "Periodicidade", nomes: ["periodicidade", "recorrencia"] },
-  competencia: { rotulo: "Competência", nomes: ["competencia", "mes de competencia"] },
+  competencia: { rotulo: "Competência", nomes: ["competencia", "mes de competencia", "mes_comp", "data de competencia"] },
   centroCusto: { rotulo: "Centro de custo", nomes: ["centro de custo", "unidade"] },
 };
 
@@ -188,6 +188,7 @@ export interface Despesa {
   categoria: string;
   /** Sempre positivo: planilhas que lançam saída como negativo são normalizadas. */
   valor: number;
+  /** false = marcada como não paga / em aberto (fica fora das saídas); null = sem a informação. */
   pago: boolean | null;
   periodicidade: string;
   /** "AAAA-MM" */
@@ -207,10 +208,67 @@ export function lerDespesas(linhas: Celula[][], op: OpcoesLeitura<CampoDespesa> 
       descricao: textoLimpo(get("descricao")),
       categoria: textoLimpo(get("categoria")),
       valor: Math.abs(valor),
-      pago: lerSimNao(get("pago")),
+      pago: lerSituacao(get("pago")),
       periodicidade: textoLimpo(get("periodicidade")),
       competencia: lerMes(get("competencia")),
       centroCusto: textoLimpo(get("centroCusto")),
+    };
+  });
+}
+
+/* ============================== ENTRADAS (recebimentos) ============================== */
+
+export type CampoEntrada = "data" | "valor" | "situacao" | "categoria" | "forma" | "competencia" | "descricao";
+
+/**
+ * Entradas de caixa: dinheiro que entrou de fato. Fonte opcional. Os nomes
+ * cobrem planilhas manuais ("Data Receb.", "Vl Receb. R$", "Status") e
+ * exportações de sistemas financeiros ("Data do último pagamento",
+ * "Valor total recebido da parcela", "Situação").
+ */
+export const DEF_ENTRADAS: DefinicaoFonte<CampoEntrada> = {
+  data: { rotulo: "Data do recebimento", nomes: ["data receb", "data do recebimento", "data de recebimento", "data recebimento", "data do ultimo pagamento", "data pgto", "data de pagamento", "data"], obrigatorio: true },
+  valor: { rotulo: "Valor recebido", nomes: ["valor total recebido da parcela (r$)", "valor recebido da parcela (r$)", "vl receb r$", "vl receb", "valor recebido", "valor r$", "valor"], obrigatorio: true },
+  situacao: { rotulo: "Situação", nomes: ["status recebido", "status do recebimento", "recebido?", "recebido", "status", "situacao"] },
+  categoria: { rotulo: "Categoria", nomes: ["categoria", "categoria 1", "categoria gestfy"] },
+  forma: { rotulo: "Forma de recebimento", nomes: ["forma receb", "forma de recebimento", "forma de pagamento", "meio de pagamento"] },
+  competencia: { rotulo: "Competência", nomes: ["data de competencia", "competencia", "mes de competencia"] },
+  descricao: { rotulo: "Descrição", nomes: ["descricao", "cliente/forneced/descricao", "historico"] },
+};
+
+export interface Recebimento {
+  linha: number;
+  data: DataISO;
+  /** Pode ser negativo (estorno). */
+  valor: number;
+  /** true = recebido, false = em aberto/previsto, null = sem situação informada. */
+  recebido: boolean | null;
+  situacao: string;
+  categoria: string;
+  forma: string;
+  /** "AAAA-MM" */
+  competencia: string | null;
+  /** Só para conferência na tela; nunca vai para relatório nem para o Claude. */
+  descricao: string;
+}
+
+export function lerEntradas(linhas: Celula[][], op: OpcoesLeitura<CampoEntrada> = {}): Leitura<Recebimento, CampoEntrada> {
+  return ler(linhas, DEF_ENTRADAS, op, (get, aviso, linha) => {
+    const bruto = get("valor");
+    // Linha sem valor (saldo inicial em branco, anotação) não é recebimento nem erro.
+    if (bruto === undefined || bruto === null || String(bruto).trim() === "") return null;
+    const valor = valorOuAviso(get, aviso, "valor");
+    if (valor === null || valor === 0) return null;
+    const data = lerData(get("data"));
+    if (!data) { aviso("data", "sem data de recebimento"); return null; }
+    return {
+      linha, data, valor,
+      recebido: lerSituacao(get("situacao")),
+      situacao: textoLimpo(get("situacao")),
+      categoria: textoLimpo(get("categoria")),
+      forma: textoLimpo(get("forma")),
+      competencia: lerMes(get("competencia")),
+      descricao: textoLimpo(get("descricao")),
     };
   });
 }

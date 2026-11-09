@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ordemAlfabetica, type GrupoDespesa, type ItemContagem } from "@/lib/fechamentos/indicadores";
+import { ordemAlfabetica, rotuloResultado, type GrupoDespesa, type ItemContagem } from "@/lib/fechamentos/indicadores";
 import type { ResultadoFechamento } from "@/lib/fechamentos/servidor";
 import { cap } from "@/lib/fechamentos/vocabulario";
 import { brl, brl0, dataBR, mesAbrev, nomePeriodo, num, pct } from "../../(app)/fechamentos/_components/formato";
@@ -135,7 +135,8 @@ export function Cabecalho({ colunas, cor = ROXO }: { colunas: { t: string; dir?:
 /** Linhas compactas: faturamento e despesas pagas, mês a mês no ano. */
 function GraficoLinhas({ r }: { r: ResultadoFechamento }) {
   const meses = r.anual;
-  const max = Math.max(1, ...meses.map((l) => Math.max(l.entradas, l.saidasCaixa)));
+  const real = meses.some((l) => l.recebido != null);
+  const max = Math.max(1, ...meses.map((l) => Math.max(l.entradas, l.saidasCaixa, l.recebido ?? 0)));
   const W = 640, H = 150, L = 22, R = 22, T = 18, B = 20, passo = (W - L - R) / Math.max(1, meses.length - 1);
   const x = (n: number) => L + n * passo;
   const y = (v: number) => T + (1 - v / max) * (H - T - B);
@@ -146,6 +147,8 @@ function GraficoLinhas({ r }: { r: ResultadoFechamento }) {
       {[0.25, 0.5, 0.75, 1].map((f) => <line key={f} x1={L} x2={W - R} y1={y(max * f)} y2={y(max * f)} stroke={LINHA} strokeWidth={1} />)}
       <polyline fill="none" stroke={LARANJA} strokeWidth={2} strokeLinejoin="round" points={pontos("saidasCaixa")} />
       <polyline fill="none" stroke={ROXO} strokeWidth={2.5} strokeLinejoin="round" points={pontos("entradas")} />
+      {real && <polyline fill="none" stroke={VERDE} strokeWidth={2} strokeDasharray="5 3" strokeLinejoin="round" points={meses.map((l, n) => `${x(n)},${y(l.recebido ?? 0)}`).join(" ")} />}
+      {real && meses.map((l, n) => <circle key={`r${l.mes}`} cx={x(n)} cy={y(l.recebido ?? 0)} r={2.5} fill={VERDE} />)}
       {meses.map((l, n) => {
         const ultimo = n === meses.length - 1;
         // Rótulo de cada série do lado em que ela fica (a de cima por cima, a de baixo por baixo).
@@ -172,16 +175,18 @@ export function SecResultadoMensal({ r }: { r: ResultadoFechamento }) {
   const i = r.indicadores, a = r.anterior;
   const vs = `vs ${mesDe(a.periodo.inicio)}`;
   const n = (atual?: number | null, antes?: number | null, custo?: boolean) => <><Var atual={atual} antes={antes} custo={custo} /> {vs}</>;
+  const real = !!i.caixa?.real;
   return (
     <div className="grid grid-cols-4 gap-2.5">
-      <Kpi rotulo="Faturamento (entradas)" valor={brl0(i.faturamento?.total)} nota={n(i.faturamento?.total, a.faturamento?.total)} />
-      <Kpi rotulo="Despesas (saídas)" valor={brl0(i.despesas?.total)} nota={n(i.despesas?.total, a.despesas?.total, true)} />
-      <Kpi rotulo="Resultado de caixa" valor={brl0(i.caixa?.resultado)} nota={i.caixa?.margem != null ? `${pct(i.caixa.margem)} da receita` : undefined} />
+      <Kpi rotulo="Faturamento" valor={brl0(i.faturamento?.total)} nota={n(i.faturamento?.total, a.faturamento?.total)} />
+      {real && <Kpi rotulo="Entradas (recebido)" valor={brl0(i.entradas?.total)} nota={n(i.entradas?.total, a.entradas?.total)} />}
+      <Kpi rotulo="Despesas pagas" valor={brl0(i.despesas?.total)} nota={n(i.despesas?.total, a.despesas?.total, true)} />
+      <Kpi rotulo={rotuloResultado(i.caixa)} valor={brl0(i.caixa?.resultado)} nota={i.caixa?.margem != null ? `${pct(i.caixa.margem)} ${real ? "das entradas" : "do faturamento"}` : undefined} />
       <Kpi rotulo="Atingimento da meta" valor={i.meta ? pct(i.meta.atingimento) : "—"} nota={i.meta ? `meta ${brl0(i.meta.valor)}` : "sem meta"} />
       <Kpi rotulo={`${cap(r.vocab.clientes)} atendidos`} valor={num(i.pacientes?.atendidos)} nota={n(i.pacientes?.atendidos, a.pacientes?.atendidos)} />
       <Kpi rotulo="Ticket médio" valor={brl(i.pacientes?.ticketMedio)} nota={n(i.pacientes?.ticketMedio, a.pacientes?.ticketMedio)} />
       <Kpi rotulo={`${cap(r.vocab.clientes)} novos`} valor={num(i.pacientes?.novos)} nota={n(i.pacientes?.novos, a.pacientes?.novos)} />
-      <Kpi rotulo="Ticket médio dos novos" valor={brl(i.pacientes?.ticketNovos)} nota={n(i.pacientes?.ticketNovos, a.pacientes?.ticketNovos)} />
+      {!real && <Kpi rotulo="Ticket médio dos novos" valor={brl(i.pacientes?.ticketNovos)} nota={n(i.pacientes?.ticketNovos, a.pacientes?.ticketNovos)} />}
     </div>
   );
 }
@@ -189,7 +194,7 @@ export function SecResultadoMensal({ r }: { r: ResultadoFechamento }) {
 export function SecGrafico({ r }: { r: ResultadoFechamento }) {
   return (
     <div className="pdf-bloco">
-      <Titulo extra={<><span className="mr-1 inline-block h-[3px] w-3 align-middle" style={{ background: ROXO }} />Faturamento<span className="ml-3 mr-1 inline-block h-[2px] w-3 align-middle" style={{ background: LARANJA }} />Despesas pagas</>}>Faturamento e despesas em {r.periodo.fim.slice(0, 4)}</Titulo>
+      <Titulo extra={<><span className="mr-1 inline-block h-[3px] w-3 align-middle" style={{ background: ROXO }} />Faturamento<span className="ml-3 mr-1 inline-block h-[2px] w-3 align-middle" style={{ background: LARANJA }} />Despesas pagas{r.anual.some((l) => l.recebido != null) && <><span className="ml-3 mr-1 inline-block h-[2px] w-3 align-middle" style={{ background: VERDE }} />Entradas</>}</>}>{r.anual.some((l) => l.recebido != null) ? "Faturamento, entradas e despesas" : "Faturamento e despesas"} em {r.periodo.fim.slice(0, 4)}</Titulo>
       <GraficoLinhas r={r} />
     </div>
   );
@@ -379,11 +384,13 @@ export function SecDespesas({ r, nivel }: { r: ResultadoFechamento } & Nivel) {
 
 function TabelaRegime({ r, regime }: { r: ResultadoFechamento; regime: "caixa" | "competencia" }) {
   const k = regime === "caixa" ? "saidasCaixa" : "saidasCompetencia";
-  const linhas = r.anual;
+  const real = regime === "caixa" && r.anual.some((l) => l.recebido != null);
+  // Caixa com fonte de Entradas: recebido. Sem ela (ou na competência): faturamento.
+  const linhas = r.anual.map((l) => ({ ...l, entradas: real ? (l.recebido ?? 0) : l.entradas }));
   const soma = (f: (l: (typeof linhas)[number]) => number) => linhas.reduce((s, l) => s + f(l), 0);
   return (
     <table className="w-full text-[10.5px]">
-      <Cabecalho colunas={[{ t: "Mês" }, { t: "Entradas", dir: true }, { t: "Var.", dir: true }, { t: regime === "caixa" ? "Saídas pagas" : "Gastos do mês", dir: true }, { t: "Var.", dir: true }, { t: "Saldo", dir: true }]} />
+      <Cabecalho colunas={[{ t: "Mês" }, { t: real ? "Entradas" : "Faturamento", dir: true }, { t: "Var.", dir: true }, { t: regime === "caixa" ? "Despesas pagas" : "Despesas do mês", dir: true }, { t: "Var.", dir: true }, { t: regime === "competencia" ? "Resultado" : real ? "Resultado de caixa" : "Fat. x Desp.", dir: true }]} />
       <tbody>
         {linhas.map((l, n) => {
           const ant = linhas[n - 1];
@@ -414,12 +421,14 @@ export function SecRegimes({ r, nivel }: { r: ResultadoFechamento } & Nivel) {
   return (
     <>
       <div className="pdf-bloco">
-        <Titulo extra="despesas no mês em que foram pagas">Regime de caixa</Titulo>
+        {r.anual.some((l) => l.recebido != null)
+          ? <Titulo extra="entradas recebidas − despesas pagas no mês">Regime de caixa</Titulo>
+          : <Titulo extra="faturamento − despesas pagas no mês (sem fonte de entradas)">Faturamento x Despesas</Titulo>}
         <TabelaRegime r={r} regime="caixa" />
       </div>
       {nivel !== "caixa" && (
         <div className="pdf-bloco">
-          <Titulo extra="despesas no mês a que se referem · receita pela data de atendimento nos dois regimes">Regime de competência</Titulo>
+          <Titulo extra="faturamento do mês − despesas do mês a que se referem">Regime de competência</Titulo>
           <TabelaRegime r={r} regime="competencia" />
         </div>
       )}

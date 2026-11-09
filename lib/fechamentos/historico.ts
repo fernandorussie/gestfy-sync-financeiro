@@ -174,7 +174,7 @@ export function estatisticas(pontos: PontoSerie[]): Estatisticas | null {
 export function anoCaixaCompetencia(periodos: PeriodoHistorico[]): { ano: string; linhas: LinhaAnual[] } | null {
   const p = periodos.filter((x) => x.tipo === "mensal" && concluido(x.atual)).sort((a, b) => b.inicio.localeCompare(a.inicio))[0];
   const anual = (p?.atual.snapshot as { anual?: LinhaAnual[] } | null)?.anual;
-  return p && anual?.length ? { ano: p.inicio.slice(0, 4), linhas: anual.filter((m) => m.entradas || m.saidasCaixa || m.saidasCompetencia) } : null;
+  return p && anual?.length ? { ano: p.inicio.slice(0, 4), linhas: anual.filter((m) => m.entradas || m.recebido || m.saidasCaixa || m.saidasCompetencia) } : null;
 }
 
 /** Indicadores de cada mês a partir dos dados lidos (puro, testável). Meses sem lançamento ficam de fora. */

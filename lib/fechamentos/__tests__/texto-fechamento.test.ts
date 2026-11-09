@@ -63,7 +63,7 @@ describe("texto do WhatsApp", () => {
     expect(t).toContain("Total do mês: R$ 117.650,00 (−23,1% vs. setembro/R$ 152.945,00)");
     expect(t).toContain("🎯 Meta: R$ 150.000,00 | Atingimento: 78,4%");
     expect(t).toContain("💳 Saídas no período: R$ 110.850,14");
-    expect(t).toContain("💵 Saldo de caixa no período: R$ 6.799,86");
+    expect(t).toContain("💵 Faturamento x Despesas: R$ 6.799,86");
   });
 
   it("seções vazias não aparecem; plano de ação com responsáveis e prazo", () => {
