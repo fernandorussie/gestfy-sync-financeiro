@@ -170,6 +170,19 @@ export function montarPacote(d: DadosPacote, opcoes: { anonimizar?: boolean; des
     for (const p of profs.slice(0, 8)) L.push(`- ${prof(p.nome)}: ${fmt(p.valor, 0)} (${pc(p.pct)} do total)${ant(` | anterior ${fmt(profA.get(chave(p.nome))?.valor ?? 0, 0)} (${pc(profA.get(chave(p.nome))?.pct ?? 0)})`)}`);
   }
 
+  for (const [titulo, itens] of [["Faturamento por unidade", i.faturamento?.porUnidade], ["Faturamento por meio de pagamento", i.faturamento?.porPagamento]] as const) {
+    const xs = (itens ?? []).filter((x) => x.nome !== "Não informado" && x.valor);
+    if (xs.length > 1) { sec(titulo); L.push(xs.slice(0, 8).map((x) => `${x.nome} ${fmt(x.valor, 0)} (${pc(x.pct)})`).join(" · ")); }
+  }
+
+  if (i.entradas) {
+    sec("Entradas de caixa por categoria (fonte Entradas)");
+    for (const g of ["operacional", "nao_operacional", "fora"] as const) {
+      const cs = i.entradas.porCategoria.filter((c) => c.grupo === g);
+      if (cs.length) L.push(`- ${g === "operacional" ? "Operacionais" : g === "nao_operacional" ? "Não operacionais" : "Fora do resultado (não é receita)"}: ${cs.slice(0, 8).map((c) => `${c.nome} ${fmt(c.valor, 0)}`).join(", ")}`);
+    }
+  }
+
   if (i.despesas) {
     sec("Despesas por grupo");
     const despA = new Map((a.despesas?.porGrupo ?? []).map((g) => [chave(g.nome), g]));
@@ -190,7 +203,8 @@ export function montarPacote(d: DadosPacote, opcoes: { anonimizar?: boolean; des
     sec("Funil de leads");
     L.push(`- Leads: ${n(i.leads.total)}${ant(` | anterior ${n(a.leads?.total)}`)} · Agendados: ${n(i.leads.agendados)}${ant(` | anterior ${n(a.leads?.agendados)}`)} · Conversão: ${pc(i.leads.conversao, 0)}${ant(` | anterior ${pc(a.leads?.conversao, 0)}`)}`);
     if (i.leads.porOrigem.length) L.push(`- Origem: ${i.leads.porOrigem.slice(0, 6).map((o) => `${o.nome} ${o.quantidade}`).join(", ")}`);
-    if (i.leads.porObjecao.length) L.push(`- Objeções: ${i.leads.porObjecao.filter((o) => o.nome !== "Não informado").slice(0, 5).map((o) => `${o.nome} ${o.quantidade}`).join(", ")}`);
+    if (i.leads.porCanal?.some((o) => o.nome !== "Não informado")) L.push(`- Canal de entrada: ${i.leads.porCanal.filter((o) => o.nome !== "Não informado").slice(0, 5).map((o) => `${o.nome} ${o.quantidade}`).join(", ")}`);
+    if (i.leads.porObjecao.some((o) => o.nome !== "Não informado")) L.push(`- Motivos de NÃO AGENDAMENTO (objeções de leads, fonte Leads; não são motivos de orçamento perdido): ${i.leads.porObjecao.filter((o) => o.nome !== "Não informado").slice(0, 5).map((o) => `${o.nome} ${o.quantidade}`).join(", ")}`);
     if (i.leads.porInteresse?.length) L.push(`- Serviços mais procurados: ${i.leads.porInteresse.filter((o) => o.nome !== "Não informado").slice(0, 5).map((o) => `${o.nome} ${o.quantidade}`).join(", ")}`);
   }
   if (i.orcamentos) {
@@ -198,11 +212,20 @@ export function montarPacote(d: DadosPacote, opcoes: { anonimizar?: boolean; des
     sec("Orçamentos");
     L.push(`- Gerados: ${o.total} (${fmt(o.valorGerado, 0)})${ant(` | anterior ${n(oa?.total)} (${fmt(oa?.valorGerado, 0)})`)}`);
     L.push(`- Fechados: ${o.fechados} (${fmt(o.valorFechado, 0)})${ant(` | anterior ${n(oa?.fechados)} (${fmt(oa?.valorFechado, 0)})`)}`);
-    L.push(`- Em negociação: ${o.emAberto} (${fmt(o.valorEmAberto, 0)}) · Conversão em valor: ${pc(o.conversaoValor, 0)}${ant(` | anterior ${pc(oa?.conversaoValor, 0)}`)}`);
+    L.push(`- Em aberto: ${o.emAberto} (${fmt(o.valorEmAberto, 0)}) · Não fecharam: ${o.naoFechou}${o.cancelados ? ` · Cancelados: ${o.cancelados} (${fmt(o.valorCancelado, 0)}), fora das taxas de conversão` : ""}`);
+    L.push(`- Conversão em quantidade (fechados ÷ gerados sem cancelados): ${pc(o.conversaoQuantidade, 0)}${ant(` | anterior ${pc(oa?.conversaoQuantidade, 0)}`)} · Conversão em valor (valor fechado ÷ valor gerado sem cancelados): ${pc(o.conversaoValor, 0)}${ant(` | anterior ${pc(oa?.conversaoValor, 0)}`)}`);
+    if (o.porStatus.length > 1) L.push(`- Por status: ${o.porStatus.slice(0, 8).map((x) => `${x.nome} ${x.quantidade}`).join(", ")}`);
+    const mot = (o.porObjecao ?? []).filter((x) => x.nome !== "Não informado");
+    L.push(mot.length ? `- Motivos de orçamento não fechado (fonte Orçamentos): ${mot.slice(0, 5).map((x) => `${x.nome} ${x.quantidade}`).join(", ")}` : "- Motivos de orçamento não fechado: a fonte de Orçamentos não registra (não use as objeções dos leads no lugar).");
   }
   if (i.nps || i.google) {
     sec(`Experiência do ${V.cliente}`);
     if (i.nps) L.push(`- NPS ${n(i.nps.nps)} com ${i.nps.respostas} respostas (promotores ${i.nps.promotores}, neutros ${i.nps.neutros}, detratores ${i.nps.detratores})${ant(` | anterior ${n(a.nps?.nps)}`)}`);
+    if (i.nps) {
+      const notas = ([["profissional", "Profissional"], ["recepcao", "Recepção"], ["infraestrutura", "Infraestrutura"], ["enfermagem", "Enfermagem"]] as const)
+        .filter(([k]) => i.nps!.notas[k] != null).map(([k, r]) => `${r} ${i.nps!.notas[k]!.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}`);
+      if (notas.length) L.push(`- Notas por área (de 0 a 5): ${notas.join(" · ")}`);
+    }
     if (i.google) L.push(`- Google: ${i.google.avaliacoes} avaliações novas, nota média ${i.google.nota?.toLocaleString("pt-BR", { maximumFractionDigits: 1 }) ?? "—"}`);
   }
 

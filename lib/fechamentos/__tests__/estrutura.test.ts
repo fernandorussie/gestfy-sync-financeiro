@@ -8,6 +8,8 @@ describe("estrutura do relatório", () => {
       ["Resultado do mês", ["resultado", "grafico", "funilLeads", "funilOrcamentos", "experiencia"]],
       ["Receitas detalhadas", ["receitas"]],
       ["Despesas detalhadas", ["despesas"]],
+      // Só é impressa quando o cliente tem a fonte de Entradas.
+      ["Entradas detalhadas", ["entradas"]],
       ["Caixa e competência no ano", ["regimes"]],
     ]);
   });
@@ -27,7 +29,7 @@ describe("estrutura do relatório", () => {
       { id: "ritmo", ativa: true },
     ], "mensal");
     // Seções ausentes entram depois da vizinha anterior no padrão (despesas depois de receitas).
-    expect(n.map((s) => s.id)).toEqual(["receitas", "despesas", "regimes", "analise", "resultado", "grafico", "funilLeads", "funilOrcamentos", "experiencia"]);
+    expect(n.map((s) => s.id)).toEqual(["receitas", "distribuicao", "despesas", "entradas", "regimes", "analise", "resultado", "grafico", "funilLeads", "funilOrcamentos", "experiencia"]);
     expect(n.find((s) => s.id === "receitas")).toEqual({ id: "receitas", ativa: true, nivel: "todas" });
     expect(n.find((s) => s.id === "resultado")!.ativa).toBe(true);
     expect(n.find((s) => s.id === "experiencia")!.ativa).toBe(false);
@@ -36,8 +38,8 @@ describe("estrutura do relatório", () => {
   it("seção pequena depois de uma grande abre página própria com seu título", () => {
     const e = normalizarEstrutura([{ id: "resultado" }, { id: "grafico" }, { id: "receitas" }, { id: "despesas" }, { id: "regimes" }, { id: "funilLeads" }, { id: "funilOrcamentos" }, { id: "experiencia" }, { id: "analise", ativa: true }], "mensal");
     const p = paginar(e, "mensal");
-    expect(p.map((x) => x.titulo)).toEqual(["Resultado do mês", "Receitas detalhadas", "Despesas detalhadas", "Caixa e competência no ano", "Funil de leads", "Análise e plano de ação"]);
-    expect(p[4].secoes.map((s) => s.id)).toEqual(["funilLeads", "funilOrcamentos", "experiencia"]);
+    expect(p.map((x) => x.titulo)).toEqual(["Resultado do mês", "Receitas detalhadas", "Despesas detalhadas", "Entradas detalhadas", "Caixa e competência no ano", "Funil de leads", "Análise e plano de ação"]);
+    expect(p[5].secoes.map((s) => s.id)).toEqual(["funilLeads", "funilOrcamentos", "experiencia"]);
   });
 
   it("limpa a estrutura vinda da tela para os dois tipos", () => {

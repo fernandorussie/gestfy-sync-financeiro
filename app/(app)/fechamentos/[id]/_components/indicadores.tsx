@@ -139,17 +139,19 @@ export function PainelIndicadores({ r }: { r: ResultadoFechamento }) {
             <div className="space-y-4">
               <Barras itens={[{ nome: "Leads chegando", v: i.leads.total }, { nome: "Agendados", v: i.leads.agendados, extra: pct(i.leads.conversao, 0) }]} formato={(v) => num(v)} />
               <div><p className="mb-1 text-xs font-semibold text-muted-foreground">Origem</p><Barras itens={contagens(i.leads.porOrigem, 5)} formato={(v) => num(v)} /></div>
-              <div><p className="mb-1 text-xs font-semibold text-muted-foreground">Principais objeções</p><Barras itens={contagens(i.leads.porObjecao.filter((o) => o.nome !== "Não informado"), 4)} formato={(v) => num(v)} /></div>
-              <div><p className="mb-1 text-xs font-semibold text-muted-foreground">Serviço mais buscado</p><Barras itens={contagens(i.leads.porInteresse.filter((o) => o.nome !== "Não informado"), 3)} formato={(v) => num(v)} /></div>
+              <SubLista titulo="Canal de entrada" itens={i.leads.porCanal} n={4} />
+              <SubLista titulo="Motivos de não agendamento" itens={i.leads.porObjecao} n={4} />
+              <SubLista titulo="Serviço mais buscado" itens={i.leads.porInteresse} n={3} />
             </div>
           ) : <p className="text-sm text-muted-foreground">Planilha de leads não configurada.</p>}
         </Secao>
         <Secao titulo="Funil comercial · orçamentos">
           {i.orcamentos ? (
             <div className="space-y-4">
-              <Barras itens={[{ nome: "Gerados", v: i.orcamentos.total }, { nome: "Fechados", v: i.orcamentos.fechados, extra: pct(i.orcamentos.conversaoQuantidade, 0) }, { nome: "Em aberto", v: i.orcamentos.emAberto }, { nome: "Não fecharam", v: i.orcamentos.naoFechou }]} formato={(v) => num(v)} />
+              <Barras itens={[{ nome: "Gerados", v: i.orcamentos.total }, { nome: "Fechados", v: i.orcamentos.fechados, extra: pct(i.orcamentos.conversaoQuantidade, 0) }, { nome: "Em aberto", v: i.orcamentos.emAberto }, { nome: "Não fecharam", v: i.orcamentos.naoFechou }, ...(i.orcamentos.cancelados ? [{ nome: "Cancelados (fora da conversão)", v: i.orcamentos.cancelados }] : [])]} formato={(v) => num(v)} />
               <Barras itens={[{ nome: "Valor gerado", v: i.orcamentos.valorGerado }, { nome: "Valor fechado", v: i.orcamentos.valorFechado, extra: pct(i.orcamentos.conversaoValor, 0) }, { nome: "Valor em aberto", v: i.orcamentos.valorEmAberto }]} formato={brl0} />
               <div><p className="mb-1 text-xs font-semibold text-muted-foreground">Por status</p><Barras itens={contagens(i.orcamentos.porStatus)} formato={(v) => num(v)} /></div>
+              <SubLista titulo="Motivos de não fechamento" itens={i.orcamentos.porObjecao} n={4} />
             </div>
           ) : <p className="text-sm text-muted-foreground">Planilha de orçamentos não configurada.</p>}
         </Secao>
@@ -320,4 +322,11 @@ export function TabelaRegimes({ reg }: { reg: ReturnType<typeof regimesAnuais> }
       </p>
     </>
   );
+}
+
+/** Contagens com título; some quando só há "Não informado". */
+function SubLista({ titulo, itens, n }: { titulo: string; itens?: ItemContagem[]; n: number }) {
+  const xs = (itens ?? []).filter((o) => o.nome !== "Não informado");
+  if (!xs.length) return null;
+  return <div><p className="mb-1 text-xs font-semibold text-muted-foreground">{titulo}</p><Barras itens={contagens(xs, n)} formato={(v) => num(v)} /></div>;
 }

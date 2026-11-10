@@ -40,6 +40,8 @@ export interface RegrasClinica {
   statusFechado?: string[];
   statusEmAberto?: string[];
   statusNaoFechou?: string[];
+  /** Status de orçamento cancelado (contém): fora das taxas de conversão. */
+  statusCancelado?: string[];
   /** Categoria de entrada (normalizada) → grupo, confirmado pelo consultor. */
   categoriasEntrada?: Record<string, GrupoEntrada>;
 }
@@ -131,13 +133,20 @@ export interface Indicadores {
     porOrigem: ItemContagem[];
     porObjecao: ItemContagem[];
     porInteresse: ItemContagem[];
+    /** Canal de entrada (WhatsApp, ligação…). Ausente em fechamentos antigos. */
+    porCanal?: ItemContagem[];
   } | null;
   orcamentos: {
     total: number;
     fechados: number;
     emAberto: number;
     naoFechou: number;
+    /** Cancelados: ficam fora das taxas de conversão. Ausente em fechamentos antigos. */
+    cancelados?: number;
+    valorCancelado?: number;
     porStatus: ItemContagem[];
+    /** Motivos de não fechamento, da própria fonte de orçamentos (nunca dos leads). */
+    porObjecao?: ItemContagem[];
     valorGerado: number;
     valorFechado: number;
     valorEmAberto: number;
@@ -161,6 +170,7 @@ const PADRAO = {
   statusFechado: ["protocolo", "fechou", "fechado", "vendido"],
   statusEmAberto: ["em negociacao", "agendado", "aguardando", "pendente"],
   statusNaoFechou: ["nao fechou", "perdido", "desistiu"],
+  statusCancelado: ["cancelad"],
 };
 
 export const NAO_INFORMADO = "Não informado";
@@ -400,6 +410,7 @@ export function calcularIndicadores(
       porOrigem: itensContagem(agruparPorNome(ls, (l) => l.origem, um, un.origem), ls.length),
       porObjecao: itensContagem(agruparPorNome(ls, (l) => l.objecao, um, un.objecao), ls.length),
       porInteresse: itensContagem(agruparPorNome(ls, (l) => l.interesse, um, un.interesse), ls.length),
+      porCanal: itensContagem(agruparPorNome(ls, (l) => l.canal, um), ls.length),
     };
   }
 
@@ -409,25 +420,33 @@ export function calcularIndicadores(
     const temPrescricao = dados.orcamentos.some((o) => o.prescricao !== null);
     const os = dados.orcamentos.filter((o) => noPeriodo(o.data, periodo) && (!temPrescricao || o.prescricao === true));
     const contem = (lista: string[]) => (o: Orcamento) => lista.map(normalizar).some((t) => normalizar(o.status).includes(t));
-    const ehFechado = contem(regras.statusFechado ?? PADRAO.statusFechado);
-    const ehNaoFechou = contem(regras.statusNaoFechou ?? PADRAO.statusNaoFechou);
-    const ehAberto = (o: Orcamento) => !ehFechado(o) && !ehNaoFechou(o) && contem(regras.statusEmAberto ?? PADRAO.statusEmAberto)(o);
+    const ehCancelado = contem(regras.statusCancelado ?? PADRAO.statusCancelado);
+    const ehFechado = (o: Orcamento) => !ehCancelado(o) && contem(regras.statusFechado ?? PADRAO.statusFechado)(o);
+    const ehNaoFechou = (o: Orcamento) => !ehCancelado(o) && contem(regras.statusNaoFechou ?? PADRAO.statusNaoFechou)(o);
+    const ehAberto = (o: Orcamento) => !ehCancelado(o) && !ehFechado(o) && !ehNaoFechou(o) && contem(regras.statusEmAberto ?? PADRAO.statusEmAberto)(o);
     const fechados = os.filter((o) => ehFechado(o) && !ehNaoFechou(o));
     const abertos = os.filter(ehAberto);
+    const cancelados = os.filter(ehCancelado);
     const soma = (xs: Orcamento[], f: (o: Orcamento) => number) => centavos(xs.reduce((s, o) => s + f(o), 0));
     const valorGerado = soma(os, (o) => o.valorPrescricao);
     const valorFechado = soma(fechados, (o) => o.valorVenda);
+    const valorCancelado = soma(cancelados, (o) => o.valorPrescricao);
+    const comMotivo = os.filter((o) => o.objecao);
     orcamentos = {
       total: os.length,
       fechados: fechados.length,
       emAberto: abertos.length,
       naoFechou: os.filter(ehNaoFechou).length,
+      cancelados: cancelados.length,
+      valorCancelado,
       porStatus: itensContagem(agruparPorNome(os, (o) => o.status, () => 1), os.length),
+      porObjecao: itensContagem(agruparPorNome(comMotivo, (o) => o.objecao ?? "", () => 1), comMotivo.length),
       valorGerado,
       valorFechado,
       valorEmAberto: soma(abertos, (o) => o.valorPrescricao),
-      conversaoQuantidade: fracOuNull(fechados.length, os.length),
-      conversaoValor: fracOuNull(valorFechado, valorGerado),
+      // Cancelados saem do denominador (decisão de 10/11).
+      conversaoQuantidade: fracOuNull(fechados.length, os.length - cancelados.length),
+      conversaoValor: fracOuNull(valorFechado, valorGerado - valorCancelado),
     };
   }
 

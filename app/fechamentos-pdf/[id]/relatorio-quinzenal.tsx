@@ -3,7 +3,7 @@ import type { ResultadoFechamento } from "@/lib/fechamentos/servidor";
 import { cap } from "@/lib/fechamentos/vocabulario";
 import type { Ritmo } from "@/lib/fechamentos/ritmo";
 import { brl, brl0, num, pct } from "../../(app)/fechamentos/_components/formato";
-import { Cabecalho, categoriasReceita, CINZA, Kpi, LINHA, Linhas, contagens, mesDe, td, Titulo, Var, VERMELHO } from "./relatorio";
+import { Cabecalho, categoriasReceita, CINZA, Kpi, LINHA, Linhas, ListaContagem, contagens, mesDe, td, Titulo, Var, VERMELHO } from "./relatorio";
 
 /*
  * Relatório quinzenal: parcial do dia 1 ao 15, focado no ritmo do mês
@@ -138,6 +138,7 @@ export function SecFunilLeadsQuinzenal({ r, nivel }: Props) {
         ) : <p className="text-[11px]" style={{ color: CINZA }}>Planilha de leads não configurada.</p>}
       </div>
       {i.leads && nivel === "completo" && <div><Titulo cor={COR}>Origem</Titulo><Linhas itens={contagens(i.leads.porOrigem, 6)} /></div>}
+      {i.leads && nivel === "completo" && <ListaContagem titulo="Motivos de não agendamento" itens={i.leads.porObjecao} cor={COR} />}
     </div>
   );
 }
@@ -158,7 +159,7 @@ export function SecFunilOrcamentosQuinzenal({ r, nivel }: Props) {
           ]} />
         ) : <p className="text-[11px]" style={{ color: CINZA }}>Planilha de orçamentos não configurada.</p>}
       </div>
-      {i.leads && nivel === "completo" && <div><Titulo cor={COR}>Principais objeções</Titulo><Linhas itens={contagens(i.leads.porObjecao, 5, true)} /></div>}
+      {i.orcamentos && nivel === "completo" && <ListaContagem titulo="Motivos de não fechamento" itens={i.orcamentos.porObjecao} cor={COR} />}
     </div>
   );
 }

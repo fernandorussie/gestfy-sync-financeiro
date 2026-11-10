@@ -35,13 +35,16 @@ export const CATALOGO: DefSecao[] = [
   { id: "grafico", titulo: "Gráfico de faturamento e despesas", descricao: "Linhas do ano, mês a mês", tipos: ["mensal"] },
   { id: "ritmo", titulo: "Ritmo do mês", descricao: "Faturamento por dia útil, projeção e quanto falta para a meta", tipos: ["quinzenal"], fixa: true },
   { id: "caixaMes", titulo: "Caixa do mês", descricao: "Despesas pagas, média de 3 meses, provisionado e saldo projetado", tipos: ["quinzenal"] },
-  { id: "funilLeads", titulo: "Funil de leads", descricao: "Leads, agendamentos e conversão", tipos: ["mensal", "quinzenal"], niveis: RESUMO_COMPLETO("Com origem dos leads"), nivelPadrao: { mensal: "completo", quinzenal: "resumo" } },
-  { id: "funilOrcamentos", titulo: "Funil de orçamentos", descricao: "Gerados, fechados, em negociação e conversão", tipos: ["mensal", "quinzenal"], niveis: RESUMO_COMPLETO("Com principais objeções"), nivelPadrao: { mensal: "completo", quinzenal: "resumo" } },
-  { id: "experiencia", titulo: "Experiência do cliente", descricao: "NPS, notas e avaliações no Google", tipos: ["mensal"] },
+  { id: "funilLeads", titulo: "Funil de leads", descricao: "Leads, agendamentos e conversão", tipos: ["mensal", "quinzenal"], niveis: RESUMO_COMPLETO("Com origem, canal, serviços buscados e motivos de não agendamento"), nivelPadrao: { mensal: "completo", quinzenal: "resumo" } },
+  { id: "funilOrcamentos", titulo: "Funil de orçamentos", descricao: "Por valor e por quantidade; cancelados ficam fora da conversão", tipos: ["mensal", "quinzenal"], niveis: RESUMO_COMPLETO("Com quantidades, status e motivos de não fechamento"), nivelPadrao: { mensal: "completo", quinzenal: "resumo" } },
+  { id: "experiencia", titulo: "Experiência do cliente", descricao: "NPS, notas por área e avaliações no Google (só o que a fonte tiver)", tipos: ["mensal"] },
   { id: "receitas", titulo: "Receitas detalhadas", descricao: "Categorias com valor, quantidade, ticket e variação", tipos: ["mensal", "quinzenal"], fixa: true, grande: true,
     niveis: [{ id: "com_valor", rotulo: "Só categorias com movimento" }, { id: "todas", rotulo: "Todas as categorias (12 meses)" }], nivelPadrao: { mensal: "todas", quinzenal: "todas" } },
+  { id: "distribuicao", titulo: "Faturamento por profissional, unidade e pagamento", descricao: "Participação de cada profissional, unidade e meio de pagamento", tipos: ["mensal"], ativaPadrao: false },
   { id: "despesas", titulo: "Despesas detalhadas", descricao: "Grupos e categorias, com o que mais aumentou", tipos: ["mensal"], fixa: true, grande: true,
     niveis: [{ id: "grupos", rotulo: "Só grupos" }, { id: "categorias", rotulo: "Grupos e categorias" }], nivelPadrao: { mensal: "categorias" } },
+  { id: "entradas", titulo: "Entradas detalhadas", descricao: "Recebimentos por grupo e categoria (só com a fonte de Entradas)", tipos: ["mensal"],
+    niveis: [{ id: "grupos", rotulo: "Só grupos" }, { id: "categorias", rotulo: "Grupos e categorias" }, { id: "completo", rotulo: "Grupos, categorias e fora do resultado" }], nivelPadrao: { mensal: "categorias" } },
   { id: "regimes", titulo: "Caixa e competência no ano", descricao: "Entradas, saídas e saldo mês a mês", tipos: ["mensal"], grande: true,
     niveis: [{ id: "caixa", rotulo: "Só regime de caixa" }, { id: "ambos", rotulo: "Caixa e competência" }], nivelPadrao: { mensal: "ambos" } },
   { id: "analise", titulo: "Análise e plano de ação", descricao: "Texto do fechamento e ações com responsáveis", tipos: ["mensal", "quinzenal"], grande: true, ativaPadrao: false },
@@ -144,7 +147,7 @@ export function limparEstrutura(e: unknown, extras: ExtraSecao[] = []): Estrutur
 export const ehPadrao = (itens: ItemSecao[], tipo: TipoRelatorio, extras: ExtraSecao[] = []) => JSON.stringify(itens) === JSON.stringify(estruturaPadrao(tipo, extras));
 
 /** Seções onde um indicador personalizado pode entrar (além da seção da própria fonte). */
-export const SECOES_DESTINO = ["resultado", "ritmo", "caixaMes", "funilLeads", "funilOrcamentos", "experiencia", "receitas", "despesas"] as const;
+export const SECOES_DESTINO = ["resultado", "ritmo", "caixaMes", "funilLeads", "funilOrcamentos", "experiencia", "receitas", "distribuicao", "despesas", "entradas"] as const;
 
 /* ---------- páginas ---------- */
 

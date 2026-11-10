@@ -200,58 +200,161 @@ export function SecGrafico({ r }: { r: ResultadoFechamento }) {
   );
 }
 
+/** Lista de contagens com título; some quando não há nada além de "Não informado". */
+export function ListaContagem({ titulo, itens, n = 5, cor = ROXO }: { titulo: string; itens?: ItemContagem[]; n?: number; cor?: string }) {
+  const xs = (itens ?? []).filter((x) => x.nome !== "Não informado");
+  if (!xs.length) return null;
+  return <div className="pdf-bloco"><Titulo cor={cor}>{titulo}</Titulo><Linhas itens={contagens(xs, n)} /></div>;
+}
+
 export function SecFunilLeadsMensal({ r, nivel }: { r: ResultadoFechamento } & Nivel) {
   const i = r.indicadores;
   return (
-    <div className="pdf-bloco space-y-4">
-      <div>
+    <div className="space-y-4">
+      <div className="pdf-bloco">
         <Titulo>Funil de leads</Titulo>
         {i.leads ? (
           <Linhas itens={[
-            { nome: "Leads", valor: num(i.leads.total) },
-            { nome: "Agendaram", valor: num(i.leads.agendados) },
-            { nome: "Conversão", valor: pct(i.leads.conversao, 0), destaque: true },
+            { nome: "Leads chegando", valor: num(i.leads.total) },
+            { nome: "Leads agendados", valor: num(i.leads.agendados) },
+            { nome: "Conversão lead → agendamento", valor: pct(i.leads.conversao, 0), destaque: true },
           ]} />
         ) : <p className="text-[11px]" style={{ color: CINZA }}>Planilha de leads não configurada.</p>}
       </div>
-      {i.leads && nivel !== "resumo" && <div><Titulo>Origem</Titulo><Linhas itens={contagens(i.leads.porOrigem, 6)} /></div>}
+      {i.leads && nivel !== "resumo" && (
+        <>
+          <ListaContagem titulo="Serviço mais buscado" itens={i.leads.porInteresse} />
+          <ListaContagem titulo="Origem do lead" itens={i.leads.porOrigem} n={6} />
+          <ListaContagem titulo="Canal de entrada" itens={i.leads.porCanal} />
+          <ListaContagem titulo="Motivos de não agendamento" itens={i.leads.porObjecao} />
+        </>
+      )}
     </div>
   );
 }
 
 export function SecFunilOrcamentosMensal({ r, nivel }: { r: ResultadoFechamento } & Nivel) {
-  const i = r.indicadores;
+  const o = r.indicadores.orcamentos;
+  const canc = o?.cancelados ?? 0;
   return (
-    <div className="pdf-bloco space-y-4">
-      <div>
-        <Titulo>Orçamentos</Titulo>
-        {i.orcamentos ? (
+    <div className="space-y-4">
+      <div className="pdf-bloco">
+        <Titulo>Orçamentos por valor</Titulo>
+        {o ? (
           <Linhas itens={[
-            { nome: "Gerados", valor: `${i.orcamentos.total} · ${brl0(i.orcamentos.valorGerado)}` },
-            { nome: "Fechados", valor: `${i.orcamentos.fechados} · ${brl0(i.orcamentos.valorFechado)}` },
-            { nome: "Em negociação", valor: `${i.orcamentos.emAberto} · ${brl0(i.orcamentos.valorEmAberto)}` },
-            { nome: "Conversão em valor", valor: pct(i.orcamentos.conversaoValor, 0), destaque: true },
+            { nome: "Gerados", valor: brl0(o.valorGerado) },
+            { nome: "Fechados", valor: brl0(o.valorFechado) },
+            { nome: "Em aberto", valor: brl0(o.valorEmAberto) },
+            ...(canc ? [{ nome: "Cancelados", valor: brl0(o.valorCancelado) }] : []),
+            { nome: "Conversão em valor", valor: pct(o.conversaoValor, 0), destaque: true },
           ]} />
         ) : <p className="text-[11px]" style={{ color: CINZA }}>Planilha de orçamentos não configurada.</p>}
       </div>
-      {i.leads && nivel !== "resumo" && <div><Titulo>Principais objeções</Titulo><Linhas itens={contagens(i.leads.porObjecao, 5, true)} /></div>}
+      {o && nivel !== "resumo" && (
+        <>
+          <div className="pdf-bloco">
+            <Titulo>Orçamentos por quantidade</Titulo>
+            <Linhas itens={[
+              { nome: "Total de orçamentos", valor: num(o.total) },
+              { nome: "Fechados", valor: num(o.fechados) },
+              { nome: "Em aberto", valor: num(o.emAberto) },
+              { nome: "Não fecharam", valor: num(o.naoFechou) },
+              ...(canc ? [{ nome: "Cancelados", valor: num(canc) }] : []),
+              { nome: "Conversão em quantidade", valor: pct(o.conversaoQuantidade, 0), destaque: true },
+            ]} />
+          </div>
+          {o.porStatus.length > 1 && <ListaContagem titulo="Por status" itens={o.porStatus} n={8} />}
+          {/* Só motivos da própria fonte de orçamentos: as objeções dos leads são outra coisa (não agendamento). */}
+          <ListaContagem titulo="Motivos de não fechamento" itens={o.porObjecao} />
+        </>
+      )}
+      {o && canc > 0 && <p className="text-[10px]" style={{ color: CINZA }}>Cancelados ficam fora das taxas de conversão.</p>}
     </div>
   );
 }
 
 export function SecExperiencia({ r }: { r: ResultadoFechamento }) {
   const i = r.indicadores;
+  const nota = (v: number | null | undefined) => num(v, v === 5 ? 1 : 2);
+  const n = i.nps;
+  // Cada card só entra quando a fonte tem a informação.
+  const cards = [
+    n && <Kpi key="nps" rotulo="NPS" valor={num(n.nps)} nota={`${n.respostas} respostas · ${n.promotores}/${n.neutros}/${n.detratores}`} />,
+    n?.notas.profissional != null && <Kpi key="prof" rotulo={cap(r.vocab.profissional)} valor={nota(n.notas.profissional)} nota="de 5" />,
+    n?.notas.recepcao != null && <Kpi key="rec" rotulo="Recepção" valor={nota(n.notas.recepcao)} nota="de 5" />,
+    n?.notas.infraestrutura != null && <Kpi key="inf" rotulo="Infraestrutura" valor={nota(n.notas.infraestrutura)} nota="de 5" />,
+    n?.notas.enfermagem != null && <Kpi key="enf" rotulo="Enfermagem" valor={nota(n.notas.enfermagem)} nota="de 5" />,
+    i.google && <Kpi key="g" rotulo="Google" valor={num(i.google.nota, 1)} nota={`${i.google.avaliacoes} avaliações`} />,
+  ].filter(Boolean);
   return (
     <div className="pdf-bloco">
       <Titulo>Experiência do {r.vocab.cliente}</Titulo>
-      {i.nps || i.google ? (
-        <div className="grid grid-cols-4 gap-2.5">
-          {i.nps && <Kpi rotulo="NPS" valor={num(i.nps.nps)} nota={`${i.nps.respostas} respostas`} />}
-          {i.nps && <Kpi rotulo="Recepção" valor={num(i.nps.notas.recepcao, i.nps.notas.recepcao === 5 ? 1 : 2)} nota="de 5" />}
-          {i.nps && <Kpi rotulo="Profissional" valor={num(i.nps.notas.profissional, i.nps.notas.profissional === 5 ? 1 : 2)} nota="de 5" />}
-          {i.google && <Kpi rotulo="Google" valor={num(i.google.nota, 1)} nota={`${i.google.avaliacoes} avaliações`} />}
-        </div>
-      ) : <p className="text-[11px]" style={{ color: CINZA }}>Planilha de NPS não configurada.</p>}
+      {cards.length ? <div className={`grid gap-2.5 ${cards.length > 4 ? "grid-cols-3" : "grid-cols-4"}`}>{cards}</div>
+        : <p className="text-[11px]" style={{ color: CINZA }}>Planilha de NPS não configurada.</p>}
+    </div>
+  );
+}
+
+/** Faturamento por profissional, unidade e meio de pagamento (o mesmo da tela de Indicadores). */
+export function SecDistribuicao({ r }: { r: ResultadoFechamento }) {
+  const f = r.indicadores.faturamento;
+  const bloco = (titulo: string, itens?: { nome: string; valor: number; pct: number }[]) => {
+    const xs = (itens ?? []).filter((x) => x.valor);
+    if (!xs.length || (xs.length === 1 && xs[0].nome === "Não informado")) return null;
+    return <div className="pdf-bloco"><Titulo>{titulo}</Titulo><Linhas itens={xs.slice(0, 8).map((x) => ({ nome: x.nome, valor: <>{brl0(x.valor)} <span style={{ color: CINZA }}>{pct(x.pct, 0)}</span></> }))} /></div>;
+  };
+  const partes = [bloco(`Por ${r.vocab.profissional}`, f?.porProfissional), bloco("Por unidade", f?.porUnidade), bloco("Meio de pagamento", f?.porPagamento)].filter(Boolean);
+  if (!partes.length) return <p className="text-[11px]" style={{ color: CINZA }}>A fonte de vendas não informa profissional, unidade nem meio de pagamento.</p>;
+  return <div className="grid grid-cols-2 gap-x-8 gap-y-4">{partes}</div>;
+}
+
+/** Entradas de caixa por grupo e categoria, com os mesmos valores da tela de Indicadores. */
+export function SecEntradas({ r, nivel }: { r: ResultadoFechamento } & Nivel) {
+  const e = r.indicadores.entradas, ea = r.anterior.entradas;
+  if (!e) return null;
+  const ROT: Record<string, string> = { operacional: "Operacionais", nao_operacional: "Não operacionais", fora: "Fora do resultado" };
+  const totalDe: Record<string, number> = { operacional: e.operacionais, nao_operacional: e.naoOperacionais, fora: e.foraDoResultado };
+  const antesDe: Record<string, number | undefined> = { operacional: ea?.operacionais, nao_operacional: ea?.naoOperacionais, fora: ea?.foraDoResultado };
+  const catA = new Map((ea?.porCategoria ?? []).map((c) => [`${c.grupo}|${chave(c.nome)}`, c.valor]));
+  const grupos = (["operacional", "nao_operacional", ...(nivel === "completo" ? ["fora"] : [])] as const)
+    .map((g) => ({ g, itens: e.porCategoria.filter((c) => c.grupo === g) })).filter((x) => x.itens.length);
+  const mesA = mesDe(r.anterior.periodo.inicio);
+  return (
+    <div className="space-y-2">
+      <Titulo extra={`${e.lancamentos} recebimentos no período`}>Entradas de caixa</Titulo>
+      <table className="w-full text-[10.5px]">
+        <Cabecalho colunas={[{ t: "Grupo / categoria", cls: "pl-1.5" }, { t: mesA, dir: true }, { t: mesDe(r.periodo.inicio), dir: true }, { t: "Variação", dir: true }, { t: "% das entradas", dir: true, cls: "pr-1.5" }]} />
+        <tbody>
+          {grupos.flatMap(({ g, itens }) => [
+            <tr key={g} className="border-b font-semibold" style={{ borderColor: LINHA, background: FUNDO, color: g === "fora" ? CINZA : undefined }}>
+              <td className="py-[4px] pl-1.5">{ROT[g]}</td>
+              <td className={`${td} text-right`} style={{ color: CINZA }}>{ea ? brl(antesDe[g] ?? 0) : "—"}</td>
+              <td className={`${td} pl-3 text-right`}>{brl(totalDe[g])}</td>
+              <td className={`${td} pl-3 text-right`}>{ea ? <Var atual={totalDe[g]} antes={antesDe[g] ?? 0} /> : "—"}</td>
+              <td className={`${td} pl-3 pr-1.5 text-right`}>{g === "fora" ? "" : pct(e.total ? totalDe[g] / e.total : null)}</td>
+            </tr>,
+            ...(nivel === "grupos" ? [] : itens.map((c) => (
+              <tr key={g + c.nome} className="border-b" style={{ borderColor: LINHA, color: g === "fora" ? CINZA : undefined }}>
+                <td className="py-[4px] pl-5 pr-2">{c.nome}</td>
+                <td className={`${td} text-right`} style={{ color: CINZA }}>{ea ? brl(catA.get(`${g}|${chave(c.nome)}`) ?? 0) : "—"}</td>
+                <td className={`${td} pl-3 text-right`}>{brl(c.valor)}</td>
+                <td className={`${td} pl-3 text-right`}>{ea ? <Var atual={c.valor} antes={catA.get(`${g}|${chave(c.nome)}`) ?? 0} /> : "—"}</td>
+                <td className={`${td} pl-3 pr-1.5 text-right`} style={{ color: CINZA }}>{g === "fora" ? "" : pct(c.pct)}</td>
+              </tr>
+            ))),
+          ])}
+          <tr className="border-t-2 font-semibold" style={{ borderColor: ROXO }}>
+            <td className="py-1.5 pl-1.5">Total de entradas</td>
+            <td className={`${td} text-right`} style={{ color: CINZA }}>{ea ? brl(ea.total) : "—"}</td>
+            <td className={`${td} pl-3 text-right`}>{brl(e.total)}</td>
+            <td className={`${td} pl-3 text-right`}>{ea ? <Var atual={e.total} antes={ea.total} forte /> : "—"}</td>
+            <td className={`${td} pl-3 pr-1.5 text-right`}>100%</td>
+          </tr>
+        </tbody>
+      </table>
+      <p className="text-[10px]" style={{ color: CINZA }}>
+        Total de entradas = operacionais + não operacionais (rendimentos, reembolsos).{e.foraDoResultado ? ` Transferências, empréstimos e aportes (${brl0(e.foraDoResultado)}) não são receita${nivel === "completo" ? " e aparecem só como informação" : " e ficam fora"}.` : ""}
+      </p>
     </div>
   );
 }

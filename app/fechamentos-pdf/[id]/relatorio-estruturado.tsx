@@ -1,7 +1,7 @@
 import { Fragment, type ReactNode } from "react";
 import type { ResultadoFechamento } from "@/lib/fechamentos/servidor";
 import { extrasDe, paginar, type ItemSecao } from "@/lib/fechamentos/estrutura";
-import { Folha, ROXO, SecAnalise, SecDespesas, SecExperiencia, SecFunilLeadsMensal, SecFunilOrcamentosMensal, SecGrafico, SecReceitasMensal, SecRegimes, SecResultadoMensal, temAnalise } from "./relatorio";
+import { Folha, ROXO, SecAnalise, SecDespesas, SecDistribuicao, SecEntradas, SecExperiencia, SecFunilLeadsMensal, SecFunilOrcamentosMensal, SecGrafico, SecReceitasMensal, SecRegimes, SecResultadoMensal, temAnalise } from "./relatorio";
 import { ComplementoPdf, SecFontePersonalizada, SecPersonalizada, indicadoresDaSecao } from "./secao-personalizada";
 import { COR_QUINZENAL, SecCaixaMes, SecFunilLeadsQuinzenal, SecFunilOrcamentosQuinzenal, SecReceitasQuinzenal, SecResultadoQuinzenal, SecRitmo } from "./relatorio-quinzenal";
 
@@ -32,6 +32,8 @@ function secaoBase(r: ResultadoFechamento, s: ItemSecao, cor: string): ReactNode
     case "experiencia": return <SecExperiencia {...p} />;
     case "receitas": return q ? <SecReceitasQuinzenal {...p} /> : <SecReceitasMensal {...p} />;
     case "despesas": return <SecDespesas {...p} />;
+    case "entradas": return <SecEntradas {...p} />;
+    case "distribuicao": return <SecDistribuicao {...p} />;
     case "regimes": return <SecRegimes {...p} />;
     case "analise": return <SecAnalise r={r} cor={cor} />;
     default: {
@@ -78,7 +80,9 @@ function tituloDaPagina(r: ResultadoFechamento, primeira: ItemSecao, padrao: str
 export function RelatorioEstruturado({ r, estrutura }: { r: ResultadoFechamento; estrutura: ItemSecao[] }) {
   const cor = r.fechamento.tipo === "quinzenal" ? COR_QUINZENAL : ROXO;
   // A página de análise só entra se houver texto ou plano.
-  const itens = estrutura.map((s) => (s.id === "analise" && !temAnalise(r) ? { ...s, ativa: false } : s));
+  // Entradas detalhadas só entram quando o cliente tem a fonte de Entradas.
+  const semDados = (id: string) => (id === "analise" && !temAnalise(r)) || (id === "entradas" && !r.indicadores.entradas);
+  const itens = estrutura.map((s) => (semDados(s.id) ? { ...s, ativa: false } : s));
   // Indicador colocado numa seção que não está no relatório (desligada, ou só do mensal) vai para o resultado.
   const ligadas = new Set(itens.filter((s) => s.ativa).map((s) => s.id));
   const destinos = new Set(r.personalizadas.flatMap((f) => f.indicadores.map((d) => d.secao)).filter((x) => x !== "fonte"));

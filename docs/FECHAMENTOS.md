@@ -256,3 +256,17 @@ Regras no motor do GestfySync (não dependem das fórmulas das planilhas-mestre)
 - Fechamentos concluídos antes desta versão não mudam (números congelados); aparecem como "Faturamento x Despesas".
 
 Testes: 223 passando (novo `entradas.test.ts`).
+
+## Etapa v3.4 — relatório: Etapa A da proposta de 10/11
+
+Proposta: https://claude.ai/artifact/VX4PFTySS4vwibarPoRuJb. Decisões (10/11): rotatividade fica para depois; cancelados fora da conversão; mínimo Gestfy = Resultado, Receitas e Despesas detalhadas; ordem A → B → C; o Claude recebe todos os indicadores disponíveis; a personalização é por cliente.
+
+- **Objeções separadas.** Orçamentos ganhou o campo opcional "Motivo / objeção do orçamento" (`porObjecao`). O PDF de orçamentos mostra só esses motivos ("Motivos de não fechamento"); as objeções dos leads aparecem no funil de leads como "Motivos de não agendamento". O pacote do Claude rotula cada um.
+- **Cancelados** (status que contém "cancelad", regra `statusCancelado`) contam à parte e saem do denominador das duas conversões (quantidade e valor).
+- **Funis no PDF (nível completo):** leads com serviço mais buscado, origem, canal de entrada (novo `porCanal`) e motivos de não agendamento; orçamentos por valor e por quantidade (gerados, fechados, em aberto, não fecharam, cancelados), por status e motivos.
+- **Experiência:** um card por informação que a fonte tiver (NPS, profissional, recepção, infraestrutura, enfermagem, Google).
+- **Novas seções no editor:** "Entradas detalhadas" (só grupos / grupos e categorias / com fora do resultado; ligada no padrão, impressa só com a fonte de Entradas) e "Faturamento por profissional, unidade e pagamento" (desligada no padrão).
+- Leitura: Orçamentos reconhece "Status"; Leads reconhece "Onde conheceu?" (origem) e "Queixa" (serviço buscado).
+- Pacote do Claude: canal, notas por área do NPS, status e motivos de orçamento, conversão por quantidade, faturamento por unidade e meio de pagamento, entradas por categoria.
+
+Testes: 227 passando (novo `etapa-a.test.ts`).

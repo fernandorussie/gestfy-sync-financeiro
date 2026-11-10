@@ -275,16 +275,18 @@ export function lerEntradas(linhas: Celula[][], op: OpcoesLeitura<CampoEntrada> 
 
 /* ============================== ORÇAMENTOS ============================== */
 
-export type CampoOrcamento = "data" | "paciente" | "profissional" | "prescricao" | "status" | "valorVenda" | "valorPrescricao";
+export type CampoOrcamento = "data" | "paciente" | "profissional" | "prescricao" | "status" | "valorVenda" | "valorPrescricao" | "objecao";
 
 export const DEF_ORCAMENTOS: DefinicaoFonte<CampoOrcamento> = {
   data: { rotulo: "Data", nomes: ["data", "data da consulta", "data do orcamento"], obrigatorio: true },
   paciente: { rotulo: "Cliente / paciente", nomes: ["nome paciente", "paciente", "cliente", "nome"] },
   profissional: { rotulo: "Profissional", nomes: ["medico responsavel", "profissional", "medico"] },
   prescricao: { rotulo: "Prescrição de tratamento", nomes: ["prescricao de tratamentos?", "prescricao de tratamento?", "prescricao"], contem: ["prescricao de trat"] },
-  status: { rotulo: "Fechamento", nomes: ["fechamento", "status do orcamento", "situacao"], obrigatorio: true },
+  status: { rotulo: "Fechamento", nomes: ["fechamento", "status do orcamento", "status orcamento", "situacao", "status"], obrigatorio: true },
   valorVenda: { rotulo: "Valor da venda", nomes: ["valor da venda", "valor fechado", "valor vendido"] },
   valorPrescricao: { rotulo: "Valor da prescrição", nomes: ["valor prescricao", "valor da prescricao", "valor orcado", "valor do orcamento"] },
+  // Motivo de o orçamento não fechar. Não confundir com a objeção do lead (motivo de não agendar).
+  objecao: { rotulo: "Motivo / objeção do orçamento", nomes: ["objecao do orcamento", "motivo nao fechou", "motivo de nao fechamento", "motivo da perda", "motivo de perda", "objecao", "motivo"] },
 };
 
 export interface Orcamento {
@@ -296,6 +298,7 @@ export interface Orcamento {
   status: string;
   valorVenda: number;
   valorPrescricao: number;
+  objecao?: string;
 }
 
 export function lerOrcamentos(linhas: Celula[][], op: OpcoesLeitura<CampoOrcamento> = {}): Leitura<Orcamento, CampoOrcamento> {
@@ -310,6 +313,7 @@ export function lerOrcamentos(linhas: Celula[][], op: OpcoesLeitura<CampoOrcamen
       status: textoLimpo(get("status")),
       valorVenda: valorOuAviso(get, aviso, "valorVenda") ?? 0,
       valorPrescricao: valorOuAviso(get, aviso, "valorPrescricao") ?? 0,
+      objecao: textoLimpo(get("objecao")),
     };
   });
 }
@@ -321,9 +325,9 @@ export type CampoLead = "data" | "origem" | "canal" | "interesse" | "status" | "
 export const DEF_LEADS: DefinicaoFonte<CampoLead> = {
   // "Data_Ajuste" primeiro: a data do 1º contato vem em UTC e pode cair no dia anterior.
   data: { rotulo: "Data do contato", nomes: ["data_ajuste", "data ajustada", "data 1º contato", "data do 1º contato", "data"], contem: ["contato"], obrigatorio: true },
-  origem: { rotulo: "Origem", nomes: ["origem", "por onde veio?", "como conheceu"] },
+  origem: { rotulo: "Origem", nomes: ["origem", "origem do lead", "por onde veio?", "como conheceu", "como conheceu?", "onde conheceu?", "onde conheceu"] },
   canal: { rotulo: "Canal", nomes: ["canal", "contato cliente"] },
-  interesse: { rotulo: "Interesse", nomes: ["interesse", "servico"] },
+  interesse: { rotulo: "Interesse / serviço buscado", nomes: ["interesse", "servico", "servico buscado", "queixa", "queixa/objetivo", "procedimento"], contem: ["queixa"] },
   status: { rotulo: "Status", nomes: ["status final", "agendou?", "status"], obrigatorio: true },
   objecao: { rotulo: "Objeção", nomes: ["objecao", "objecao (caso nao agende)", "motivo de perda"], contem: ["objecao"] },
   responsavel: { rotulo: "Responsável", nomes: ["responsavel", "atendente"] },
