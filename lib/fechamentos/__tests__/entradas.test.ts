@@ -127,3 +127,13 @@ describe("Resultado de caixa x Faturamento x Despesas", () => {
     expect(regimesAnuais([{ mes: "2026-10", entradas: 9000, saidasCaixa: 1000, saidasCompetencia: 1000 }])).toMatchObject({ real: false, linhas: [{ resultadoCaixa: 8000, entradas: null }] });
   });
 });
+
+describe("valor contábil", () => {
+  it("'R$ -' do formato contábil vale zero", async () => {
+    const { lerValor } = await import("../texto");
+    expect(lerValor(" R$  -   ")).toBe(0);
+    expect(lerValor("-")).toBe(0);
+    expect(lerValor(" R$  14.000,00 ")).toBe(14000);
+    expect(lerValor("-R$ 10,00")).toBe(-10);
+  });
+});

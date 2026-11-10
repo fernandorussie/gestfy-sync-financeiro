@@ -73,6 +73,8 @@ export function lerValor(valor: Celula): number | null {
   if (typeof valor === "number") return Number.isFinite(valor) ? valor : null;
   let s = String(valor).trim();
   if (!s) return null;
+  // Formato contábil do Sheets: "R$ -" = zero.
+  if (/^(R\$)?\s*-\s*$/.test(s)) return 0;
   let negativo = false;
   if (/^\(.*\)$/.test(s)) { negativo = true; s = s.slice(1, -1); }
   if (s.includes("-")) { negativo = true; s = s.replace(/-/g, ""); }
