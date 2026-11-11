@@ -3,7 +3,7 @@ import type { ResultadoFechamento } from "@/lib/fechamentos/servidor";
 import { cap } from "@/lib/fechamentos/vocabulario";
 import type { Ritmo } from "@/lib/fechamentos/ritmo";
 import { brl, brl0, num, pct } from "../../(app)/fechamentos/_components/formato";
-import { Cabecalho, categoriasReceita, CINZA, Kpi, LINHA, Linhas, ListaContagem, contagens, mesDe, td, Titulo, Var, VERMELHO } from "./relatorio";
+import { Cabecalho, categoriasReceita, CINZA, Kpi, LINHA, ListaContagem, mesDe, td, Titulo, Var, VERMELHO } from "./relatorio";
 
 /*
  * Relatório quinzenal: parcial do dia 1 ao 15, focado no ritmo do mês
@@ -55,7 +55,8 @@ function BarraMeta({ ritmo }: { ritmo: Ritmo }) {
   );
 }
 
-type Props = { r: ResultadoFechamento; nivel?: string };
+type Props = { r: ResultadoFechamento; nivel?: string; blocos?: Set<string> };
+const liga = (blocos: Set<string> | undefined, id: string) => !blocos || blocos.has(id);
 const vsDe = (r: ResultadoFechamento) => `vs 1–15 de ${mesDe(r.anterior.periodo.inicio).slice(0, 3)}`;
 function notaVar(r: ResultadoFechamento) {
   return function nota(atual?: number | null, antes?: number | null, custo?: boolean) {
@@ -64,14 +65,15 @@ function notaVar(r: ResultadoFechamento) {
 }
 const tkOrc = (o: ResultadoFechamento["indicadores"]["orcamentos"]) => (o && o.total ? o.valorGerado / o.total : null);
 
-export function SecResultadoQuinzenal({ r }: Props) {
+export function SecResultadoQuinzenal({ r, blocos }: Props) {
   const i = r.indicadores, a = r.anterior, n = notaVar(r);
+  const b = (id: string) => liga(blocos, id);
   return (
     <div className="grid grid-cols-4 gap-2.5">
       <Kpi fundo={FUNDO} rotulo="Faturamento até o dia 15" valor={brl0(i.faturamento?.total)} nota={n(i.faturamento?.total, a.faturamento?.total)} />
-      <Kpi fundo={FUNDO} rotulo={`${cap(r.vocab.clientes)} atendidos`} valor={num(i.pacientes?.atendidos)} nota={n(i.pacientes?.atendidos, a.pacientes?.atendidos)} />
-      <Kpi fundo={FUNDO} rotulo="Ticket médio" valor={brl(i.pacientes?.ticketMedio)} nota={n(i.pacientes?.ticketMedio, a.pacientes?.ticketMedio)} />
-      <Kpi fundo={FUNDO} rotulo={`${cap(r.vocab.clientes)} novos`} valor={num(i.pacientes?.novos)} nota={n(i.pacientes?.novos, a.pacientes?.novos)} />
+      {b("res.atendidos") && <Kpi fundo={FUNDO} rotulo={`${cap(r.vocab.clientes)} atendidos`} valor={num(i.pacientes?.atendidos)} nota={n(i.pacientes?.atendidos, a.pacientes?.atendidos)} />}
+      {b("res.ticket") && <Kpi fundo={FUNDO} rotulo="Ticket médio" valor={brl(i.pacientes?.ticketMedio)} nota={n(i.pacientes?.ticketMedio, a.pacientes?.ticketMedio)} />}
+      {b("res.novos") && <Kpi fundo={FUNDO} rotulo={`${cap(r.vocab.clientes)} novos`} valor={num(i.pacientes?.novos)} nota={n(i.pacientes?.novos, a.pacientes?.novos)} />}
     </div>
   );
 }
@@ -123,8 +125,9 @@ export function SecCaixaMes({ r }: Props) {
   );
 }
 
-export function SecFunilLeadsQuinzenal({ r, nivel }: Props) {
+export function SecFunilLeadsQuinzenal({ r, blocos }: Props) {
   const i = r.indicadores, a = r.anterior;
+  const b = (id: string) => liga(blocos, id);
   return (
     <div className="pdf-bloco space-y-4">
       <div>
@@ -137,14 +140,15 @@ export function SecFunilLeadsQuinzenal({ r, nivel }: Props) {
           ]} />
         ) : <p className="text-[11px]" style={{ color: CINZA }}>Planilha de leads não configurada.</p>}
       </div>
-      {i.leads && nivel === "completo" && <div><Titulo cor={COR}>Origem</Titulo><Linhas itens={contagens(i.leads.porOrigem, 6)} /></div>}
-      {i.leads && nivel === "completo" && <ListaContagem titulo="Motivos de não agendamento" itens={i.leads.porObjecao} cor={COR} />}
+      {i.leads && b("leads.origem") && <ListaContagem titulo="Origem" itens={i.leads.porOrigem} n={6} cor={COR} />}
+      {i.leads && b("leads.objecoes") && <ListaContagem titulo="Motivos de não agendamento" itens={i.leads.porObjecao} cor={COR} />}
     </div>
   );
 }
 
-export function SecFunilOrcamentosQuinzenal({ r, nivel }: Props) {
+export function SecFunilOrcamentosQuinzenal({ r, blocos }: Props) {
   const i = r.indicadores, a = r.anterior;
+  const b = (id: string) => liga(blocos, id);
   return (
     <div className="pdf-bloco space-y-4">
       <div>
@@ -159,7 +163,7 @@ export function SecFunilOrcamentosQuinzenal({ r, nivel }: Props) {
           ]} />
         ) : <p className="text-[11px]" style={{ color: CINZA }}>Planilha de orçamentos não configurada.</p>}
       </div>
-      {i.orcamentos && nivel === "completo" && <ListaContagem titulo="Motivos de não fechamento" itens={i.orcamentos.porObjecao} cor={COR} />}
+      {i.orcamentos && b("orc.motivos") && <ListaContagem titulo="Motivos de não fechamento" itens={i.orcamentos.porObjecao} cor={COR} />}
     </div>
   );
 }

@@ -270,3 +270,14 @@ Proposta: https://claude.ai/artifact/VX4PFTySS4vwibarPoRuJb. Decisões (10/11): 
 - Pacote do Claude: canal, notas por área do NPS, status e motivos de orçamento, conversão por quantidade, faturamento por unidade e meio de pagamento, entradas por categoria.
 
 Testes: 227 passando (novo `etapa-a.test.ts`).
+
+## Etapa v3.5 — catálogo único de blocos e editor por blocos (Etapa B, 11/11)
+
+- **`lib/fechamentos/blocos.ts`**: catálogo único. Cada bloco (card ou lista) tem seção, fonte, regra de cálculo, disponibilidade (`disponivel(indicadores)` + motivo) e se é obrigatório ou de detalhe. Seções com blocos: Resultado (faturamento, entradas, despesas, resultado, meta, atendidos, ticket, novos, ticket dos novos), Funil de leads (funil, serviço, origem, canal, motivos de não agendamento), Funil de orçamentos (por valor, por quantidade, por status, motivos), Experiência (NPS, profissional, recepção, infraestrutura, enfermagem, Google), Faturamento por profissional/unidade/pagamento. Tabelas (receitas, despesas, entradas, caixa x competência) seguem com o nível de detalhamento.
+- **Mínimo Gestfy**: seções Resultado, Receitas e Despesas detalhadas fixas; dentro do Resultado, Faturamento, Despesas pagas e Resultado são obrigatórios.
+- **Escolha salva** em `ItemSecao.ocultos` (blocos desligados). Sem escolha, vale o padrão: estruturas antigas no nível "Resumo" escondem os blocos de detalhe; com Entradas, o ticket dos novos fica fora (como antes). Fechamentos concluídos mantêm a estrutura congelada.
+- **Quebra de página**: `ItemSecao.novaPagina` ("Começar em página nova"). Sem escolha, a regra antiga. Seção que entra no meio da página ganha o próprio título. No papel, o que não cabe continua na folha seguinte sem cortar cards e linhas.
+- **Editor**: cada seção com blocos mostra "x de y itens"; ao abrir, caixas por bloco (obrigatórios com cadeado; sem dados no cliente aparecem com o motivo, a partir do fechamento mais recente). Funis com atalhos Resumo / Completo. Prévia das páginas com contagem de itens. **"Ver PDF de exemplo"** abre o PDF do fechamento mais recente com a estrutura ainda não salva (`/fechamentos-pdf/[id]?previa=<base64url>`).
+- **Pacote do Claude**: seção "Definições dos indicadores" gerada do catálogo (fonte e regra de cada indicador com dados), marca `[PDF]` no que está no relatório do cliente e lista o que não tem dados ("não comente nem estime").
+
+Testes: 235 passando (novo `blocos.test.ts`).

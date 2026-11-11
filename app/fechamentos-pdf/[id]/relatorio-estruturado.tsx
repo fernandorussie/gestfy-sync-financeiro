@@ -1,6 +1,7 @@
 import { Fragment, type ReactNode } from "react";
 import type { ResultadoFechamento } from "@/lib/fechamentos/servidor";
-import { extrasDe, paginar, type ItemSecao } from "@/lib/fechamentos/estrutura";
+import { defSecao, extrasDe, paginar, type ExtraSecao, type ItemSecao } from "@/lib/fechamentos/estrutura";
+import { blocosLigados } from "@/lib/fechamentos/blocos";
 import { Folha, ROXO, SecAnalise, SecDespesas, SecDistribuicao, SecEntradas, SecExperiencia, SecFunilLeadsMensal, SecFunilOrcamentosMensal, SecGrafico, SecReceitasMensal, SecRegimes, SecResultadoMensal, temAnalise } from "./relatorio";
 import { ComplementoPdf, SecFontePersonalizada, SecPersonalizada, indicadoresDaSecao } from "./secao-personalizada";
 import { COR_QUINZENAL, SecCaixaMes, SecFunilLeadsQuinzenal, SecFunilOrcamentosQuinzenal, SecReceitasQuinzenal, SecResultadoQuinzenal, SecRitmo } from "./relatorio-quinzenal";
@@ -21,7 +22,7 @@ function secao(r: ResultadoFechamento, s: ItemSecao, cor: string, orfaos: string
 
 function secaoBase(r: ResultadoFechamento, s: ItemSecao, cor: string): ReactNode {
   const q = r.fechamento.tipo === "quinzenal";
-  const p = { r, nivel: s.nivel };
+  const p = { r, nivel: s.nivel, blocos: blocosLigados(s, r.fechamento.tipo, { real: !!r.indicadores.caixa?.real }) };
   switch (s.id) {
     case "resultado": return q ? <SecResultadoQuinzenal {...p} /> : <SecResultadoMensal {...p} />;
     case "grafico": return <SecGrafico {...p} />;
@@ -51,10 +52,15 @@ function secaoBase(r: ResultadoFechamento, s: ItemSecao, cor: string): ReactNode
 const FUNIS = new Set(["funilLeads", "funilOrcamentos"]);
 
 /** Conteúdo de uma página: os dois funis lado a lado quando estão em sequência. */
-function conteudo(r: ResultadoFechamento, secoes: ItemSecao[], cor: string, orfaos: string[]): ReactNode[] {
+function conteudo(r: ResultadoFechamento, secoes: ItemSecao[], cor: string, orfaos: string[], extras: ExtraSecao[]): ReactNode[] {
   const out: ReactNode[] = [];
   for (let k = 0; k < secoes.length; k++) {
     const s = secoes[k], prox = secoes[k + 1];
+    // Seção que entrou no meio da página (sem abrir página própria) ganha o título dela.
+    const d = defSecao(s.id, extras);
+    if (k > 0 && d && !d.tituloProprio && !s.id.startsWith("fonte:") && !s.id.startsWith("sec:")) {
+      out.push(<h3 key={`t-${s.id}`} className="font-heading mt-2 border-b pb-1 text-base font-semibold" style={{ color: cor, borderColor: "#E7E2EC" }}>{s.id === "resultado" ? "Resultado do período" : d.titulo}</h3>);
+    }
     if (FUNIS.has(s.id) && prox && FUNIS.has(prox.id)) {
       // Funis lado a lado: o complemento de cada um fica embaixo dele, na mesma coluna.
       out.push(
@@ -87,11 +93,12 @@ export function RelatorioEstruturado({ r, estrutura }: { r: ResultadoFechamento;
   const ligadas = new Set(itens.filter((s) => s.ativa).map((s) => s.id));
   const destinos = new Set(r.personalizadas.flatMap((f) => f.indicadores.map((d) => d.secao)).filter((x) => x !== "fonte"));
   const orfaos = [...destinos].filter((d) => !ligadas.has(d) && d !== "resultado");
+  const extras = extrasDe(r.personalizadas, r.secoes);
   return (
     <>
-      {paginar(itens, r.fechamento.tipo, extrasDe(r.personalizadas, r.secoes)).map((pg) => (
+      {paginar(itens, r.fechamento.tipo, extras).map((pg) => (
         <Folha key={pg.secoes[0].id} r={r} titulo={tituloDaPagina(r, pg.secoes[0], pg.titulo)} cor={cor} compacta={pg.secoes[0].id === "despesas"}>
-          {conteudo(r, pg.secoes, cor, orfaos)}
+          {conteudo(r, pg.secoes, cor, orfaos, extras)}
         </Folha>
       ))}
     </>

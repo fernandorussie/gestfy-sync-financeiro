@@ -14,6 +14,8 @@ import type { Ritmo } from "./ritmo";
 import type { ResultadoPersonalizado } from "./fonte-personalizada";
 import { formatarIndicador, variacaoIndicador } from "./formato-indicador";
 import { NEUTRO, cap, type Vocabulario } from "./vocabulario";
+import { BLOCOS, blocosLigados, indisponiveis } from "./blocos";
+import { CATALOGO, type ItemSecao } from "./estrutura";
 import { citar, naturezaPontuais, nomeDoMes, rotulo, type Acao, type Acompanhamento, type SecoesTexto, type TextoFechamento } from "./texto-fechamento";
 
 export interface DadosPacote {
@@ -33,6 +35,8 @@ export interface DadosPacote {
   vocab?: Vocabulario;
   /** Fontes personalizadas (contratos, cirurgias, recall…). */
   personalizadas?: ResultadoPersonalizado[];
+  /** Estrutura do PDF do cliente: diz ao Claude o que o cliente vai ver. */
+  estrutura?: ItemSecao[];
 }
 
 const fmt = (v: number | null | undefined, casas = 2) => (v == null ? "—" : `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas })}`);
@@ -245,6 +249,22 @@ export function montarPacote(d: DadosPacote, opcoes: { anonimizar?: boolean; des
   if (d.anual.filter((m) => m.entradas || m.saidasCaixa).length > 1) {
     sec(`Evolução em ${i.periodo.inicio.slice(0, 4)} (regime de caixa)`);
     L.push(d.anual.filter((m) => m.entradas || m.saidasCaixa).map((m) => `${nomeDoMes(m.mes + "-01").slice(0, 3)}: fat. ${fmt(m.entradas, 0)}${m.recebido != null ? ` / receb. ${fmt(m.recebido, 0)}` : ""} / desp. ${fmt(m.saidasCaixa, 0)}`).join(" · "));
+  }
+
+  // Catálogo único: as mesmas definições do editor e do PDF. Vai tudo o que tem dados; marca o que está no PDF.
+  {
+    const sem = indisponiveis(i);
+    const noPdf = new Set<string>();
+    if (d.estrutura) for (const s of d.estrutura.filter((x) => x.ativa)) for (const b of blocosLigados(s, d.tipo, { real: !!i.caixa?.real })) noPdf.add(b);
+    const disp = BLOCOS.filter((b) => (!b.tipos || b.tipos.includes(d.tipo)) && !sem[b.id]);
+    sec("Definições dos indicadores (fonte e regra de cálculo)");
+    if (d.estrutura) L.push("Itens marcados com [PDF] estão no relatório que o cliente recebe; os demais servem de contexto para a análise.");
+    for (const secao of CATALOGO) {
+      const bs = disp.filter((b) => b.secao === secao.id);
+      if (bs.length) L.push(`- ${secao.titulo}: ${bs.map((b) => `${b.rotulo}${noPdf.has(b.id) ? " [PDF]" : ""} (${b.fonte}: ${b.regra})`).join(" · ")}`);
+    }
+    const faltam = BLOCOS.filter((b) => (!b.tipos || b.tipos.includes(d.tipo)) && sem[b.id]);
+    if (faltam.length) L.push(`- Sem dados para este cliente (não comente nem estime): ${faltam.map((b) => `${b.rotulo} (${sem[b.id]})`).join("; ")}.`);
   }
 
   if (d.acompanhamento.length) {

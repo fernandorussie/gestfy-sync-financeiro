@@ -169,24 +169,27 @@ function GraficoLinhas({ r }: { r: ResultadoFechamento }) {
 
 
 
-type Nivel = { nivel?: string };
+type Nivel = { nivel?: string; blocos?: Set<string> };
+/** Bloco ligado? Sem a lista (chamada antiga), tudo aparece. */
+const liga = (blocos: Set<string> | undefined, id: string) => !blocos || blocos.has(id);
 
-export function SecResultadoMensal({ r }: { r: ResultadoFechamento }) {
+export function SecResultadoMensal({ r, blocos }: { r: ResultadoFechamento } & Nivel) {
   const i = r.indicadores, a = r.anterior;
   const vs = `vs ${mesDe(a.periodo.inicio)}`;
   const n = (atual?: number | null, antes?: number | null, custo?: boolean) => <><Var atual={atual} antes={antes} custo={custo} /> {vs}</>;
   const real = !!i.caixa?.real;
+  const b = (id: string) => liga(blocos, id);
   return (
     <div className="grid grid-cols-4 gap-2.5">
       <Kpi rotulo="Faturamento" valor={brl0(i.faturamento?.total)} nota={n(i.faturamento?.total, a.faturamento?.total)} />
-      {real && <Kpi rotulo="Entradas (recebido)" valor={brl0(i.entradas?.total)} nota={n(i.entradas?.total, a.entradas?.total)} />}
+      {real && b("res.entradas") && <Kpi rotulo="Entradas (recebido)" valor={brl0(i.entradas?.total)} nota={n(i.entradas?.total, a.entradas?.total)} />}
       <Kpi rotulo="Despesas pagas" valor={brl0(i.despesas?.total)} nota={n(i.despesas?.total, a.despesas?.total, true)} />
       <Kpi rotulo={rotuloResultado(i.caixa)} valor={brl0(i.caixa?.resultado)} nota={i.caixa?.margem != null ? `${pct(i.caixa.margem)} ${real ? "das entradas" : "do faturamento"}` : undefined} />
-      <Kpi rotulo="Atingimento da meta" valor={i.meta ? pct(i.meta.atingimento) : "—"} nota={i.meta ? `meta ${brl0(i.meta.valor)}` : "sem meta"} />
-      <Kpi rotulo={`${cap(r.vocab.clientes)} atendidos`} valor={num(i.pacientes?.atendidos)} nota={n(i.pacientes?.atendidos, a.pacientes?.atendidos)} />
-      <Kpi rotulo="Ticket médio" valor={brl(i.pacientes?.ticketMedio)} nota={n(i.pacientes?.ticketMedio, a.pacientes?.ticketMedio)} />
-      <Kpi rotulo={`${cap(r.vocab.clientes)} novos`} valor={num(i.pacientes?.novos)} nota={n(i.pacientes?.novos, a.pacientes?.novos)} />
-      {!real && <Kpi rotulo="Ticket médio dos novos" valor={brl(i.pacientes?.ticketNovos)} nota={n(i.pacientes?.ticketNovos, a.pacientes?.ticketNovos)} />}
+      {b("res.meta") && <Kpi rotulo="Atingimento da meta" valor={i.meta ? pct(i.meta.atingimento) : "—"} nota={i.meta ? `meta ${brl0(i.meta.valor)}` : "sem meta"} />}
+      {b("res.atendidos") && <Kpi rotulo={`${cap(r.vocab.clientes)} atendidos`} valor={num(i.pacientes?.atendidos)} nota={n(i.pacientes?.atendidos, a.pacientes?.atendidos)} />}
+      {b("res.ticket") && <Kpi rotulo="Ticket médio" valor={brl(i.pacientes?.ticketMedio)} nota={n(i.pacientes?.ticketMedio, a.pacientes?.ticketMedio)} />}
+      {b("res.novos") && <Kpi rotulo={`${cap(r.vocab.clientes)} novos`} valor={num(i.pacientes?.novos)} nota={n(i.pacientes?.novos, a.pacientes?.novos)} />}
+      {b("res.ticketNovos") && <Kpi rotulo="Ticket médio dos novos" valor={brl(i.pacientes?.ticketNovos)} nota={n(i.pacientes?.ticketNovos, a.pacientes?.ticketNovos)} />}
     </div>
   );
 }
@@ -207,11 +210,12 @@ export function ListaContagem({ titulo, itens, n = 5, cor = ROXO }: { titulo: st
   return <div className="pdf-bloco"><Titulo cor={cor}>{titulo}</Titulo><Linhas itens={contagens(xs, n)} /></div>;
 }
 
-export function SecFunilLeadsMensal({ r, nivel }: { r: ResultadoFechamento } & Nivel) {
+export function SecFunilLeadsMensal({ r, blocos }: { r: ResultadoFechamento } & Nivel) {
   const i = r.indicadores;
+  const b = (id: string) => liga(blocos, id);
   return (
     <div className="space-y-4">
-      <div className="pdf-bloco">
+      {b("leads.funil") && <div className="pdf-bloco">
         <Titulo>Funil de leads</Titulo>
         {i.leads ? (
           <Linhas itens={[
@@ -220,25 +224,26 @@ export function SecFunilLeadsMensal({ r, nivel }: { r: ResultadoFechamento } & N
             { nome: "Conversão lead → agendamento", valor: pct(i.leads.conversao, 0), destaque: true },
           ]} />
         ) : <p className="text-[11px]" style={{ color: CINZA }}>Planilha de leads não configurada.</p>}
-      </div>
-      {i.leads && nivel !== "resumo" && (
+      </div>}
+      {i.leads && (
         <>
-          <ListaContagem titulo="Serviço mais buscado" itens={i.leads.porInteresse} />
-          <ListaContagem titulo="Origem do lead" itens={i.leads.porOrigem} n={6} />
-          <ListaContagem titulo="Canal de entrada" itens={i.leads.porCanal} />
-          <ListaContagem titulo="Motivos de não agendamento" itens={i.leads.porObjecao} />
+          {b("leads.servico") && <ListaContagem titulo="Serviço mais buscado" itens={i.leads.porInteresse} />}
+          {b("leads.origem") && <ListaContagem titulo="Origem do lead" itens={i.leads.porOrigem} n={6} />}
+          {b("leads.canal") && <ListaContagem titulo="Canal de entrada" itens={i.leads.porCanal} />}
+          {b("leads.objecoes") && <ListaContagem titulo="Motivos de não agendamento" itens={i.leads.porObjecao} />}
         </>
       )}
     </div>
   );
 }
 
-export function SecFunilOrcamentosMensal({ r, nivel }: { r: ResultadoFechamento } & Nivel) {
+export function SecFunilOrcamentosMensal({ r, blocos }: { r: ResultadoFechamento } & Nivel) {
   const o = r.indicadores.orcamentos;
   const canc = o?.cancelados ?? 0;
+  const b = (id: string) => liga(blocos, id);
   return (
     <div className="space-y-4">
-      <div className="pdf-bloco">
+      {(b("orc.valor") || !o) && <div className="pdf-bloco">
         <Titulo>Orçamentos por valor</Titulo>
         {o ? (
           <Linhas itens={[
@@ -249,10 +254,10 @@ export function SecFunilOrcamentosMensal({ r, nivel }: { r: ResultadoFechamento 
             { nome: "Conversão em valor", valor: pct(o.conversaoValor, 0), destaque: true },
           ]} />
         ) : <p className="text-[11px]" style={{ color: CINZA }}>Planilha de orçamentos não configurada.</p>}
-      </div>
-      {o && nivel !== "resumo" && (
+      </div>}
+      {o && (
         <>
-          <div className="pdf-bloco">
+          {b("orc.quantidade") && <div className="pdf-bloco">
             <Titulo>Orçamentos por quantidade</Titulo>
             <Linhas itens={[
               { nome: "Total de orçamentos", valor: num(o.total) },
@@ -262,10 +267,10 @@ export function SecFunilOrcamentosMensal({ r, nivel }: { r: ResultadoFechamento 
               ...(canc ? [{ nome: "Cancelados", valor: num(canc) }] : []),
               { nome: "Conversão em quantidade", valor: pct(o.conversaoQuantidade, 0), destaque: true },
             ]} />
-          </div>
-          {o.porStatus.length > 1 && <ListaContagem titulo="Por status" itens={o.porStatus} n={8} />}
+          </div>}
+          {b("orc.status") && o.porStatus.length > 1 && <ListaContagem titulo="Por status" itens={o.porStatus} n={8} />}
           {/* Só motivos da própria fonte de orçamentos: as objeções dos leads são outra coisa (não agendamento). */}
-          <ListaContagem titulo="Motivos de não fechamento" itens={o.porObjecao} />
+          {b("orc.motivos") && <ListaContagem titulo="Motivos de não fechamento" itens={o.porObjecao} />}
         </>
       )}
       {o && canc > 0 && <p className="text-[10px]" style={{ color: CINZA }}>Cancelados ficam fora das taxas de conversão.</p>}
@@ -273,18 +278,19 @@ export function SecFunilOrcamentosMensal({ r, nivel }: { r: ResultadoFechamento 
   );
 }
 
-export function SecExperiencia({ r }: { r: ResultadoFechamento }) {
+export function SecExperiencia({ r, blocos }: { r: ResultadoFechamento } & Nivel) {
+  const b = (id: string) => liga(blocos, id);
   const i = r.indicadores;
   const nota = (v: number | null | undefined) => num(v, v === 5 ? 1 : 2);
   const n = i.nps;
   // Cada card só entra quando a fonte tem a informação.
   const cards = [
-    n && <Kpi key="nps" rotulo="NPS" valor={num(n.nps)} nota={`${n.respostas} respostas · ${n.promotores}/${n.neutros}/${n.detratores}`} />,
-    n?.notas.profissional != null && <Kpi key="prof" rotulo={cap(r.vocab.profissional)} valor={nota(n.notas.profissional)} nota="de 5" />,
-    n?.notas.recepcao != null && <Kpi key="rec" rotulo="Recepção" valor={nota(n.notas.recepcao)} nota="de 5" />,
-    n?.notas.infraestrutura != null && <Kpi key="inf" rotulo="Infraestrutura" valor={nota(n.notas.infraestrutura)} nota="de 5" />,
-    n?.notas.enfermagem != null && <Kpi key="enf" rotulo="Enfermagem" valor={nota(n.notas.enfermagem)} nota="de 5" />,
-    i.google && <Kpi key="g" rotulo="Google" valor={num(i.google.nota, 1)} nota={`${i.google.avaliacoes} avaliações`} />,
+    n && b("exp.nps") && <Kpi key="nps" rotulo="NPS" valor={num(n.nps)} nota={`${n.respostas} respostas · ${n.promotores}/${n.neutros}/${n.detratores}`} />,
+    n?.notas.profissional != null && b("exp.profissional") && <Kpi key="prof" rotulo={cap(r.vocab.profissional)} valor={nota(n.notas.profissional)} nota="de 5" />,
+    n?.notas.recepcao != null && b("exp.recepcao") && <Kpi key="rec" rotulo="Recepção" valor={nota(n.notas.recepcao)} nota="de 5" />,
+    n?.notas.infraestrutura != null && b("exp.infraestrutura") && <Kpi key="inf" rotulo="Infraestrutura" valor={nota(n.notas.infraestrutura)} nota="de 5" />,
+    n?.notas.enfermagem != null && b("exp.enfermagem") && <Kpi key="enf" rotulo="Enfermagem" valor={nota(n.notas.enfermagem)} nota="de 5" />,
+    i.google && b("exp.google") && <Kpi key="g" rotulo="Google" valor={num(i.google.nota, 1)} nota={`${i.google.avaliacoes} avaliações`} />,
   ].filter(Boolean);
   return (
     <div className="pdf-bloco">
@@ -296,14 +302,15 @@ export function SecExperiencia({ r }: { r: ResultadoFechamento }) {
 }
 
 /** Faturamento por profissional, unidade e meio de pagamento (o mesmo da tela de Indicadores). */
-export function SecDistribuicao({ r }: { r: ResultadoFechamento }) {
+export function SecDistribuicao({ r, blocos }: { r: ResultadoFechamento } & Nivel) {
+  const b = (id: string) => liga(blocos, id);
   const f = r.indicadores.faturamento;
   const bloco = (titulo: string, itens?: { nome: string; valor: number; pct: number }[]) => {
     const xs = (itens ?? []).filter((x) => x.valor);
     if (!xs.length || (xs.length === 1 && xs[0].nome === "Não informado")) return null;
     return <div className="pdf-bloco"><Titulo>{titulo}</Titulo><Linhas itens={xs.slice(0, 8).map((x) => ({ nome: x.nome, valor: <>{brl0(x.valor)} <span style={{ color: CINZA }}>{pct(x.pct, 0)}</span></> }))} /></div>;
   };
-  const partes = [bloco(`Por ${r.vocab.profissional}`, f?.porProfissional), bloco("Por unidade", f?.porUnidade), bloco("Meio de pagamento", f?.porPagamento)].filter(Boolean);
+  const partes = [b("dist.profissional") && bloco(`Por ${r.vocab.profissional}`, f?.porProfissional), b("dist.unidade") && bloco("Por unidade", f?.porUnidade), b("dist.pagamento") && bloco("Meio de pagamento", f?.porPagamento)].filter(Boolean);
   if (!partes.length) return <p className="text-[11px]" style={{ color: CINZA }}>A fonte de vendas não informa profissional, unidade nem meio de pagamento.</p>;
   return <div className="grid grid-cols-2 gap-x-8 gap-y-4">{partes}</div>;
 }

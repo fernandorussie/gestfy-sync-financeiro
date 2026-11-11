@@ -22,6 +22,15 @@ const base: DadosPacote = {
 describe("pacote para o Claude", () => {
   const p = montarPacote(base);
 
+  it("leva as definições do catálogo, marca o que está no PDF e diz o que não tem dados", () => {
+    const q = montarPacote({ ...base, estrutura: [{ id: "resultado", ativa: true, ocultos: ["res.meta"] }, { id: "funilLeads", ativa: false }] });
+    expect(q).toContain("## Definições dos indicadores (fonte e regra de cálculo)");
+    expect(q).toContain("Faturamento [PDF] (Vendas:");
+    expect(q).toMatch(/Atingimento da meta \(Vendas e meta/);
+    expect(q).toContain("Sem dados para este cliente");
+    expect(q).toMatch(/Entradas \(recebido\) \(o cliente não tem a fonte de Entradas\)/);
+  });
+
   it("traz instruções, formato da resposta, ficha e números do período", () => {
     expect(p).toContain("Responda SOMENTE no formato abaixo");
     expect(p).toContain("### PLANO DE AÇÃO");

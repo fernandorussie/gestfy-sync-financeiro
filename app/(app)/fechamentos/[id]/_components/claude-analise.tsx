@@ -32,7 +32,7 @@ export function ClaudeAnalise({ r, estado, mudar }: { r: ResultadoFechamento; es
   const copiar = async () => {
     const texto = montarPacote({
       clinica: r.clinicaNome, tipo: r.fechamento.tipo, indicadores: r.indicadores, anterior: r.anterior, anual: r.anual, ritmo: r.ritmo,
-      alertas: r.alertas, decisoes: r.decisoes, texto: estado.texto, acoes: estado.acoes, acompanhamento: estado.acompanhamento, ficha, personalizadas: r.personalizadas, vocab: r.vocab,
+      alertas: r.alertas, decisoes: r.decisoes, texto: estado.texto, acoes: estado.acoes, acompanhamento: estado.acompanhamento, ficha, personalizadas: r.personalizadas, vocab: r.vocab, estrutura: r.estrutura,
     }, { anonimizar });
     try {
       await navigator.clipboard.writeText(texto);

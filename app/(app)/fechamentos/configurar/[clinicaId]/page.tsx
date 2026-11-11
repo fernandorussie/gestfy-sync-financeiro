@@ -9,6 +9,9 @@ import { limparFicha, type FichaClinica } from "@/lib/fechamentos/ficha";
 import { limparFontePersonalizada, type FontePersonalizada } from "@/lib/fechamentos/fonte-personalizada";
 import { CATALOGO, SECOES_DESTINO, extrasDe, limparEstrutura, type EstruturaRelatorio } from "@/lib/fechamentos/estrutura";
 import { migracoesPendentes } from "@/lib/fechamentos/banco";
+import { indisponiveis } from "@/lib/fechamentos/blocos";
+import type { Indicadores } from "@/lib/fechamentos/indicadores";
+import { nomePeriodo } from "../../_components/formato";
 import { AvisoBanco } from "../../_components/aviso-banco";
 import { AbasConfig, type AbaConfig } from "./abas-config";
 import { FontesDados } from "./fontes-dados";
@@ -18,10 +21,11 @@ import { FichaClinicaCard } from "./ficha-clinica";
 export default async function ConfigurarPage({ params, searchParams }: { params: Promise<{ clinicaId: string }>; searchParams: Promise<{ aba?: string }> }) {
   const [{ clinicaId }, { aba }] = await Promise.all([params, searchParams]);
   const db = getSupabaseAdmin();
-  const [{ data: clinica }, { data: config }, pendentes] = await Promise.all([
+  const [{ data: clinica }, { data: config }, pendentes, { data: recentes }] = await Promise.all([
     db.from("clinicas").select("id, nome").eq("id", clinicaId).maybeSingle(),
     db.from("fechamento_config").select("*").eq("clinica_id", clinicaId).maybeSingle(),
     migracoesPendentes(db),
+    db.from("fechamentos").select("id, tipo, inicio, fim, indicadores").eq("clinica_id", clinicaId).order("inicio", { ascending: false }).order("versao", { ascending: false }).limit(12),
   ]);
   if (!clinica) notFound();
   const cfg = (config ?? {}) as { fontes?: unknown; fontes_extras?: unknown; relatorio?: unknown; ficha?: unknown };
@@ -40,6 +44,15 @@ export default async function ConfigurarPage({ params, searchParams }: { params:
     const k = d.secao === "fonte" ? `fonte:${f.id}` : d.secao;
     (porSecao[k] ??= []).push(d.secao === "fonte" ? d.nome : `${d.nome} (${f.nome})`);
   }
+  // Fechamento mais recente de cada tipo: dá o PDF de exemplo e mostra quais itens têm dados neste cliente.
+  type Recente = { id: string; tipo: "mensal" | "quinzenal"; inicio: string; fim: string; indicadores: unknown };
+  const lista = (recentes ?? []) as Recente[];
+  const exemplos = Object.fromEntries((["mensal", "quinzenal"] as const).flatMap((t) => {
+    const f = lista.find((x) => x.tipo === t);
+    return f ? [[t, { id: f.id, rotulo: `${t === "mensal" ? "Mensal" : "Quinzenal"} · ${nomePeriodo(f.tipo, f.inicio, f.fim)}` }]] : [];
+  }));
+  const ultimoMensal = lista.find((x) => x.tipo === "mensal" && x.indicadores) ?? lista.find((x) => x.indicadores);
+  const semDados = indisponiveis((ultimoMensal?.indicadores ?? null) as Indicadores | null);
   const abaInicial: AbaConfig = aba === "estrutura" || aba === "perfil" ? aba : "fontes";
   const fontesPadrao = (cfg.fontes ?? {}) as FontesFechamento;
   const pronto = !!(fontesPadrao.vendas && fontesPadrao.despesas);
@@ -59,7 +72,7 @@ export default async function ConfigurarPage({ params, searchParams }: { params:
       <AbasConfig
         inicial={abaInicial}
         fontes={<FontesDados clinicaId={clinica.id} padraoInicial={fontesPadrao} extrasIniciais={extras} destinos={destinos} />}
-        estrutura={<EstruturaRelatorioCard key={JSON.stringify(extrasDe(extras))} clinicaId={clinica.id} extrasFontes={extrasDe(extras)} inicial={estrutura} porSecao={porSecao} />}
+        estrutura={<EstruturaRelatorioCard key={JSON.stringify(extrasDe(extras))} clinicaId={clinica.id} extrasFontes={extrasDe(extras)} inicial={estrutura} porSecao={porSecao} indisponiveis={semDados} exemplos={exemplos} />}
         perfil={<FichaClinicaCard clinicaId={clinica.id} clinicaNome={clinica.nome} inicial={limparFicha((cfg.ficha ?? {}) as Partial<FichaClinica>)} />}
       />
     </div>

@@ -223,7 +223,7 @@ export async function gerarComClaude(p: { id: string; anonimizar: boolean; texto
     const texto: TextoFechamento = { contexto: corta(p.texto?.contexto, 4000), observacao: corta(p.texto?.observacao, 8000), destaques: corta(p.texto?.destaques, 6000), comercial: corta(p.texto?.comercial, 6000), atencao: corta(p.texto?.atencao, 6000) };
     const prompt = montarPacote({
       clinica: r.clinicaNome, tipo: r.fechamento.tipo, indicadores: r.indicadores, anterior: r.anterior, anual: r.anual, ritmo: r.ritmo,
-      alertas: r.alertas, decisoes: r.decisoes, texto, acoes: (p.acoes ?? []).slice(0, 20), acompanhamento: (p.acompanhamento ?? []).slice(0, 20), ficha: r.ficha, personalizadas: r.personalizadas, vocab: r.vocab,
+      alertas: r.alertas, decisoes: r.decisoes, texto, acoes: (p.acoes ?? []).slice(0, 20), acompanhamento: (p.acompanhamento ?? []).slice(0, 20), ficha: r.ficha, personalizadas: r.personalizadas, vocab: r.vocab, estrutura: r.estrutura,
     }, { anonimizar: !!p.anonimizar, destino: "api" });
     const res = await chamarClaude(prompt);
     // Estimativa pelo preço do Sonnet (US$ 2 / US$ 10 por milhão de tokens); só para referência na tela.
