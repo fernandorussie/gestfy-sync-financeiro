@@ -106,7 +106,7 @@ create table relatorios_gerados (
 ```bash
 npm run dev
 # Acesse http://localhost:3000
-# Senha: valor de APP_PASSWORD no .env.local
+# Usuário: admin (ou APP_LOGIN) · Senha: valor de APP_PASSWORD no .env.local
 ```
 
 ---
@@ -138,7 +138,8 @@ npm run dev
 1. Importe o repositório.
 2. **Settings → Environment Variables** → adicione todas as variáveis do `.env.example`.
    - `GOOGLE_SERVICE_ACCOUNT_JSON`: JSON completo em uma única linha.
-3. Defina `APP_PASSWORD` com senha forte (≥ 20 caracteres aleatórios).
+3. Defina `APP_PASSWORD` com senha forte (≥ 20 caracteres aleatórios). Login: usuário `admin` (ou o valor de `APP_LOGIN`).
+4. Acesso dos consultores (opcional): defina `CONSULTOR_PASSWORD` (e, se quiser, `CONSULTOR_LOGIN`, padrão `consultor`). Sem ela, o login de consultor fica desligado. Trocar a senha derruba as sessões abertas daquele perfil.
 
 ---
 

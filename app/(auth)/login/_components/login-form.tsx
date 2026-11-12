@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Eye, EyeOff, Lock } from "lucide-react";
+import { Eye, EyeOff, Lock, User } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,25 +14,27 @@ export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
+  const [usuario, setUsuario] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!password) return;
+    if (!usuario || !password) return;
     setLoading(true);
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ usuario, password }),
       });
       if (res.ok) {
         const from = searchParams.get("from") ?? "/dashboard";
         router.push(from);
         router.refresh();
       } else {
-        toast.error("Senha incorreta");
+        const corpo = await res.json().catch(() => ({}));
+        toast.error(corpo.error ?? "Usuário ou senha incorretos");
         setPassword("");
       }
     } catch {
@@ -98,11 +100,30 @@ export function LoginForm() {
               Acessar Gestfy Sync
             </h1>
             <p className="text-sm text-muted-foreground">
-              Digite a senha para continuar.
+              Entre com seu usuário e senha.
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="space-y-2">
+              <Label htmlFor="usuario" className="text-sm font-medium">
+                Usuário
+              </Label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                <Input
+                  id="usuario"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  className="pl-9 h-11"
+                  value={usuario}
+                  onChange={(e) => setUsuario(e.target.value)}
+                  autoFocus
+                  required
+                />
+              </div>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="password" className="text-sm font-medium">
                 Senha
@@ -116,7 +137,7 @@ export function LoginForm() {
                   className="pl-9 pr-10 h-11"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  autoFocus
+                  autoComplete="current-password"
                   required
                 />
                 <button

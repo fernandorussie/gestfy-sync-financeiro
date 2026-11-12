@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
+import { COOKIE_NAME, perfilDoCookie, type Perfil } from "@/lib/auth";
 import { Separator } from "@/components/ui/separator";
 import { GestfyLogo } from "@/components/brand/gestfy-logo";
 import { SidebarNav } from "@/components/sidebar-nav";
@@ -19,7 +21,7 @@ function Marca({ compacta = false }: { compacta?: boolean }) {
   );
 }
 
-function ConteudoMenu() {
+function ConteudoMenu({ perfil }: { perfil: Perfil | null }) {
   return (
     <>
       <Marca />
@@ -28,19 +30,20 @@ function ConteudoMenu() {
         <SidebarNav />
       </div>
       <Separator className="bg-sidebar-border" />
-      <SidebarFooterClient />
+      <SidebarFooterClient perfil={perfil} />
     </>
   );
 }
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  const perfil = perfilDoCookie((await cookies()).get(COOKIE_NAME)?.value);
   return (
     <div className="flex h-dvh flex-col lg:flex-row">
       {/* Computador: menu lateral fixo. Celular e tablet: barra no topo com gaveta. */}
       <aside className="hidden w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar lg:flex">
-        <ConteudoMenu />
+        <ConteudoMenu perfil={perfil} />
       </aside>
-      <MenuMovel marca={<Marca compacta />}><ConteudoMenu /></MenuMovel>
+      <MenuMovel marca={<Marca compacta />}><ConteudoMenu perfil={perfil} /></MenuMovel>
 
       <main className="min-w-0 flex-1 overflow-auto bg-background">
         {children}

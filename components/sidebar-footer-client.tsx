@@ -5,7 +5,7 @@ import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 
-export function SidebarFooterClient() {
+export function SidebarFooterClient({ perfil }: { perfil?: "admin" | "consultor" | null }) {
   const router = useRouter();
 
   async function handleLogout() {
@@ -16,7 +16,10 @@ export function SidebarFooterClient() {
 
   return (
     <div className="flex items-center justify-between px-4 py-3">
-      <ThemeToggle />
+      <span className="flex items-center gap-2">
+        <ThemeToggle />
+        {perfil && <span className="text-xs text-muted-foreground" title="Perfil desta sessão">{perfil === "admin" ? "Administrador" : "Consultor"}</span>}
+      </span>
       <Button
         variant="ghost"
         size="sm"

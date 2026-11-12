@@ -1,23 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAuthToken, COOKIE_NAME } from "@/lib/auth";
+import { autenticar, createAuthToken, COOKIE_NAME } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
-  let password: string;
+  let usuario: string, password: string;
   try {
     const body = await request.json();
-    password = body.password ?? "";
+    usuario = String(body.usuario ?? "");
+    password = String(body.password ?? "");
   } catch {
     return NextResponse.json({ error: "Requisição inválida" }, { status: 400 });
   }
 
-  const appPassword = process.env.APP_PASSWORD;
-  if (!appPassword || password !== appPassword) {
-    return NextResponse.json({ error: "Senha incorreta" }, { status: 401 });
+  if (!process.env.APP_PASSWORD) {
+    return NextResponse.json({ error: "Acesso não configurado no servidor." }, { status: 500 });
+  }
+  const perfil = autenticar(usuario, password);
+  if (!perfil) {
+    // Pequena espera em cada erro: dificulta tentativas em massa.
+    await new Promise((r) => setTimeout(r, 600));
+    return NextResponse.json({ error: "Usuário ou senha incorretos" }, { status: 401 });
   }
 
-  const token = await createAuthToken(appPassword);
-
-  const response = NextResponse.json({ ok: true });
+  const token = await createAuthToken(perfil);
+  const response = NextResponse.json({ ok: true, perfil });
   response.cookies.set(COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",

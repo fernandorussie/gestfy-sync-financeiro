@@ -306,3 +306,12 @@ Revisão: https://claude.ai/artifact/HEsG6HVrNWEJuBJCW6uCCK. Aprovada inteira (p
 - "Não informado" sempre por último e em cinza (tela e PDF).
 
 Testes: 237 passando.
+
+## Acesso por usuário e senha (12/11)
+
+- Tela de login com **Usuário** e **Senha**. Dois perfis, definidos no ambiente da Vercel:
+  - `admin`: usuário `APP_LOGIN` (padrão `admin`) e senha `APP_PASSWORD` (a de sempre).
+  - `consultor`: usuário `CONSULTOR_LOGIN` (padrão `consultor`) e senha `CONSULTOR_PASSWORD`. Sem essa variável, o acesso de consultor fica desligado.
+- Os dois perfis têm o mesmo acesso às telas. O perfil aparece no rodapé do menu.
+- Cookie assinado (HMAC) com o perfil, 30 dias. Trocar a senha de um perfil derruba as sessões dele; cookies antigos (só senha) continuam valendo como admin.
+- Cada erro de login espera 0,6 s (dificulta tentativas em massa). Código: `lib/auth.ts`, `proxy.ts`, `app/api/auth/login/route.ts`. Testes: `auth.test.ts`.

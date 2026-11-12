@@ -26,9 +26,8 @@ export async function proxy(request: NextRequest) {
   }
 
   const token = request.cookies.get(COOKIE_NAME)?.value;
-  const appPassword = process.env.APP_PASSWORD;
 
-  if (!token || !appPassword || !(await verifyAuthToken(token, appPassword))) {
+  if (!token || !(await verifyAuthToken(token))) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("from", pathname);
     return NextResponse.redirect(loginUrl);
