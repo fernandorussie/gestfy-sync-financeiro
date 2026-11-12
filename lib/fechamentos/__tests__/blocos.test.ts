@@ -58,3 +58,26 @@ describe("Etapa B: catálogo de blocos", () => {
     expect(indisponiveis(null)).toEqual({});
   });
 });
+
+import { explicarErro } from "../erros";
+import { mesesComDados, regimesAnuais } from "../indicadores";
+
+describe("Revisão de UX", () => {
+  it("erros técnicos viram o que fazer", () => {
+    expect(explicarErro(new Error("GOOGLE_SERVICE_ACCOUNT_JSON não configurado")).titulo).toMatch(/conexão com o Google/);
+    expect(explicarErro(new Error("The caller does not have permission")).acao).toMatch(/leitor-planilhas@/);
+    expect(explicarErro(new Error("Quota exceeded (429)")).acao).toMatch(/minuto/);
+    const x = explicarErro(new Error("Cannot read properties of undefined (reading 'filter')"));
+    expect(x.titulo).toMatch(/Algo deu errado/);
+    expect(x.detalhe).toContain("Cannot read");
+  });
+  it("ano começa no primeiro mês com lançamento; mês vazio no meio é marcado", () => {
+    const z = { entradas: 0, saidasCaixa: 0, saidasCompetencia: 0 };
+    const linhas = [{ mes: "2026-01", ...z }, { mes: "2026-02", ...z }, { mes: "2026-03", entradas: 10, saidasCaixa: 5, saidasCompetencia: 5 }, { mes: "2026-04", ...z }, { mes: "2026-05", entradas: 20, saidasCaixa: 5, saidasCompetencia: 5 }];
+    expect(mesesComDados(linhas).map((l) => l.mes)).toEqual(["2026-03", "2026-04", "2026-05"]);
+    const reg = regimesAnuais(linhas);
+    expect(reg.linhas.map((l) => !!l.vazio)).toEqual([false, true, false]);
+    expect(reg.total.faturamento).toBe(30);
+    expect(mesesComDados([{ mes: "2026-01", ...z }])).toEqual([]);
+  });
+});

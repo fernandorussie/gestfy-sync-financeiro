@@ -6,6 +6,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { calcularFechamento, type ResultadoFechamento } from "@/lib/fechamentos/servidor";
 import { extrasDe, normalizarEstrutura, type ItemSecao } from "@/lib/fechamentos/estrutura";
+import { ErroAmigavel } from "../../(app)/fechamentos/_components/erro-amigavel";
 import { nomePeriodo } from "../../(app)/fechamentos/_components/formato";
 import { CSS, temAnalise } from "./relatorio";
 import { RelatorioEstruturado } from "./relatorio-estruturado";
@@ -28,19 +29,18 @@ export default async function FechamentoPdfPage({ params, searchParams }: { para
   const { id } = await params;
   const { analise: pedido, previa } = await searchParams;
   let r: ResultadoFechamento | null = null;
-  let erro = "";
+  let erro: unknown = null;
   try {
     r = await carregar(id);
   } catch (e) {
-    erro = e instanceof Error ? e.message : "Erro inesperado.";
+    erro = e;
   }
 
   if (!r) {
     return (
       <div className="mx-auto max-w-xl space-y-3 p-10">
         <h1 className="text-lg font-semibold">Não foi possível montar o relatório</h1>
-        <p className="text-sm">{erro}</p>
-        <Link href="/fechamentos" className="text-sm font-medium underline">Voltar aos fechamentos</Link>
+        <ErroAmigavel erro={erro} voltar={{ href: "/fechamentos", rotulo: "Voltar aos fechamentos" }} />
       </div>
     );
   }

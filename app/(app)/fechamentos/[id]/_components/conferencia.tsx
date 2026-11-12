@@ -126,7 +126,7 @@ export function Conferencia({ r, decidir, desfazer, irParaIndicadores, somenteLe
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-3">
+      {pendentes.length > 0 && <div className="grid gap-3 sm:grid-cols-3">
         {(["grave", "atencao", "info"] as Gravidade[]).map((g) => (
           <div key={g} className="rounded-lg border p-4">
             <p className="text-xs font-medium text-muted-foreground">{g === "grave" ? "Graves pendentes" : g === "atencao" ? "Atenção pendentes" : "Informativos"}</p>
@@ -134,10 +134,14 @@ export function Conferencia({ r, decidir, desfazer, irParaIndicadores, somenteLe
             <p className="text-xs text-muted-foreground">{g === "grave" ? "bloqueiam os indicadores" : g === "atencao" ? "podem seguir, viram pontos de atenção" : "para conhecimento"}</p>
           </div>
         ))}
-      </div>
+      </div>}
 
+      {/* Sem pendências: um bloco só, com o próximo passo (em vez de três zeros e um aviso). */}
       {pendentes.length === 0 && (
-        <div className="rounded-lg border p-5 text-sm">Nenhum alerta pendente.</div>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-emerald-300/60 bg-emerald-50 p-4 dark:border-emerald-900 dark:bg-emerald-950/30">
+          <p className="flex items-center gap-2 text-sm font-medium text-emerald-800 dark:text-emerald-300"><CheckCircle2 className="h-4 w-4" />Tudo certo na conferência: nenhum alerta pendente{decididos.length ? ` (${decididos.length} já ${decididos.length > 1 ? "decididos" : "decidido"})` : ""}.</p>
+          <Button onClick={irParaIndicadores}>Ver indicadores<ChevronRight /></Button>
+        </div>
       )}
 
       {pendentes.map((a) => (
@@ -171,12 +175,12 @@ export function Conferencia({ r, decidir, desfazer, irParaIndicadores, somenteLe
         </section>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4">
+      {pendentes.length > 0 && <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4">
         <p className="text-sm text-muted-foreground">
           {r.pendentesGraves ? `Decida ${r.pendentesGraves === 1 ? "o alerta grave" : `os ${r.pendentesGraves} alertas graves`} para liberar os indicadores.` : "Conferência liberada. Alertas de atenção abertos podem virar pontos de atenção no texto."}
         </p>
         <Button onClick={irParaIndicadores} disabled={r.pendentesGraves > 0}>Ver indicadores<ChevronRight /></Button>
-      </div>
+      </div>}
     </div>
   );
 }

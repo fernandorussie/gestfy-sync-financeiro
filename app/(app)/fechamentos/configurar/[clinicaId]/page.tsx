@@ -58,7 +58,7 @@ export default async function ConfigurarPage({ params, searchParams }: { params:
   const pronto = !!(fontesPadrao.vendas && fontesPadrao.despesas);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 p-6 md:p-8">
+    <div className="mx-auto max-w-6xl space-y-6 p-4 md:p-8">
       <div className="space-y-1">
         <p className="text-sm text-muted-foreground"><Link href="/fechamentos/clientes" className="hover:underline">Clientes e configurações</Link> / {clinica.nome}</p>
         <div className="flex flex-wrap items-center gap-3">

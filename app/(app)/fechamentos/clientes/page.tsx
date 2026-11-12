@@ -10,7 +10,7 @@ import { SEGMENTOS } from "@/lib/fechamentos/vocabulario";
 import { AvisoBanco } from "../_components/aviso-banco";
 import { dataBR } from "../_components/formato";
 
-const PADRAO = ["vendas", "despesas", "orcamentos", "leads", "nps"] as const;
+const PADRAO = ["vendas", "despesas", "entradas", "orcamentos", "leads", "nps"] as const;
 
 const SITUACAO: Record<SituacaoCliente, { rotulo: string; cor: string; Icone: typeof CircleCheck }> = {
   pronto: { rotulo: "Pronto para fechar", cor: "text-emerald-700 dark:text-emerald-400", Icone: CircleCheck },
@@ -51,7 +51,7 @@ function Tabela({ itens }: { itens: LinhaCliente[] }) {
                   {c.situacao.situacao === "pendente" && <span className="block text-xs text-muted-foreground">falta {c.situacao.faltando.join(" e ")}</span>}
                 </td>
                 <td className="px-3 py-3 text-xs text-muted-foreground">
-                  <span className="block"><b className="font-medium text-foreground">{c.padrao}</b> de 5 padrão</span>
+                  <span className="block"><b className="font-medium text-foreground">{c.padrao}</b> de {PADRAO.length} padrão</span>
                   <span className="block">{c.extras ? `${c.extras} personalizada${c.extras > 1 ? "s" : ""}` : "nenhuma personalizada"}</span>
                 </td>
                 <td className="px-3 py-3 text-xs text-muted-foreground">
@@ -105,7 +105,7 @@ export default async function ClientesPage() {
   const contagem = (s: SituacaoCliente) => ativos.filter((c) => c.situacao.situacao === s).length;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 p-6 md:p-8">
+    <div className="mx-auto max-w-6xl space-y-6 p-4 md:p-8">
       <div className="space-y-1">
         <p className="text-sm text-muted-foreground">Relatórios Financeiros</p>
         <h1 className="text-2xl font-semibold">Clientes e configurações</h1>

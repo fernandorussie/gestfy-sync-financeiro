@@ -534,6 +534,18 @@ export function variacao(atual: number | null | undefined, anterior: number | nu
   return atual / anterior - 1;
 }
 
+/** Mês sem nenhum lançamento (faturamento, entradas e despesas zerados). */
+export const mesVazio = (l: LinhaAnual) => !l.entradas && !l.recebido && !l.saidasCaixa && !l.saidasCompetencia;
+
+/**
+ * Meses para mostrar no ano: começa no primeiro mês com lançamento (antes disso
+ * a planilha ainda não existia; mostrar R$ 0 pareceria resultado real).
+ */
+export function mesesComDados(linhas: LinhaAnual[]): LinhaAnual[] {
+  const k = linhas.findIndex((l) => !mesVazio(l));
+  return k < 0 ? [] : linhas.slice(k);
+}
+
 export interface LinhaRegime {
   mes: string;
   faturamento: number;
@@ -551,13 +563,15 @@ export interface LinhaRegime {
  * Tabela "Caixa x competência" a partir do resumo anual. Aceita fechamentos
  * antigos (sem "recebido"): nesse caso o resultado é Faturamento x Despesas.
  */
-export function regimesAnuais(linhas: LinhaAnual[]): { real: boolean; linhas: LinhaRegime[]; total: Omit<LinhaRegime, "mes"> } {
-  const real = linhas.some((l) => l.recebido != null);
-  const out: LinhaRegime[] = linhas.map((l) => {
+export function regimesAnuais(todas: LinhaAnual[]): { real: boolean; linhas: (LinhaRegime & { vazio?: boolean })[]; total: Omit<LinhaRegime, "mes"> } {
+  const real = todas.some((l) => l.recebido != null);
+  const linhas = mesesComDados(todas);
+  const out: (LinhaRegime & { vazio?: boolean })[] = linhas.map((l) => {
     const base = real ? (l.recebido ?? 0) : l.entradas;
     return {
       mes: l.mes, faturamento: l.entradas, entradas: real ? (l.recebido ?? 0) : null, saidasCaixa: l.saidasCaixa,
       resultadoCaixa: centavos(base - l.saidasCaixa), despesasCompetencia: l.saidasCompetencia, resultadoCompetencia: centavos(l.entradas - l.saidasCompetencia),
+      ...(mesVazio(l) ? { vazio: true } : {}),
     };
   });
   const soma = (f: (l: LinhaRegime) => number) => centavos(out.reduce((s, l) => s + f(l), 0));

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ordemAlfabetica, rotuloResultado, type GrupoDespesa, type ItemContagem } from "@/lib/fechamentos/indicadores";
+import { mesesComDados, ordemAlfabetica, rotuloResultado, type GrupoDespesa, type ItemContagem } from "@/lib/fechamentos/indicadores";
 import type { ResultadoFechamento } from "@/lib/fechamentos/servidor";
 import { cap } from "@/lib/fechamentos/vocabulario";
 import { brl, brl0, dataBR, mesAbrev, nomePeriodo, num, pct } from "../../(app)/fechamentos/_components/formato";
@@ -114,8 +114,9 @@ export function Linhas({ itens }: { itens: { nome: string; valor: ReactNode; des
     </table>
   );
 }
+/** "Não informado" vai sempre por último. */
 export const contagens = (xs: ItemContagem[], n: number, semNaoInformado = false) =>
-  xs.filter((x) => !semNaoInformado || x.nome !== "Não informado").slice(0, n).map((x) => ({ nome: x.nome, valor: num(x.quantidade) }));
+  [...xs.filter((x) => x.nome !== "Não informado"), ...xs.filter((x) => !semNaoInformado && x.nome === "Não informado")].slice(0, n).map((x) => ({ nome: x.nome, valor: num(x.quantidade) }));
 
 export const th = "py-1.5 text-[9.5px] font-semibold uppercase tracking-wide";
 export const td = "py-[4px] tabular-nums";
@@ -134,7 +135,7 @@ export function Cabecalho({ colunas, cor = ROXO }: { colunas: { t: string; dir?:
 
 /** Linhas compactas: faturamento e despesas pagas, mês a mês no ano. */
 function GraficoLinhas({ r }: { r: ResultadoFechamento }) {
-  const meses = r.anual;
+  const meses = mesesComDados(r.anual);
   const real = meses.some((l) => l.recebido != null);
   const max = Math.max(1, ...meses.map((l) => Math.max(l.entradas, l.saidasCaixa, l.recebido ?? 0)));
   const W = 640, H = 150, L = 22, R = 22, T = 18, B = 20, passo = (W - L - R) / Math.max(1, meses.length - 1);
@@ -496,7 +497,7 @@ function TabelaRegime({ r, regime }: { r: ResultadoFechamento; regime: "caixa" |
   const k = regime === "caixa" ? "saidasCaixa" : "saidasCompetencia";
   const real = regime === "caixa" && r.anual.some((l) => l.recebido != null);
   // Caixa com fonte de Entradas: recebido. Sem ela (ou na competência): faturamento.
-  const linhas = r.anual.map((l) => ({ ...l, entradas: real ? (l.recebido ?? 0) : l.entradas }));
+  const linhas = mesesComDados(r.anual).map((l) => ({ ...l, entradas: real ? (l.recebido ?? 0) : l.entradas }));
   const soma = (f: (l: (typeof linhas)[number]) => number) => linhas.reduce((s, l) => s + f(l), 0);
   return (
     <table className="w-full text-[10.5px]">

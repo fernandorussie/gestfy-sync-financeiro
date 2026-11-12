@@ -2,6 +2,7 @@ export const revalidate = 0;
 export const maxDuration = 60;
 
 import Link from "next/link";
+import { explicarErro } from "@/lib/fechamentos/erros";
 import { History } from "lucide-react";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { dadosDaBase } from "@/lib/fechamentos/servidor";
@@ -33,12 +34,12 @@ export default async function ComparativosPage({ searchParams }: { searchParams:
     <div className="space-y-1">
       <p className="text-sm text-muted-foreground">Relatórios Financeiros</p>
       <h1 className="text-2xl font-semibold">Comparativos{clinica ? ` · ${clinica.nome}` : ""}</h1>
-      <p className="text-sm text-muted-foreground">Evolução de um cliente ao longo dos meses, calculada das planilhas do cliente; meses com fechamento concluído usam os números do fechamento. A comparação entre clientes (benchmarking) virá numa próxima etapa.</p>
+      <p className="text-sm text-muted-foreground">Evolução de um cliente ao longo dos meses, calculada das planilhas do cliente; meses com fechamento concluído usam os números do fechamento.</p>
     </div>
   );
   if (!clinica) {
     return (
-      <div className="mx-auto max-w-6xl space-y-6 p-6 md:p-8">
+      <div className="mx-auto max-w-6xl space-y-6 p-4 md:p-8">
         {cabecalho}
         <div className="rounded-lg border bg-card p-5">
           {clientes.length ? <SeletorCliente clientes={clientes} atual="" /> : <p className="text-sm text-muted-foreground">Nenhum cliente com as planilhas de vendas e despesas configuradas. Configure em <Link href="/fechamentos/clientes" className="underline">Clientes e configurações</Link>.</p>}
@@ -72,20 +73,20 @@ export default async function ComparativosPage({ searchParams }: { searchParams:
   }
 
   // Meses sem fechamento vêm direto das planilhas do cliente.
-  const base = await dadosDaBase(clinicaId, 24).catch((e: unknown) => ({ meses: [], ano: null, erro: e instanceof Error ? e.message : "Erro ao ler as planilhas." }));
+  const base = await dadosDaBase(clinicaId, 24).catch((e: unknown) => { const x = explicarErro(e); return { meses: [], ano: null, erro: `${x.titulo} ${x.acao}` }; });
 
   const vocab = vocabularioDe(limparFicha(((config as { ficha?: unknown } | null)?.ficha ?? {}) as Partial<FichaClinica>));
   const rotulos = { atendidos: `${cap(vocab.clientes)} atendidos`, novos: `${cap(vocab.clientes)} novos` };
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 p-6 md:p-8">
+    <div className="mx-auto max-w-6xl space-y-6 p-4 md:p-8">
       <div className="flex flex-wrap items-end justify-between gap-3">
         {cabecalho}
         <Link href={`/fechamentos/historico?cliente=${clinicaId}`} className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-muted"><History className="h-4 w-4" />Histórico deste cliente</Link>
       </div>
       <div className="rounded-lg border bg-card p-4"><SeletorCliente clientes={clientes} atual={clinicaId} /></div>
       {error && <div className="rounded-md border border-destructive/40 bg-destructive/5 p-4 text-sm"><b>Não foi possível ler o banco de dados:</b> {error.message}</div>}
-      {base.erro && <div className="rounded-md border border-amber-400/60 bg-amber-50 p-4 text-sm dark:bg-amber-950/30"><b>Não foi possível ler as planilhas do cliente:</b> {base.erro} <span className="text-muted-foreground">Os comparativos mostram só os meses com fechamento.</span></div>}
+      {base.erro && <div className="rounded-lg border border-amber-400/60 bg-amber-50 p-4 text-sm dark:bg-amber-950/30" role="alert"><b className="font-medium">Não foi possível ler as planilhas do cliente.</b> {base.erro} <span className="block text-muted-foreground">Enquanto isso, os comparativos mostram só os meses com fechamento concluído.</span></div>}
       <ComparativosView key={clinicaId} series={seriesComparativas(periodos, 24, base.meses)} ano={base.ano ?? anoCaixaCompetencia(periodos)} rotulos={rotulos} />
     </div>
   );

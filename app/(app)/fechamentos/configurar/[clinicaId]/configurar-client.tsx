@@ -61,7 +61,7 @@ export function CorpoFontePadrao({ f, cfg, onChange, onEstado }: { f: (typeof FO
       </div>
       <div className="flex flex-wrap items-center gap-3">
         <Button size="sm" variant="outline" onClick={testar} disabled={testando || !cfg.sheetId || !cfg.aba}>
-          {testando ? <Loader2 className="animate-spin" /> : <PlayCircle />}Testar leitura
+          {testando ? <Loader2 className="animate-spin" /> : <PlayCircle />}{testando ? "Lendo…" : "Testar leitura"}
         </Button>
         {teste?.erro && <span className="flex items-center gap-1.5 text-sm text-destructive"><XCircle className="h-4 w-4" />{teste.erro}</span>}
         {teste && !teste.erro && teste.leitura && (

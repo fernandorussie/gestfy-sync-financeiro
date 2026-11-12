@@ -99,7 +99,7 @@ export function FontesDados({ clinicaId, padraoInicial, extrasIniciais, destinos
           {configuradas} {configuradas === 1 ? "fonte configurada" : "fontes configuradas"}. Cada planilha precisa estar compartilhada, como Leitor, com a conta de serviço do app. O app só lê as colunas que usa.
         </p>
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" onClick={testarTodas} disabled={testando}>{testando ? <Loader2 className="animate-spin" /> : <RefreshCw />}Testar todas</Button>
+          <Button size="sm" variant="outline" onClick={testarTodas} disabled={testando}>{testando ? <Loader2 className="animate-spin" /> : <RefreshCw />}{testando ? "Lendo as planilhas…" : "Testar todas"}</Button>
           <Button size="sm" variant="outline" onClick={() => { const n = novaFonte(); alterarExtras([...extras, n]); setAbertos((a) => new Set(a).add(n.id)); }} disabled={extras.length >= 12}><Plus />Fonte personalizada</Button>
         </div>
       </div>
@@ -129,7 +129,7 @@ export function FontesDados({ clinicaId, padraoInicial, extrasIniciais, destinos
       </ul>
 
       <div className="sticky bottom-0 -mx-1 flex items-center justify-end gap-3 border-t bg-background/95 px-1 py-3 backdrop-blur">
-        {mudou && <span className="text-sm text-amber-700 dark:text-amber-400">Alterações não salvas</span>}
+        <span className={`text-xs ${mudou ? "font-medium text-amber-700 dark:text-amber-400" : "text-muted-foreground"}`} aria-live="polite">{mudou ? "Alterações não salvas" : "Sem alterações"}</span>
         <Button onClick={salvar} disabled={salvando || !mudou}>{salvando ? <Loader2 className="animate-spin" /> : <Save />}Salvar fontes</Button>
       </div>
     </div>

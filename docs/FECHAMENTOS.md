@@ -281,3 +281,28 @@ Testes: 227 passando (novo `etapa-a.test.ts`).
 - **Pacote do Claude**: seção "Definições dos indicadores" gerada do catálogo (fonte e regra de cada indicador com dados), marca `[PDF]` no que está no relatório do cliente e lista o que não tem dados ("não comente nem estime").
 
 Testes: 235 passando (novo `blocos.test.ts`).
+
+## Etapa v3.6 — revisão de UX/UI (12/11)
+
+Revisão: https://claude.ai/artifact/HEsG6HVrNWEJuBJCW6uCCK. Aprovada inteira (pacotes 1 → 2 → 3; Histórico com linha clicável + PDF + menu "⋯"; tabelas longas com as 10 maiores + "ver todas"). Nenhum cálculo, fonte ou PDF entregue mudou.
+
+**Pacote 1 — uso real**
+- Celular e tablet (abaixo de 1024 px): o menu lateral vira gaveta (`components/menu-movel.tsx`), com barra no topo, fecha ao navegar, com Esc ou tocando fora. Vale para todo o GestfySync de testes (o layout é compartilhado).
+- Telas de carregamento (`loading.tsx`) no painel, fechamento, Histórico, Comparativos, Clientes, configuração e PDF, com o que está acontecendo ("Lendo as planilhas do cliente…"). Botões de leitura mostram "Lendo…".
+- Erros em linguagem do usuário (`lib/fechamentos/erros.ts` + `ErroAmigavel`): o que aconteceu e o que fazer; texto técnico em "Ver detalhes".
+- Ano começa no primeiro mês com lançamento (`mesesComDados`) no gráfico e na Caixa x competência (tela e PDF); mês vazio no meio aparece como "sem lançamentos neste mês".
+
+**Pacote 2 — clareza**
+- Indicadores: índice fixo de seções; Receitas abre com as 10 maiores categorias (+ linha "Outras N"); Despesas mostra todos os grupos e as 10 maiores categorias; "Ver todas".
+- Experiência na tela igual ao PDF (um card por informação, Google incluso).
+- Clientes: contagem "de 6 padrão" (Entradas incluída).
+- Histórico: linha inteira abre o fechamento; ações = PDF + menu "⋯" (Conferência, Indicadores, Análise, Texto e entrega); competência em lista de meses.
+- Fechamento concluído: Análise aparece como texto lido, sem ajudas de edição.
+- Comparativos sem texto de planos futuros; largura e espaçamento das páginas padronizados.
+
+**Pacote 3 — polimento**
+- Textos de apoio do editor com 12 px; "Sem alterações" / "Alterações não salvas" ao lado de Salvar fontes, perfil e estrutura.
+- Conferência sem alertas: um bloco só ("Tudo certo") com o botão para os indicadores.
+- "Não informado" sempre por último e em cinza (tela e PDF).
+
+Testes: 237 passando.

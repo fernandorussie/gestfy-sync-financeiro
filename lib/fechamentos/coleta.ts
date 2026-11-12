@@ -91,10 +91,11 @@ export async function coletar(fontes: FontesFechamento, ler: LerPlanilha): Promi
   return res;
 }
 
+import { explicarErro } from "./erros";
+
 export function mensagemDeErro(e: unknown): string {
   const msg = e instanceof Error ? e.message : String(e);
-  if (/permission|403|forbidden/i.test(msg)) return "Sem permissão. Compartilhe a planilha com o e-mail da conta de serviço, como Leitor.";
   if (/unable to parse range|400/i.test(msg)) return "Aba não encontrada. Confira o nome exato da aba na configuração do cliente.";
-  if (/not found|404/i.test(msg)) return "Planilha não encontrada. Confira o link na configuração do cliente.";
-  return `Não foi possível ler a planilha: ${msg}`;
+  const x = explicarErro(e);
+  return x.titulo.startsWith("Algo deu errado") ? `Não foi possível ler a planilha (${msg}).` : `${x.titulo} ${x.acao}`;
 }

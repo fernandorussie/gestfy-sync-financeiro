@@ -1,7 +1,8 @@
 export const revalidate = 0;
 
 import Link from "next/link";
-import { FileDown, LineChart } from "lucide-react";
+import { FileDown, LineChart, MoreHorizontal } from "lucide-react";
+import { LinhaClicavel } from "./linha-clicavel";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { StatusFechamento } from "../_components/status";
 import { brl0, dataBR, nomePeriodo } from "../_components/formato";
@@ -10,6 +11,9 @@ type Linha = {
   id: string; clinica_id: string; tipo: "mensal" | "quinzenal"; inicio: string; fim: string;
   status: "conferencia" | "analise" | "concluido" | "enviado"; versao: number; indicadores: unknown; atualizado_em: string;
 };
+
+const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+const nomeMesAno = (m: string) => `${MESES[Number(m.slice(5, 7)) - 1]}/${m.slice(0, 4)}`;
 
 const STATUS = [["", "Todas"], ["andamento", "Em andamento"], ["concluido", "Concluídos"], ["enviado", "Enviados"]] as const;
 
@@ -43,13 +47,16 @@ export default async function HistoricoPage({ searchParams }: { searchParams: Pr
   }
   const linhas = [...grupos.values()].flatMap((g) => (versoes ? g.map((l, n) => ({ linha: l, outras: 0, antiga: n > 0 })) : [{ linha: g[0], outras: g.length - 1, antiga: false }]));
   const anoAtual = new Date().getFullYear();
+  // Competências dos últimos 24 meses (o campo de mês do navegador aparece como "--------- ----" quando vazio).
+  const hoje = new Date();
+  const mesesRecentes = Array.from({ length: 24 }, (_, k) => { const d = new Date(Date.UTC(hoje.getFullYear(), hoje.getMonth() - k, 1)); return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`; });
   const campo = "h-9 rounded-md border border-input bg-background px-3 text-sm";
   const filtrado = !!(sp.cliente || sp.tipo || sp.status || sp.ano || sp.mes || versoes);
   const clienteNome = sp.cliente ? nome.get(sp.cliente) : undefined;
-  const link = (id: string, etapa: string, rotulo: string) => <Link href={`/fechamentos/${id}?etapa=${etapa}`} className="rounded px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-muted hover:text-foreground">{rotulo}</Link>;
+  const link = (id: string, etapa: string, rotulo: string) => <Link href={`/fechamentos/${id}?etapa=${etapa}`} className="block rounded px-3 py-1.5 text-sm hover:bg-muted">{rotulo}</Link>;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 p-6 md:p-8">
+    <div className="mx-auto max-w-6xl space-y-6 p-4 md:p-8">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="space-y-1">
           <p className="text-sm text-muted-foreground">Relatórios Financeiros</p>
@@ -67,7 +74,10 @@ export default async function HistoricoPage({ searchParams }: { searchParams: Pr
           </select>
         </label>
         <label className="flex flex-col gap-1.5 text-sm font-medium">Competência
-          <input type="month" name="mes" defaultValue={sp.mes ?? ""} className={campo} />
+          <select name="mes" defaultValue={sp.mes ?? ""} className={campo}>
+            <option value="">Todas</option>
+            {mesesRecentes.map((m) => <option key={m} value={m}>{nomeMesAno(m)}</option>)}
+          </select>
         </label>
         <label className="flex flex-col gap-1.5 text-sm font-medium">Ano
           <select name="ano" defaultValue={sp.ano ?? ""} className={campo}><option value="">Todos</option>{[0, 1, 2].map((d) => <option key={d} value={anoAtual - d}>{anoAtual - d}</option>)}</select>
@@ -92,14 +102,14 @@ export default async function HistoricoPage({ searchParams }: { searchParams: Pr
               <tr>
                 <th className="px-4 py-2 font-medium">Cliente</th><th className="px-3 py-2 font-medium">Competência</th><th className="px-3 py-2 font-medium">Situação</th>
                 <th className="px-3 py-2 text-right font-medium">Faturamento</th><th className="px-3 py-2 text-right font-medium">Resultado</th>
-                <th className="px-3 py-2 font-medium">Atualizado</th><th className="px-4 py-2 font-medium">Abrir</th>
+                <th className="px-3 py-2 font-medium">Atualizado</th><th className="px-4 py-2 font-medium"><span className="sr-only">Ações</span></th>
               </tr>
             </thead>
             <tbody>
               {linhas.map(({ linha: f, outras, antiga }) => {
                 const ind = f.indicadores as { faturamento?: { total: number }; caixa?: { resultado: number } } | null;
                 return (
-                  <tr key={f.id} className={`border-b align-top last:border-0 hover:bg-muted/50 ${antiga ? "text-muted-foreground" : ""}`}>
+                  <LinhaClicavel key={f.id} href={`/fechamentos/${f.id}`} className={`border-b align-top last:border-0 hover:bg-muted/50 ${antiga ? "text-muted-foreground" : ""}`}>
                     <td className="px-4 py-2.5"><Link href={`/fechamentos/historico?cliente=${f.clinica_id}`} className="hover:underline">{nome.get(f.clinica_id) ?? "—"}</Link></td>
                     <td className="px-3 py-2.5"><Link href={`/fechamentos/${f.id}`} className="font-medium hover:underline">{f.tipo === "mensal" ? "Mensal" : "Quinzenal"} · {nomePeriodo(f.tipo, f.inicio, f.fim)}</Link></td>
                     <td className="px-3 py-2.5">
@@ -111,12 +121,17 @@ export default async function HistoricoPage({ searchParams }: { searchParams: Pr
                     <td className={`px-3 py-2.5 text-right tabular-nums ${(ind?.caixa?.resultado ?? 0) < 0 ? "text-red-600 dark:text-red-400" : ""}`}>{brl0(ind?.caixa?.resultado)}</td>
                     <td className="px-3 py-2.5 text-muted-foreground">{dataBR(f.atualizado_em)}</td>
                     <td className="px-4 py-2">
-                      <span className="flex flex-wrap items-center gap-0.5">
-                        {link(f.id, "conferencia", "Conferência")}{link(f.id, "indicadores", "Indicadores")}{link(f.id, "analise", "Análise")}{link(f.id, "entrega", "Texto")}
-                        <a href={`/fechamentos-pdf/${f.id}`} target="_blank" rel="noopener noreferrer" className="ml-1 inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium hover:bg-muted"><FileDown className="h-3.5 w-3.5" />PDF</a>
+                      <span className="flex items-center gap-1">
+                        <a href={`/fechamentos-pdf/${f.id}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium hover:bg-muted"><FileDown className="h-3.5 w-3.5" />PDF</a>
+                        <details className="relative">
+                          <summary className="flex cursor-pointer list-none items-center rounded-md border p-1 hover:bg-muted [&::-webkit-details-marker]:hidden" aria-label="Abrir uma etapa"><MoreHorizontal className="h-4 w-4" /></summary>
+                          <div className="absolute right-0 z-20 mt-1 w-40 rounded-md border bg-popover py-1 shadow-md">
+                            {link(f.id, "conferencia", "Conferência")}{link(f.id, "indicadores", "Indicadores")}{link(f.id, "analise", "Análise")}{link(f.id, "entrega", "Texto e entrega")}
+                          </div>
+                        </details>
                       </span>
                     </td>
-                  </tr>
+                  </LinhaClicavel>
                 );
               })}
             </tbody>

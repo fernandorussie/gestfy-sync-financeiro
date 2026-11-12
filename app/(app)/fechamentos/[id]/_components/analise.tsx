@@ -22,6 +22,13 @@ const SECOES: { chave: keyof SecoesTexto; titulo: string; ajuda: string; linhas:
 
 const campo = "w-full rounded-md border border-input bg-background px-3 py-2 text-sm leading-relaxed disabled:opacity-70";
 
+/** Fechamento concluído: o texto aparece como texto, não como formulário vazio. */
+function Leitura({ valor, vazio = "Nada registrado neste fechamento." }: { valor: string; vazio?: string }) {
+  return valor.trim()
+    ? <p className="whitespace-pre-wrap rounded-md bg-muted/40 px-3 py-2 text-sm leading-relaxed">{valor}</p>
+    : <p className="text-sm text-muted-foreground">{vazio}</p>;
+}
+
 function Responsaveis({ valor, equipe, onChange, desabilitado, id }: { valor: string[]; equipe: string[]; onChange: (v: string[]) => void; desabilitado: boolean; id: string }) {
   const [novo, setNovo] = useState("");
   const adicionar = (nome: string) => {
@@ -75,10 +82,14 @@ export function Analise({ r, estado, mudar, desabilitado }: { r: ResultadoFecham
       <div className="grid gap-5 lg:grid-cols-2">
         <section className="space-y-2 rounded-lg border bg-card p-4">
           <h2 className="text-sm font-semibold">Contexto do período</h2>
-          <p className="text-xs text-muted-foreground">O que as planilhas não mostram: ausências, campanhas, pedidos do cliente. Um tópico por linha. Serve de apoio para escrever o texto.</p>
-          <textarea className={campo} rows={6} value={texto.contexto} disabled={desabilitado} aria-label="Contexto do período"
-            placeholder={"- Black Week em novembro com foco em estética\n- Recepcionista de férias na segunda quinzena"}
-            onChange={(e) => mudar({ ...estado, texto: { ...texto, contexto: e.target.value } })} />
+          {desabilitado ? <Leitura valor={texto.contexto} /> : (
+            <>
+              <p className="text-xs text-muted-foreground">O que as planilhas não mostram: ausências, campanhas, pedidos do cliente. Um tópico por linha. Serve de apoio para escrever o texto.</p>
+              <textarea className={campo} rows={6} value={texto.contexto} aria-label="Contexto do período"
+                placeholder={"- Black Week em novembro com foco em estética\n- Recepcionista de férias na segunda quinzena"}
+                onChange={(e) => mudar({ ...estado, texto: { ...texto, contexto: e.target.value } })} />
+            </>
+          )}
         </section>
         <section className="space-y-3 rounded-lg border bg-card p-4">
           <h2 className="text-sm font-semibold">Ações do fechamento anterior</h2>
@@ -113,12 +124,14 @@ export function Analise({ r, estado, mudar, desabilitado }: { r: ResultadoFecham
         </div>
         {SECOES.map((s) => (
           <label key={s.chave} className="block space-y-1.5">
-            <span className="flex flex-wrap items-baseline justify-between gap-2"><span className="text-sm font-semibold">{s.titulo}</span><span className="text-xs text-muted-foreground">{s.ajuda}</span></span>
-            <textarea className={campo} rows={s.linhas} value={texto[s.chave]} disabled={desabilitado}
-              onChange={(e) => mudar({ ...estado, texto: { ...texto, [s.chave]: e.target.value } })} />
+            <span className="flex flex-wrap items-baseline justify-between gap-2"><span className="text-sm font-semibold">{s.titulo}</span>{!desabilitado && <span className="text-xs text-muted-foreground">{s.ajuda}</span>}</span>
+            {desabilitado ? <Leitura valor={texto[s.chave]} /> : (
+              <textarea className={campo} rows={s.linhas} value={texto[s.chave]}
+                onChange={(e) => mudar({ ...estado, texto: { ...texto, [s.chave]: e.target.value } })} />
+            )}
           </label>
         ))}
-        <p className="text-xs text-muted-foreground">O rascunho automático usa só os números e as decisões da conferência. Para uma análise com o contexto do cliente, use “Análise com o Claude”, acima.</p>
+        {!desabilitado && <p className="text-xs text-muted-foreground">O rascunho automático usa só os números e as decisões da conferência. Para uma análise com o contexto do cliente, use “Análise com o Claude”, acima.</p>}
       </section>
 
       <section className="space-y-4 rounded-lg border bg-card p-4">
@@ -126,7 +139,7 @@ export function Analise({ r, estado, mudar, desabilitado }: { r: ResultadoFecham
           <h2 className="text-sm font-semibold">Plano de ação</h2>
           {!desabilitado && <Button size="sm" variant="outline" onClick={novaAcao}><Plus />Adicionar ação</Button>}
         </div>
-        {acoes.length === 0 && <p className="text-sm text-muted-foreground">Nenhuma ação ainda. Os reports da Gestfy costumam ter 4.</p>}
+        {acoes.length === 0 && <p className="text-sm text-muted-foreground">{desabilitado ? "Nenhuma ação registrada neste fechamento." : "Nenhuma ação ainda. Os reports da Gestfy costumam ter 4."}</p>}
         {acoes.map((a, i) => (
           <div key={a.id} className="grid grid-cols-[28px_1fr] gap-3 border-t pt-4 first:border-0 first:pt-0">
             <span className="grid h-7 w-7 place-items-center rounded-full bg-secondary text-xs font-bold text-secondary-foreground">{i + 1}</span>

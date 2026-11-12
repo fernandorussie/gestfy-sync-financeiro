@@ -155,7 +155,7 @@ export function EstruturaRelatorioCard({ clinicaId, inicial, extrasFontes = [], 
                               : <input type="checkbox" className="mt-1" checked={ligados.has(b.id)} onChange={(e) => alternarBloco(k, b.id, e.target.checked)} />}
                             <span>
                               {b.rotulo}
-                              <span className="block text-[11px] text-muted-foreground">{motivo ? `Sem dados: ${motivo}` : b.fonte}</span>
+                              <span className="block text-xs text-muted-foreground">{motivo ? `Sem dados: ${motivo}` : b.fonte}</span>
                             </span>
                           </label>
                         </li>
@@ -190,15 +190,15 @@ export function EstruturaRelatorioCard({ clinicaId, inicial, extrasFontes = [], 
               </div>
             ))}
           </div>
-          <p className="text-[11px] text-muted-foreground">No papel, o que não cabe numa folha continua na seguinte, sem cortar cards nem linhas. A análise só aparece quando o fechamento tem texto ou plano de ação; Entradas detalhadas, só com a fonte de Entradas.</p>
+          <p className="text-xs text-muted-foreground">No papel, o que não cabe numa folha continua na seguinte, sem cortar cards nem linhas. A análise só aparece quando o fechamento tem texto ou plano de ação; Entradas detalhadas, só com a fonte de Entradas.</p>
           {exemplo ? (
             <a href={`/fechamentos-pdf/${exemplo.id}?previa=${codificar(itens)}`} target="_blank" rel="noopener noreferrer"
               className="inline-flex w-full items-center justify-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-muted">
               <ExternalLink className="h-4 w-4" />Ver PDF de exemplo
             </a>
-          ) : <p className="text-[11px] text-muted-foreground">O PDF de exemplo aparece depois do primeiro fechamento {tipo} deste cliente.</p>}
-          {exemplo && <p className="text-[11px] text-muted-foreground">Usa os dados de {exemplo.rotulo} e esta estrutura, mesmo sem salvar.</p>}
-          {semIndicadores && <p className="text-[11px] text-muted-foreground">Os itens sem dados na fonte aparecem depois do primeiro fechamento.</p>}
+          ) : <p className="text-xs text-muted-foreground">O PDF de exemplo aparece depois do primeiro fechamento {tipo} deste cliente.</p>}
+          {exemplo && <p className="text-xs text-muted-foreground">Usa os dados de {exemplo.rotulo} e esta estrutura, mesmo sem salvar.</p>}
+          {semIndicadores && <p className="text-xs text-muted-foreground">Os itens sem dados na fonte aparecem depois do primeiro fechamento.</p>}
         </div>
       </div>
 
@@ -222,7 +222,8 @@ export function EstruturaRelatorioCard({ clinicaId, inicial, extrasFontes = [], 
 
       <div className="flex flex-wrap justify-between gap-2">
         <Button variant="outline" size="sm" disabled={ehPadrao(itens, tipo, extras)} onClick={() => definir(estruturaPadrao(tipo, extras))}><RotateCcw />Voltar ao padrão Gestfy</Button>
-        <Button onClick={salvar} disabled={salvando || !mudou}>{salvando ? <Loader2 className="animate-spin" /> : <Save />}Salvar estrutura</Button>
+        <span className="flex items-center gap-3"><span className={`text-xs ${mudou ? "font-medium text-amber-700 dark:text-amber-400" : "text-muted-foreground"}`} aria-live="polite">{mudou ? "Alterações não salvas" : "Sem alterações"}</span>
+          <Button onClick={salvar} disabled={salvando || !mudou}>{salvando ? <Loader2 className="animate-spin" /> : <Save />}Salvar estrutura</Button></span>
       </div>
     </section>
   );

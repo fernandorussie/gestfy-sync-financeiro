@@ -97,7 +97,7 @@ export default async function FechamentosPage({ searchParams }: { searchParams: 
   const naoProntos = lista.length - resumo.prontos;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 p-6 md:p-8">
+    <div className="mx-auto max-w-6xl space-y-6 p-4 md:p-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-1">
           <p className="text-sm text-muted-foreground">Relatórios Financeiros</p>

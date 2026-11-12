@@ -103,7 +103,7 @@ export function FechamentoClient({ inicial, etapaInicial }: { inicial: Resultado
   const atual = bloqueado ? "conferencia" : aba;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 p-6 md:p-8">
+    <div className="mx-auto max-w-6xl space-y-6 p-4 md:p-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-1">
           <p className="text-sm text-muted-foreground">
@@ -131,7 +131,7 @@ export function FechamentoClient({ inicial, etapaInicial }: { inicial: Resultado
               </span>
             </label>
             <Button size="sm" variant="outline" onClick={lerDeNovo} disabled={ocupado}>
-              {ocupado ? <Loader2 className="animate-spin" /> : <RefreshCw />}Ler de novo
+              {ocupado ? <Loader2 className="animate-spin" /> : <RefreshCw />}{ocupado ? "Lendo…" : "Ler de novo"}
             </Button>
           </div>
         )}

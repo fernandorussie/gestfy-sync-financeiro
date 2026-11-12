@@ -139,6 +139,6 @@ describe("compatibilidade", () => {
     const semData = await lerFontePersonalizada(antiga, async () => [["Nome", "Valor"], ["a", 1]]);
     expect(semData.erro).toContain("Coluna não encontrada: Data");
     const semAcesso = await lerFontePersonalizada(antiga, async () => { throw new Error("The caller does not have permission (403)"); });
-    expect(semAcesso.erro).toContain("Sem permissão");
+    expect(semAcesso.erro).toContain("Compartilhe a planilha com leitor-planilhas@");
   });
 });

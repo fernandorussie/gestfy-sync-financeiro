@@ -133,7 +133,8 @@ export function FichaClinicaCard({ clinicaId, clinicaNome, inicial }: { clinicaI
         ))}
       </div>
       <p className="text-xs text-muted-foreground">Não registre dados pessoais dos clientes dele aqui.</p>
-      <div className="flex justify-end">
+      <div className="flex items-center justify-end gap-3">
+        <span className={`text-xs ${mudou ? "font-medium text-amber-700 dark:text-amber-400" : "text-muted-foreground"}`} aria-live="polite">{mudou ? "Alterações não salvas" : "Sem alterações"}</span>
         <Button onClick={salvar} disabled={salvando || !mudou}>{salvando ? <Loader2 className="animate-spin" /> : <Save />}Salvar perfil</Button>
       </div>
     </section>
