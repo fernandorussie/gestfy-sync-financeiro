@@ -315,3 +315,9 @@ Testes: 237 passando.
 - Os dois perfis têm o mesmo acesso às telas. O perfil aparece no rodapé do menu.
 - Cookie assinado (HMAC) com o perfil, 30 dias. Trocar a senha de um perfil derruba as sessões dele; cookies antigos (só senha) continuam valendo como admin.
 - Cada erro de login espera 0,6 s (dificulta tentativas em massa). Código: `lib/auth.ts`, `proxy.ts`, `app/api/auth/login/route.ts`. Testes: `auth.test.ts`.
+
+## PDF de exemplo sempre disponível no editor (12/11)
+
+- Com fechamento do tipo (mensal/quinzenal): usa o mais recente, como antes.
+- Sem fechamento, mas com vendas e despesas configuradas: `/fechamentos-pdf/exemplo?cliente=<id>&tipo=<tipo>&previa=…` lê as planilhas do último período (mês anterior; quinzenal = 1–15 do mês, ou do mês anterior até o dia 15) e monta o PDF sem salvar nada (`calcularExemplo` em `servidor.ts`).
+- Sem vendas e despesas: o editor mostra o aviso com link para Fontes de dados.

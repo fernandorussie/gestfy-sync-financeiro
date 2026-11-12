@@ -191,7 +191,43 @@ export async function calcularFechamento(id: string, opcoes: { releitura?: boole
   return { ...comuns, ...retrato, ritmo: retrato.ritmo ?? null, personalizadas: retrato.personalizadas ?? [], pendentesGraves: gravesPendentes(retrato.alertas, decisoes).length, congelado: false };
 }
 
-/** Lê as planilhas (ou o cache) e calcula alertas, indicadores, período anterior e ano. */
+/**
+ * PDF de exemplo para o editor de Estrutura quando o cliente ainda não tem
+ * fechamento daquele tipo: lê as planilhas do último período fechado (mês
+ * anterior; quinzenal = 1–15 do mês, ou do mês anterior antes do dia 16) e
+ * monta o relatório sem salvar nada.
+ */
+export async function calcularExemplo(clinicaId: string, tipo: "mensal" | "quinzenal"): Promise<ResultadoFechamento> {
+  const db = getSupabaseAdmin();
+  const [{ data: clinica }, { data: config }] = await Promise.all([
+    db.from("clinicas").select("nome").eq("id", clinicaId).maybeSingle(),
+    db.from("fechamento_config").select("*").eq("clinica_id", clinicaId).maybeSingle(),
+  ]);
+  if (!clinica) throw new Error("Fechamento não encontrado.");
+  const fontes = (config?.fontes ?? {}) as unknown as FontesFechamento;
+  if (!config || !fontes.vendas || !fontes.despesas) throw new Error("Configure as fontes de vendas e despesas deste cliente para ver o PDF de exemplo.");
+  const hoje = new Date();
+  const ref = new Date(hoje.getFullYear(), hoje.getMonth() - (tipo === "mensal" || hoje.getDate() <= 15 ? 1 : 0), 1);
+  const mes = `${ref.getFullYear()}-${String(ref.getMonth() + 1).padStart(2, "0")}`;
+  const p = periodoDe(mes, tipo);
+  const agora = hoje.toISOString();
+  const f = {
+    id: "exemplo", clinica_id: clinicaId, tipo, inicio: p.inicio, fim: p.fim, status: "conferencia", versao: 1,
+    decisoes: null, texto: null, acoes: null, acompanhamento: null, snapshot: null, indicadores: null, alertas: null,
+    criado_em: agora, atualizado_em: agora, calculado_em: null,
+  } as unknown as Fechamento;
+  const decisoes = lerDecisoes(null);
+  const ficha = limparFicha((config.ficha ?? {}) as Partial<FichaClinica>);
+  const retrato = await calcularRetrato(f, config, decisoes, false);
+  return {
+    fechamento: f, clinicaNome: clinica.nome ?? "", periodo: p, decisoes,
+    texto: textoVazio(), acoes: [], acompanhamento: [], equipe: lista<string>(config.equipe), ficha, vocab: vocabularioDe(ficha), iaLigada: false,
+    estrutura: normalizarEstrutura(((config as { relatorio?: Record<string, unknown> }).relatorio ?? {})[tipo], tipo, extrasDaConfig(config)),
+    secoes: secoesDaConfig(config),
+    ...retrato, ritmo: retrato.ritmo ?? null, personalizadas: retrato.personalizadas ?? [], pendentesGraves: gravesPendentes(retrato.alertas, decisoes).length, congelado: false,
+  };
+}
+
 /* ---------- fontes personalizadas ---------- */
 
 const cacheExtras = new Map<string, { em: number; leitura: LeituraPersonalizada | null; erro: string | null }>();

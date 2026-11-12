@@ -4,7 +4,7 @@ export const maxDuration = 60;
 import { cache } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { calcularFechamento, type ResultadoFechamento } from "@/lib/fechamentos/servidor";
+import { calcularExemplo, calcularFechamento, type ResultadoFechamento } from "@/lib/fechamentos/servidor";
 import { extrasDe, normalizarEstrutura, type ItemSecao } from "@/lib/fechamentos/estrutura";
 import { ErroAmigavel } from "../../(app)/fechamentos/_components/erro-amigavel";
 import { nomePeriodo } from "../../(app)/fechamentos/_components/formato";
@@ -12,11 +12,16 @@ import { CSS, temAnalise } from "./relatorio";
 import { RelatorioEstruturado } from "./relatorio-estruturado";
 import { BotaoImprimir } from "./imprimir";
 
-const carregar = cache((id: string) => calcularFechamento(id));
+/** "exemplo" = PDF de exemplo do editor para um cliente ainda sem fechamento daquele tipo (nada é salvo). */
+const carregar = cache((id: string, cliente?: string, tipo?: string) =>
+  id === "exemplo" && cliente ? calcularExemplo(cliente, tipo === "quinzenal" ? "quinzenal" : "mensal") : calcularFechamento(id));
 
-export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+type Busca = { analise?: string; previa?: string; cliente?: string; tipo?: string };
+
+export async function generateMetadata({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Busca> }): Promise<Metadata> {
   try {
-    const r = await carregar((await params).id);
+    const sp = await searchParams;
+    const r = await carregar((await params).id, sp.cliente, sp.tipo);
     const f = r.fechamento;
     // O título vira o nome sugerido do arquivo ao salvar o PDF.
     return { title: `${r.clinicaNome} - Fechamento ${nomePeriodo(f.tipo, f.inicio, f.fim).replace("/", " ")}` };
@@ -25,13 +30,14 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   }
 }
 
-export default async function FechamentoPdfPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ analise?: string; previa?: string }> }) {
+export default async function FechamentoPdfPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Busca> }) {
   const { id } = await params;
-  const { analise: pedido, previa } = await searchParams;
+  const { analise: pedido, previa, cliente, tipo } = await searchParams;
+  const exemplo = id === "exemplo";
   let r: ResultadoFechamento | null = null;
   let erro: unknown = null;
   try {
-    r = await carregar(id);
+    r = await carregar(id, cliente, tipo);
   } catch (e) {
     erro = e;
   }
@@ -40,7 +46,7 @@ export default async function FechamentoPdfPage({ params, searchParams }: { para
     return (
       <div className="mx-auto max-w-xl space-y-3 p-10">
         <h1 className="text-lg font-semibold">Não foi possível montar o relatório</h1>
-        <ErroAmigavel erro={erro} voltar={{ href: "/fechamentos", rotulo: "Voltar aos fechamentos" }} />
+        <ErroAmigavel erro={erro} voltar={exemplo && cliente ? { href: `/fechamentos/configurar/${cliente}?aba=fontes`, rotulo: "Ir para as fontes do cliente" } : { href: "/fechamentos", rotulo: "Voltar aos fechamentos" }} />
       </div>
     );
   }
@@ -60,12 +66,14 @@ export default async function FechamentoPdfPage({ params, searchParams }: { para
       <style>{CSS}</style>
       <div className="pdf-sem-impressao mx-auto mb-5 flex max-w-[210mm] flex-wrap items-center justify-between gap-3 px-2">
         <div className="text-sm">
-          <Link href={`/fechamentos/${f.id}`} className="font-medium underline">Voltar ao fechamento</Link>
-          <span className="ml-2 text-[#6B6577]">{previa ? "Exemplo com a estrutura do editor (não salva)" : r.congelado ? `Versão ${f.versao} concluída` : "Prévia: o fechamento ainda não foi concluído"}</span>
+          {exemplo
+            ? <Link href={`/fechamentos/configurar/${f.clinica_id}?aba=estrutura`} className="font-medium underline">Voltar à estrutura</Link>
+            : <Link href={`/fechamentos/${f.id}`} className="font-medium underline">Voltar ao fechamento</Link>}
+          <span className="ml-2 text-[#6B6577]">{exemplo ? "Exemplo com dados atuais das planilhas e a estrutura do editor (nada é salvo)" : previa ? "Exemplo com a estrutura do editor (não salva)" : r.congelado ? `Versão ${f.versao} concluída` : "Prévia: o fechamento ainda não foi concluído"}</span>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           {temAnalise(r) && (
-            <Link href={`/fechamentos-pdf/${f.id}?analise=${comAnalise ? "0" : "1"}${previa ? `&previa=${previa}` : ""}`} replace className="text-sm font-medium underline">
+            <Link href={`/fechamentos-pdf/${f.id}?analise=${comAnalise ? "0" : "1"}${previa ? `&previa=${previa}` : ""}${exemplo && cliente ? `&cliente=${cliente}&tipo=${f.tipo}` : ""}`} replace className="text-sm font-medium underline">
               {comAnalise ? "Tirar a página de análise" : "Incluir página de análise e plano de ação"}
             </Link>
           )}

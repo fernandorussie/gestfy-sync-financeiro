@@ -72,7 +72,7 @@ export default async function ConfigurarPage({ params, searchParams }: { params:
       <AbasConfig
         inicial={abaInicial}
         fontes={<FontesDados clinicaId={clinica.id} padraoInicial={fontesPadrao} extrasIniciais={extras} destinos={destinos} />}
-        estrutura={<EstruturaRelatorioCard key={JSON.stringify(extrasDe(extras))} clinicaId={clinica.id} extrasFontes={extrasDe(extras)} inicial={estrutura} porSecao={porSecao} indisponiveis={semDados} exemplos={exemplos} />}
+        estrutura={<EstruturaRelatorioCard key={JSON.stringify(extrasDe(extras))} clinicaId={clinica.id} extrasFontes={extrasDe(extras)} inicial={estrutura} porSecao={porSecao} indisponiveis={semDados} exemplos={exemplos} pronto={pronto} />}
         perfil={<FichaClinicaCard clinicaId={clinica.id} clinicaNome={clinica.nome} inicial={limparFicha((cfg.ficha ?? {}) as Partial<FichaClinica>)} />}
       />
     </div>

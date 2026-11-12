@@ -23,6 +23,8 @@ export function explicarErro(e: unknown): ErroExplicado {
     return t("Não foi possível falar com o Google ou com o banco de dados.", "Confira a conexão e tente de novo em instantes.");
   if (/relation .* does not exist|column .* does not exist|schema cache/i.test(detalhe))
     return t("O banco de dados está desatualizado.", "Rode as migrações pendentes indicadas no aviso do topo da página.");
+  if (/configure as fontes de vendas e despesas/i.test(detalhe))
+    return t("Este cliente ainda não tem as fontes de vendas e despesas configuradas.", "Configure em Clientes e configurações → Fontes de dados e tente de novo.");
   if (/fechamento n[aã]o encontrado/i.test(detalhe))
     return t("Fechamento não encontrado.", "Ele pode ter sido removido. Volte ao painel e abra de novo.");
   return t("Algo deu errado ao montar esta tela.", "Tente de novo. Se continuar, envie o detalhe abaixo para o responsável técnico.");

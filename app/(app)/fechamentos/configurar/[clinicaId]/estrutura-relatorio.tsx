@@ -20,12 +20,14 @@ function codificar(itens: ItemSecao[]): string {
   return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-export function EstruturaRelatorioCard({ clinicaId, inicial, extrasFontes = [], porSecao = {}, indisponiveis = {}, exemplos = {} }: {
+export function EstruturaRelatorioCard({ clinicaId, inicial, extrasFontes = [], porSecao = {}, indisponiveis = {}, exemplos = {}, pronto = true }: {
   clinicaId: string; inicial: Required<EstruturaRelatorio>; extrasFontes?: ExtraSecao[]; porSecao?: Record<string, string[]>;
   /** Blocos sem dados para este cliente (id → motivo), pelo fechamento mais recente. */
   indisponiveis?: Record<string, string>;
   /** Fechamento mais recente de cada tipo, para o PDF de exemplo. */
   exemplos?: Partial<Record<TipoRelatorio, { id: string; rotulo: string }>>;
+  /** Cliente com vendas e despesas configuradas (sem fechamento, o exemplo lê as planilhas na hora). */
+  pronto?: boolean;
 }) {
   const [aberta, setAberta] = useState<string | null>(null);
   const router = useRouter();
@@ -191,13 +193,18 @@ export function EstruturaRelatorioCard({ clinicaId, inicial, extrasFontes = [], 
             ))}
           </div>
           <p className="text-xs text-muted-foreground">No papel, o que não cabe numa folha continua na seguinte, sem cortar cards nem linhas. A análise só aparece quando o fechamento tem texto ou plano de ação; Entradas detalhadas, só com a fonte de Entradas.</p>
-          {exemplo ? (
-            <a href={`/fechamentos-pdf/${exemplo.id}?previa=${codificar(itens)}`} target="_blank" rel="noopener noreferrer"
+          {exemplo || pronto ? (
+            <a href={exemplo ? `/fechamentos-pdf/${exemplo.id}?previa=${codificar(itens)}` : `/fechamentos-pdf/exemplo?cliente=${clinicaId}&tipo=${tipo}&previa=${codificar(itens)}`}
+              target="_blank" rel="noopener noreferrer"
               className="inline-flex w-full items-center justify-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-muted">
               <ExternalLink className="h-4 w-4" />Ver PDF de exemplo
             </a>
-          ) : <p className="text-xs text-muted-foreground">O PDF de exemplo aparece depois do primeiro fechamento {tipo} deste cliente.</p>}
-          {exemplo && <p className="text-xs text-muted-foreground">Usa os dados de {exemplo.rotulo} e esta estrutura, mesmo sem salvar.</p>}
+          ) : (
+            <p className="text-xs text-muted-foreground">Para ver o PDF de exemplo, configure as fontes de vendas e despesas em <a href={`/fechamentos/configurar/${clinicaId}?aba=fontes`} className="underline">Fontes de dados</a>.</p>
+          )}
+          {exemplo
+            ? <p className="text-xs text-muted-foreground">Usa os dados de {exemplo.rotulo} e esta estrutura, mesmo sem salvar.</p>
+            : pronto && <p className="text-xs text-muted-foreground">Ainda não há fechamento {tipo}: o exemplo lê as planilhas do último período {tipo === "mensal" ? "(mês anterior)" : "(1ª quinzena)"} na hora, sem salvar nada.</p>}
           {semIndicadores && <p className="text-xs text-muted-foreground">Os itens sem dados na fonte aparecem depois do primeiro fechamento.</p>}
         </div>
       </div>
