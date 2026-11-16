@@ -153,7 +153,7 @@ export default async function FechamentosPage({ searchParams }: { searchParams: 
                     <td className="px-3 py-3">
                       {pode ? <span className={`text-xs font-medium ${cor}`}>{rotulo}</span> : (
                         // Pendência de configuração: o status leva direto para as fontes do cliente.
-                        <Link href={`/fechamentos/configurar/${c.id}?aba=fontes`} className={`text-xs font-medium underline-offset-2 hover:underline ${cor}`} title="Configurar as fontes deste cliente">
+                        <Link href={`/clientes/${c.id}?aba=fontes`} className={`text-xs font-medium underline-offset-2 hover:underline ${cor}`} title="Configurar as fontes deste cliente">
                           {rotulo}{c.situacao.situacao === "pendente" ? `: falta ${c.situacao.faltando.join(" e ")}` : ""} →
                         </Link>
                       )}
@@ -168,7 +168,7 @@ export default async function FechamentosPage({ searchParams }: { searchParams: 
         </div>
         {lista.length === 0 && <p className="p-6 text-sm text-muted-foreground">Nenhum cliente ativo no cadastro do GestfySync.</p>}
       </section>
-      <p className="text-xs text-muted-foreground">Os clientes vêm do cadastro do GestfySync. Fontes, estrutura do relatório e perfil ficam em <Link href="/fechamentos/clientes" className="underline">Clientes e configurações</Link>.</p>
+      <p className="text-xs text-muted-foreground">Os clientes, as fontes de dados e a estrutura dos relatórios ficam em <Link href="/clientes" className="underline">Clientes</Link>.</p>
     </div>
   );
 }

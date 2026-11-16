@@ -54,7 +54,7 @@ export function SelecaoClinicas({
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <Label>
-          Clínicas{" "}
+          Clientes{" "}
           <span className="text-muted-foreground text-sm font-normal">
             ({selecionadas.size} de {clinicas.length} selecionada{selecionadas.size !== 1 ? "s" : ""})
           </span>

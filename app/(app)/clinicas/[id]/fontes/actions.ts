@@ -98,7 +98,7 @@ export async function upsertFonte(
     : await db.from("fontes_dados").insert({ ...payload, clinica_id: clinicaId, tipo });
 
   if (error) return { error: error.message };
-  revalidatePath(`/clinicas/${clinicaId}/fontes`);
+  revalidatePath(`/clientes/${clinicaId}`);
   return { ok: true };
 }
 
@@ -110,7 +110,7 @@ export async function deleteFonte(clinicaId: string, tipo: TipoFonte) {
     .eq("clinica_id", clinicaId)
     .eq("tipo", tipo);
   if (error) return { error: error.message };
-  revalidatePath(`/clinicas/${clinicaId}/fontes`);
+  revalidatePath(`/clientes/${clinicaId}`);
   return { ok: true };
 }
 

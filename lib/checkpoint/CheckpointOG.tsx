@@ -124,7 +124,7 @@ function normalizar(dados: CheckpointImagemData): {
   ok: number; atencao: number; branco: number;
 } {
   const clinicas = (dados?.clinicas ?? []).map((c) => ({
-    clinicaNome: txt(c?.clinicaNome) || "Clínica",
+    clinicaNome: txt(c?.clinicaNome) || "Cliente",
     semIndicadores: c?.semIndicadores === true,
     indicadores: (c?.indicadores ?? [])
       .map((i) => ({
@@ -180,8 +180,8 @@ export function CheckpointOG({
           </div>
           <div style={{ display: "flex", fontSize: 16, color: C.lavanda }}>
             {clinicas.length === 1
-              ? "1 clínica conferida"
-              : `${clinicas.length} clínicas conferidas`}
+              ? "1 cliente conferido"
+              : `${clinicas.length} clientes conferidos`}
             {data ? ` · ${data}` : ""}
           </div>
         </div>

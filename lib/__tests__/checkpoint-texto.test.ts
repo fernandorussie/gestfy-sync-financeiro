@@ -77,7 +77,7 @@ describe("montarTextoCheckpoint", () => {
       },
     ], HOJE);
     expect(t).not.toMatch(/null|undefined|NaN/);
-    expect(t).toContain("*Clínica*");
+    expect(t).toContain("*Cliente*");
     // indicador sem nome não vira linha
     expect(t).not.toContain("some");
   });

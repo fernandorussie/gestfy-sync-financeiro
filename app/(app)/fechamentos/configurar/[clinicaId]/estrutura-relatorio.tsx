@@ -200,7 +200,7 @@ export function EstruturaRelatorioCard({ clinicaId, inicial, extrasFontes = [], 
               <ExternalLink className="h-4 w-4" />Ver PDF de exemplo
             </a>
           ) : (
-            <p className="text-xs text-muted-foreground">Para ver o PDF de exemplo, configure as fontes de vendas e despesas em <a href={`/fechamentos/configurar/${clinicaId}?aba=fontes`} className="underline">Fontes de dados</a>.</p>
+            <p className="text-xs text-muted-foreground">Para ver o PDF de exemplo, configure as fontes de vendas e despesas em <a href={`/clientes/${clinicaId}?aba=fontes`} className="underline">Fontes de dados</a>.</p>
           )}
           {exemplo
             ? <p className="text-xs text-muted-foreground">Usa os dados de {exemplo.rotulo} e esta estrutura, mesmo sem salvar.</p>

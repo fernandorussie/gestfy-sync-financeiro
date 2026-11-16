@@ -13,7 +13,7 @@ import {
 
 const NAV_ITEMS = [
   { label: "Dashboard",       href: "/dashboard",     icon: LayoutDashboard },
-  { label: "Clínicas",        href: "/clinicas",      icon: Building2       },
+  { label: "Clientes",        href: "/clientes",      icon: Building2       },
   { label: "Checkpoint",      href: "/checkpoint",    icon: ClipboardCheck  },
   { label: "Gerar Relatório", href: "/relatorio",     icon: FileText        },
   { label: "Configurações",   href: "/configuracoes", icon: Settings        },

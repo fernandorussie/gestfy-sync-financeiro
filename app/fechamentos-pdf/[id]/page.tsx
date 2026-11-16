@@ -46,7 +46,7 @@ export default async function FechamentoPdfPage({ params, searchParams }: { para
     return (
       <div className="mx-auto max-w-xl space-y-3 p-10">
         <h1 className="text-lg font-semibold">Não foi possível montar o relatório</h1>
-        <ErroAmigavel erro={erro} voltar={exemplo && cliente ? { href: `/fechamentos/configurar/${cliente}?aba=fontes`, rotulo: "Ir para as fontes do cliente" } : { href: "/fechamentos", rotulo: "Voltar aos fechamentos" }} />
+        <ErroAmigavel erro={erro} voltar={exemplo && cliente ? { href: `/clientes/${cliente}?aba=fontes`, rotulo: "Ir para as fontes do cliente" } : { href: "/fechamentos", rotulo: "Voltar aos fechamentos" }} />
       </div>
     );
   }
@@ -67,7 +67,7 @@ export default async function FechamentoPdfPage({ params, searchParams }: { para
       <div className="pdf-sem-impressao mx-auto mb-5 flex max-w-[210mm] flex-wrap items-center justify-between gap-3 px-2">
         <div className="text-sm">
           {exemplo
-            ? <Link href={`/fechamentos/configurar/${f.clinica_id}?aba=estrutura`} className="font-medium underline">Voltar à estrutura</Link>
+            ? <Link href={`/clientes/${f.clinica_id}?aba=estrutura`} className="font-medium underline">Voltar à estrutura</Link>
             : <Link href={`/fechamentos/${f.id}`} className="font-medium underline">Voltar ao fechamento</Link>}
           <span className="ml-2 text-[#6B6577]">{exemplo ? "Exemplo com dados atuais das planilhas e a estrutura do editor (nada é salvo)" : previa ? "Exemplo com a estrutura do editor (não salva)" : r.congelado ? `Versão ${f.versao} concluída` : "Prévia: o fechamento ainda não foi concluído"}</span>
         </div>

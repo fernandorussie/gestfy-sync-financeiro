@@ -76,7 +76,7 @@ export function ClaudeAnalise({ r, estado, mudar }: { r: ResultadoFechamento; es
             <span className="inline-flex items-center gap-1"><FileText className="h-3.5 w-3.5" />
               {temFicha ? `Perfil do cliente incluído${ficha.atualizadoEm ? ` (atualizado em ${new Date(ficha.atualizadoEm).toLocaleDateString("pt-BR")})` : ""}` : "Sem perfil do cliente"}
             </span>
-            <Link href={`/fechamentos/configurar/${r.fechamento.clinica_id}?aba=perfil`} className="underline">{temFicha ? "Ver perfil" : "Preencher perfil"}</Link>
+            <Link href={`/clientes/${r.fechamento.clinica_id}?aba=dados`} className="underline">{temFicha ? "Ver perfil" : "Preencher perfil"}</Link>
           </p>
         </div>
         <div className="flex flex-col items-end gap-2">

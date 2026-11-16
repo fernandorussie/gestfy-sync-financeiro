@@ -14,13 +14,12 @@ import {
   ChevronDown,
   History,
   LineChart,
-  Settings2,
   Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const mainNavItems = [
-  { href: "/clinicas", label: "Clínicas", icon: Building2 },
+  { href: "/clientes", label: "Clientes", icon: Building2 },
   // Antes do report: o checkpoint é a conferência que vem primeiro no fluxo.
   { href: "/checkpoint", label: "Checkpoint", icon: ClipboardCheck },
   { href: "/relatorio", label: "Gerar Report Semanal", icon: FileText },
@@ -35,7 +34,8 @@ const configNavItems = [
 /*
  * Relatórios Financeiros (módulo Fechamentos): grupo recolhível. Cada item diz
  * quais rotas o deixam ativo, porque as páginas internas (um fechamento, o
- * histórico de um cliente, a configuração) pertencem a um dos quatro itens.
+ * histórico de um cliente) pertencem a um dos três itens. A configuração do
+ * cliente fica no item Clientes, no topo do menu.
  */
 const relatoriosItems: { href: string; label: string; icon: React.ElementType; ativo: (p: string) => boolean }[] = [
   {
@@ -45,7 +45,6 @@ const relatoriosItems: { href: string; label: string; icon: React.ElementType; a
   },
   { href: "/fechamentos/historico", label: "Histórico", icon: History, ativo: (p) => p.startsWith("/fechamentos/historico") || p.startsWith("/fechamentos/clinica/") },
   { href: "/fechamentos/comparativos", label: "Comparativos", icon: LineChart, ativo: (p) => p.startsWith("/fechamentos/comparativos") },
-  { href: "/fechamentos/clientes", label: "Clientes e configurações", icon: Settings2, ativo: (p) => p.startsWith("/fechamentos/clientes") || p.startsWith("/fechamentos/configurar") },
 ];
 
 const CHAVE_GRUPO = "gestfy:menu-relatorios";

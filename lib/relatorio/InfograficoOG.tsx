@@ -253,7 +253,7 @@ function withDefaults(raw: RelatorioImagemData): RelatorioImagemData {
   const com = raw.visaoGeral?.comercial;
   return {
     cabecalho: {
-      clinica_nome: raw.cabecalho?.clinica_nome ?? "Clínica",
+      clinica_nome: raw.cabecalho?.clinica_nome ?? "Cliente",
       tag: raw.cabecalho?.tag ?? "",
       semana: raw.cabecalho?.semana ?? null,
       periodo_ini: raw.cabecalho?.periodo_ini ?? "--",
@@ -394,7 +394,7 @@ export function InfograficoOG({
   const alertas   = dados.alertas.map(txt).filter((a) => a !== "");
   const acoes     = dados.acoes.map(txt).filter((a) => a !== "");
 
-  const nome = txt(cabecalho.clinica_nome) || "Clínica";
+  const nome = txt(cabecalho.clinica_nome) || "Cliente";
   const nomeTruncado = nome.length > 28 ? nome.slice(0, 27) + "…" : nome;
   const selo = cabecalho.semana != null && Number.isFinite(cabecalho.semana)
     ? `SEMANA ${cabecalho.semana}`

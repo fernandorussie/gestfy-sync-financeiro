@@ -188,7 +188,7 @@ export function ComentariosOG({
   const elogios  = todos.filter((c) => !c.critica);
   const criticas = todos.filter((c) => c.critica);
 
-  const nome = txt(dados?.cabecalho?.clinica_nome) || "Clínica";
+  const nome = txt(dados?.cabecalho?.clinica_nome) || "Cliente";
   const nomeTruncado = nome.length > 28 ? nome.slice(0, 27) + "…" : nome;
   const semana = dados?.cabecalho?.semana;
   const selo = semana != null && Number.isFinite(semana)

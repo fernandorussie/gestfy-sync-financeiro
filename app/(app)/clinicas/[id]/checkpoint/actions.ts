@@ -29,7 +29,7 @@ export async function salvarIndicadores(
 
   if (error) return { ok: false, erro: error.message };
 
-  revalidatePath(`/clinicas/${clinicaId}/checkpoint`);
+  revalidatePath(`/clientes/${clinicaId}`);
   revalidatePath("/checkpoint");
   return { ok: true };
 }

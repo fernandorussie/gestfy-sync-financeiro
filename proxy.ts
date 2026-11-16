@@ -9,6 +9,7 @@ function isProtected(pathname: string): boolean {
   }
   return (
     pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/clientes") ||
     pathname.startsWith("/clinicas") ||
     pathname.startsWith("/checkpoint") ||
     pathname.startsWith("/relatorio") ||

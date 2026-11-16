@@ -132,7 +132,7 @@ export async function salvarConfig(p: { clinicaId: string; fontes: FontesFechame
   if (error) return { ok: false, erro: "Não foi possível salvar." };
   limparCache(p.clinicaId);
   revalidatePath("/fechamentos");
-  revalidatePath(`/fechamentos/configurar/${p.clinicaId}`);
+  revalidatePath(`/clientes/${p.clinicaId}`);
   return { ok: true, dados: null };
 }
 
@@ -153,7 +153,7 @@ export async function salvarFicha(p: { clinicaId: string; ficha: FichaClinica })
     ? await db.from("fechamento_config").update({ ficha: ficha as unknown as Json, atualizado_em: new Date().toISOString() }).eq("clinica_id", p.clinicaId)
     : await db.from("fechamento_config").insert({ clinica_id: p.clinicaId, ficha: ficha as unknown as Json });
   if (error) return { ok: false, erro: /ficha/.test(error.message) ? "Falta rodar a atualização do banco 007_ficha_clinica.sql no Supabase." : "Não foi possível salvar a ficha." };
-  revalidatePath(`/fechamentos/configurar/${p.clinicaId}`);
+  revalidatePath(`/clientes/${p.clinicaId}`);
   return { ok: true, dados: ficha };
 }
 
@@ -170,7 +170,7 @@ export async function salvarEstrutura(p: { clinicaId: string; estrutura: Estrutu
     : await db.from("fechamento_config").insert({ clinica_id: p.clinicaId, relatorio: estrutura as unknown as Json });
   if (error) return { ok: false, erro: /relatorio/.test(error.message) ? "Falta rodar a atualização do banco 008_estrutura_relatorio.sql no Supabase." : "Não foi possível salvar a estrutura." };
   limparCache(p.clinicaId);
-  revalidatePath(`/fechamentos/configurar/${p.clinicaId}`);
+  revalidatePath(`/clientes/${p.clinicaId}`);
   return { ok: true, dados: estrutura };
 }
 
@@ -186,7 +186,7 @@ export async function salvarFontesExtras(p: { clinicaId: string; fontes: FontePe
     : await db.from("fechamento_config").insert({ clinica_id: p.clinicaId, fontes_extras: fontes as unknown as Json });
   if (error) return { ok: false, erro: /fontes_extras/.test(error.message) ? "Falta rodar a atualização do banco 009_fontes_personalizadas.sql no Supabase." : "Não foi possível salvar as fontes." };
   limparCache(p.clinicaId);
-  revalidatePath(`/fechamentos/configurar/${p.clinicaId}`);
+  revalidatePath(`/clientes/${p.clinicaId}`);
   return { ok: true, dados: fontes };
 }
 

@@ -233,7 +233,7 @@ export function DashboardClient({ relatorios }: { relatorios: RelatorioComClinic
                       aria-label="Selecionar todos"
                     />
                   </TableHead>
-                  <TableHead>Clínica</TableHead>
+                  <TableHead>Cliente</TableHead>
                   <TableHead>Formato</TableHead>
                   <TableHead>Período</TableHead>
                   <TableHead>Gerado em</TableHead>

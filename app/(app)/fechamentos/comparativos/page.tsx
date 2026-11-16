@@ -42,7 +42,7 @@ export default async function ComparativosPage({ searchParams }: { searchParams:
       <div className="mx-auto max-w-6xl space-y-6 p-4 md:p-8">
         {cabecalho}
         <div className="rounded-lg border bg-card p-5">
-          {clientes.length ? <SeletorCliente clientes={clientes} atual="" /> : <p className="text-sm text-muted-foreground">Nenhum cliente com as planilhas de vendas e despesas configuradas. Configure em <Link href="/fechamentos/clientes" className="underline">Clientes e configurações</Link>.</p>}
+          {clientes.length ? <SeletorCliente clientes={clientes} atual="" /> : <p className="text-sm text-muted-foreground">Nenhum cliente com as planilhas de vendas e despesas configuradas. Configure em <Link href="/clientes" className="underline">Clientes</Link>.</p>}
         </div>
       </div>
     );

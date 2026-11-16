@@ -68,7 +68,7 @@ export async function rodarCheckpointClinica(params: {
       db.from("feriados").select("data"),
     ]);
 
-  if (!clinica) return { ...base, erros: ["Clínica não encontrada."] };
+  if (!clinica) return { ...base, erros: ["Cliente não encontrado."] };
 
   const nome         = clinica.nome;
   const tiposFonte   = (fontes ?? []).map((f) => f.tipo as TipoFonte);

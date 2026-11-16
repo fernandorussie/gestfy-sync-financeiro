@@ -37,7 +37,7 @@ export async function criarMeta(
     if (error.code === "23505") return { error: "Já existe uma meta deste tipo para este mês." };
     return { error: error.message };
   }
-  revalidatePath(`/clinicas/${clinicaId}/metas`);
+  revalidatePath(`/clientes/${clinicaId}`);
   return { ok: true };
 }
 
@@ -52,7 +52,7 @@ export async function editarMeta(id: string, clinicaId: string, data: unknown) {
     .eq("id", id);
 
   if (error) return { error: error.message };
-  revalidatePath(`/clinicas/${clinicaId}/metas`);
+  revalidatePath(`/clientes/${clinicaId}`);
   return { ok: true };
 }
 
@@ -60,7 +60,7 @@ export async function deletarMeta(id: string, clinicaId: string) {
   const db = getSupabaseAdmin();
   const { error } = await db.from("metas").delete().eq("id", id);
   if (error) return { error: error.message };
-  revalidatePath(`/clinicas/${clinicaId}/metas`);
+  revalidatePath(`/clientes/${clinicaId}`);
   return { ok: true };
 }
 
@@ -119,7 +119,7 @@ export async function copiarMetasMesAnterior(
   const { error } = await db.from("metas").insert(inserts);
   if (error) return { erro: error.message };
 
-  revalidatePath(`/clinicas/${clinicaId}/metas`);
+  revalidatePath(`/clientes/${clinicaId}`);
   return { ok: true, copiadas: novas.length };
 }
 
@@ -139,6 +139,6 @@ export async function atualizarRealizados(clinicaId: string, data: unknown) {
   const err = results.find((r) => r.error);
   if (err?.error) return { error: err.error.message };
 
-  revalidatePath(`/clinicas/${clinicaId}/metas`);
+  revalidatePath(`/clientes/${clinicaId}`);
   return { ok: true };
 }

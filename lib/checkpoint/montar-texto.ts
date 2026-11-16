@@ -44,7 +44,7 @@ export function montarTextoCheckpoint(clinicas: ClinicaTexto[], hoje: Date): str
   linhas.push(`*CHECKPOINT · ${format(hoje, "dd/MM/yyyy")}*`);
 
   for (const clinica of clinicas) {
-    const nome = limpar(clinica.clinicaNome) || "Clínica";
+    const nome = limpar(clinica.clinicaNome) || "Cliente";
     linhas.push("");
     linhas.push(`*${nome}*`);
 

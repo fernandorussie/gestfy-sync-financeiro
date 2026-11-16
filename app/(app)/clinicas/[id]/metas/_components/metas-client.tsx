@@ -73,7 +73,7 @@ export function MetasClient({
     let newAno = ano;
     if (newMes > 12) { newMes = 1; newAno++; }
     if (newMes < 1) { newMes = 12; newAno--; }
-    router.push(`/clinicas/${clinicaId}/metas?mes=${newMes}&ano=${newAno}`);
+    router.push(`/clientes/${clinicaId}?aba=metas&mes=${newMes}&ano=${newAno}`, { scroll: false });
   }
 
   async function handleCopiar(forcar = false) {
@@ -112,12 +112,12 @@ export function MetasClient({
   return (
     <>
       {/* Header */}
-      <div className="flex items-start justify-between mb-6">
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
         <div>
-          <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">{clinicaNome}</p>
-          <h1 className="text-2xl font-bold text-foreground font-heading">Metas</h1>
+          <h2 className="font-semibold">Metas de {clinicaNome}</h2>
+          <p className="text-sm text-muted-foreground">Usadas no Report Semanal (meta proporcional) e nos fechamentos (atingimento da meta de faturamento).</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="outline" className="gap-2" onClick={() => handleCopiar(false)} disabled={isCopying}>
             {isCopying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Copy className="h-4 w-4" />}
             Copiar mês anterior

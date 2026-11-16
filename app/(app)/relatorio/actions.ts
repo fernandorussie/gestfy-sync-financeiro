@@ -64,7 +64,7 @@ export async function gerarRelatorioWhatsapp(
     .eq("id", clinicaId)
     .single();
 
-  if (!clinica) return { texto: "", erros: ["Clínica não encontrada."] };
+  if (!clinica) return { texto: "", erros: ["Cliente não encontrado."] };
 
   let texto = "";
 
@@ -214,7 +214,7 @@ export async function prepararDadosImagem(params: {
     .single();
 
   if (!clinica) {
-    return { dados: {} as RelatorioImagemData, erros: ["Clínica não encontrada."] };
+    return { dados: {} as RelatorioImagemData, erros: ["Cliente não encontrado."] };
   }
 
   const { data: fontes } = await db

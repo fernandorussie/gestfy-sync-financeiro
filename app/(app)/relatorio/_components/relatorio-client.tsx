@@ -1037,7 +1037,7 @@ function ClinicaImagemCard({
             )}
           </div>
         ) : resultado.erros.length > 0 ? (
-          <p className="text-sm text-destructive">Não foi possível coletar dados para esta clínica.</p>
+          <p className="text-sm text-destructive">Não foi possível coletar dados para este cliente.</p>
         ) : null}
       </CardContent>
     </Card>
@@ -1341,7 +1341,7 @@ export function RelatorioClient({
             <div className="space-y-2">
               {multiClinica && (
                 <Label className="text-sm text-muted-foreground">
-                  Avaliações Google — por clínica (opcional)
+                  Avaliações Google — por cliente (opcional)
                 </Label>
               )}
               {selectedClinics.map(c => (
@@ -1362,7 +1362,7 @@ export function RelatorioClient({
             <div className="space-y-2">
               {multiClinica && (
                 <Label className="text-sm text-muted-foreground">
-                  Leads — por clínica (opcional, sobrescreve planilha)
+                  Leads — por cliente (opcional, sobrescreve planilha)
                 </Label>
               )}
               {selectedClinics.map(c => (
@@ -1393,7 +1393,7 @@ export function RelatorioClient({
                   : `Gerar${clinicasSel.size > 1 ? ` (${clinicasSel.size})` : ""}`}
             </Button>
             {!isGenerating && clinicasSel.size === 0 && (
-              <p className="text-sm text-muted-foreground">Selecione ao menos uma clínica.</p>
+              <p className="text-sm text-muted-foreground">Selecione ao menos um cliente.</p>
             )}
           </div>
         </CardContent>
@@ -1409,7 +1409,7 @@ export function RelatorioClient({
               <Loader2 className="h-4 w-4 animate-spin shrink-0" />
               <span>
                 {progresso.done === 0
-                  ? `Iniciando geração para ${progresso.total} clínica${progresso.total !== 1 ? "s" : ""}…`
+                  ? `Iniciando geração para ${progresso.total} cliente${progresso.total !== 1 ? "s" : ""}…`
                   : `${progresso.done} de ${progresso.total} concluído${progresso.done !== 1 ? "s" : ""}${
                       progresso.done < progresso.total ? " — aguardando os demais…" : ""
                     }`}
@@ -1422,7 +1422,7 @@ export function RelatorioClient({
             <div className="flex justify-end">
               <CopyButton
                 text={resultados.map(r => `===== ${r.clinicaNome} =====\n\n${r.texto}`).join("\n\n")}
-                label={`Copiar tudo (${resultados.length} clínicas)`}
+                label={`Copiar tudo (${resultados.length} clientes)`}
               />
             </div>
           )}

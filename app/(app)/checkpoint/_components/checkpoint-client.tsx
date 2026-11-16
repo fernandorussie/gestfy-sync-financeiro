@@ -87,7 +87,7 @@ function ClinicaCheckpointCard({
     <Card>
       <CardHeader className="pb-4">
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <CardTitle className="text-base">{linha.clinicaNome || "Clínica"}</CardTitle>
+          <CardTitle className="text-base">{linha.clinicaNome || "Cliente"}</CardTitle>
           {linha.indicadores.length > 0 && (
             <span className="text-xs text-muted-foreground">
               {totalAtencao > 0
@@ -109,10 +109,10 @@ function ClinicaCheckpointCard({
         {linha.semIndicadores ? (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Nenhum indicador ativo para esta clínica.
+              Nenhum indicador ativo para este cliente.
             </p>
             <Button variant="outline" size="sm" asChild className="gap-1.5">
-              <Link href={`/clinicas/${linha.clinicaId}/checkpoint`}>
+              <Link href={`/clientes/${linha.clinicaId}?aba=fontes#checkpoint`}>
                 <Settings2 className="h-3.5 w-3.5" />Configurar indicadores
               </Link>
             </Button>
@@ -340,7 +340,7 @@ export function CheckpointClient({ clinicas }: { clinicas: Clinica[] }) {
                 : `Rodar checkpoint${clinicasSel.size > 1 ? ` (${clinicasSel.size})` : ""}`}
             </Button>
             {!rodando && clinicasSel.size === 0 && (
-              <p className="text-sm text-muted-foreground">Selecione ao menos uma clínica.</p>
+              <p className="text-sm text-muted-foreground">Selecione ao menos um cliente.</p>
             )}
           </div>
         </CardContent>
@@ -354,7 +354,7 @@ export function CheckpointClient({ clinicas }: { clinicas: Clinica[] }) {
               <Loader2 className="h-4 w-4 animate-spin shrink-0" />
               <span>
                 {progresso.done === 0
-                  ? `Lendo as planilhas de ${progresso.total} clínica${progresso.total !== 1 ? "s" : ""}…`
+                  ? `Lendo as planilhas de ${progresso.total} cliente${progresso.total !== 1 ? "s" : ""}…`
                   : `${progresso.done} de ${progresso.total} concluído${progresso.done !== 1 ? "s" : ""}`}
               </span>
             </div>
@@ -444,7 +444,7 @@ export function CheckpointClient({ clinicas }: { clinicas: Clinica[] }) {
                     </div>
                   ) : (
                     <p className="text-xs text-muted-foreground">
-                      Uma imagem com todas as clínicas conferidas, no visual Gestfy. Editou algum
+                      Uma imagem com todos os clientes conferidos, no visual Gestfy. Editou algum
                       status acima? Gere de novo para a imagem acompanhar.
                     </p>
                   )}

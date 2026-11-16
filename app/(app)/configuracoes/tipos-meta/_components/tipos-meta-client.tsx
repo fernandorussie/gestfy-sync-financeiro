@@ -87,7 +87,7 @@ export function TiposMetaClient({ tiposMeta }: Props) {
         <div>
           <h1 className="text-2xl font-bold text-foreground font-heading">Tipos de Meta</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Categorias usadas em todas as clínicas para definir e acompanhar metas.
+            Categorias usadas em todos os clientes para definir e acompanhar metas.
           </p>
         </div>
         <Button className="gap-2" onClick={openCreate}>

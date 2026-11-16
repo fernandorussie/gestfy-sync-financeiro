@@ -321,3 +321,20 @@ Testes: 237 passando.
 - Com fechamento do tipo (mensal/quinzenal): usa o mais recente, como antes.
 - Sem fechamento, mas com vendas e despesas configuradas: `/fechamentos-pdf/exemplo?cliente=<id>&tipo=<tipo>&previa=…` lê as planilhas do último período (mês anterior; quinzenal = 1–15 do mês, ou do mês anterior até o dia 15) e monta o PDF sem salvar nada (`calcularExemplo` em `servidor.ts`).
 - Sem vendas e despesas: o editor mostra o aviso com link para Fontes de dados.
+
+## Cadastro único de Clientes (v3.7, 16/11)
+
+Proposta: https://claude.ai/artifact/HbfhqFJhaMvsa8yZLZYLbv (entrega 1).
+
+- **Nova área `/clientes`** (item "Clientes" no topo do menu) substitui "Clínicas" e "Relatórios Financeiros → Clientes e configurações". Lista com metas do mês, planilhas do Report Semanal, situação dos fechamentos e perfil; botão "Novo cliente".
+- **`/clientes/[id]`** com cinco abas (`?aba=dados|metas|fontes|estrutura|alvos`):
+  - Dados gerais: cadastro (nome, identificador, sigla, Google Place ID), Perfil do cliente (ficha) e Situação.
+  - Metas: o mesmo componente de antes (`?mes=&ano=` trocam o mês).
+  - Fontes de dados: quadro "Planilhas deste cliente" (cada planilha, quem usa, se Report Semanal e Quinzenal/Mensal apontam para a mesma planilha) + fontes dos fechamentos + fontes do Report Semanal + indicadores do Checkpoint (`#checkpoint`).
+  - Estrutura dos relatórios: editor do Mensal/Quinzenal; Report Semanal ainda com modelo fixo (próxima etapa).
+  - Alvos & Premiações: vazia até o módulo existir.
+- **Sem migração de dados**: tudo continua nas mesmas tabelas e IDs (`clinicas`, `fontes_dados`, `checkpoint_indicadores`, `metas`, `fechamento_config`…). A tabela segue com o nome `clinicas`; só as telas falam "cliente".
+- **Excluir virou Desativar** (`alterarSituacaoCliente`). A exclusão definitiva (`deleteClinica`) só funciona para cliente sem metas, reports e fechamentos, e exige o nome digitado; antes ela apagava tudo em cascata.
+- **Endereços antigos redirecionam**: `/clinicas`, `/clinicas/[id]/fontes|metas|checkpoint`, `/fechamentos/clientes`, `/fechamentos/configurar/[id]?aba=fontes|estrutura|perfil`. Os componentes continuam nas pastas antigas e são importados pela nova página; as ações revalidam `/clientes/[id]`.
+- Linguagem "clínica" → "cliente" nas telas, mensagens e imagens do Checkpoint/Report (o texto do prompt da IA do Report Semanal não foi mexido).
+- `/clientes` entrou na lista de rotas protegidas do `proxy.ts`.

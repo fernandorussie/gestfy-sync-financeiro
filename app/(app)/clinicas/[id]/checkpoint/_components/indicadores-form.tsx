@@ -65,7 +65,7 @@ export function IndicadoresForm({
         {!jaSalvo && (
           <p className="text-sm text-muted-foreground">
             Sugestão inicial: os indicadores que já têm planilha configurada vêm ligados.
-            Ligue os demais se a clínica acompanha esses números por fora.
+            Ligue os demais se o cliente acompanha esses números por fora.
           </p>
         )}
       </CardHeader>

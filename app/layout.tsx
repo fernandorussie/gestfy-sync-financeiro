@@ -27,7 +27,7 @@ const parkinsans = localFont({
 
 export const metadata: Metadata = {
   title: "Gestfy — Relatórios Semanais",
-  description: "Gerador de relatórios semanais para clínicas de saúde",
+  description: "Relatórios e gestão de resultados dos clientes Gestfy",
 };
 
 export default function RootLayout({
