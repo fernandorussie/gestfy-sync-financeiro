@@ -128,6 +128,10 @@ export async function salvarConfig(p: { clinicaId: string; fontes: FontesFechame
   const bloqueio = await limite(); if (bloqueio) return { ok: false, erro: bloqueio };
   const db = getSupabaseAdmin();
   const fontes = limparFontes(p.fontes);
+  // Avaliações Google por planilha não têm card na tela: mantém a configuração que já existir.
+  const { data: atual } = await db.from("fechamento_config").select("fontes").eq("clinica_id", p.clinicaId).maybeSingle();
+  const antes = (atual?.fontes ?? {}) as FontesFechamento;
+  if (antes.avaliacoes && !fontes.avaliacoes) fontes.avaliacoes = antes.avaliacoes;
   const { error } = await db.from("fechamento_config").upsert({ clinica_id: p.clinicaId, fontes: fontes as unknown as Json, atualizado_em: new Date().toISOString() });
   if (error) return { ok: false, erro: "Não foi possível salvar." };
   limparCache(p.clinicaId);
