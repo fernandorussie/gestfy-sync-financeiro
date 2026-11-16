@@ -10,9 +10,10 @@ import { garantirFontesUnicas } from "@/lib/clientes/fontes-unicas";
 import { calcularRitmo, type Ritmo } from "./ritmo";
 import { limparFicha, type FichaClinica } from "./ficha";
 import { vocabularioDe, type Vocabulario } from "./vocabulario";
-import { gravarMetricas, metricasDoFechamento } from "./metricas";
+import { gravarMetricas, metricasDoFechamento, type Metrica } from "./metricas";
 import { claudeConfigurado } from "./claude-api";
-import { mesesDaBase } from "./historico";
+import { agruparPeriodos, concluido, indicadoresDe, mesesDaBase, type LinhaFechamento } from "./historico";
+import { metaDoIntervalo } from "./comparativos";
 import { extrasDe, limparSecoes, normalizarEstrutura, type ItemSecao, type SecaoPersonalizada } from "./estrutura";
 import { adaptarResultado, calcularFontes, colunasUsadas, lerFontePersonalizada, limparFontePersonalizada, type FontePersonalizada, type LeituraPersonalizada, type ResultadoPersonalizado } from "./fonte-personalizada";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
@@ -457,3 +458,83 @@ export async function dadosDaBase(clinicaId: string, quantos = 24, hoje = new Da
   return { meses: out, ano: linhas.length ? { ano: String(ano), linhas } : null, erro: null };
 }
 
+
+/* ======================= Comparativos v2 ======================= */
+
+export interface PontoComparativo {
+  chave: string;
+  rotulo: string;
+  inicio: string;
+  fim: string;
+  parcial: boolean;
+  /** fechamento = números congelados de um fechamento concluído; planilha = calculado agora. */
+  origem: "fechamento" | "planilha";
+  fechamentoId: string | null;
+  metricas: Metrica[];
+}
+
+/** Período anterior do mesmo tamanho (para as variações das personalizadas). */
+function mesmoTamanhoAntes(p: Periodo): Periodo {
+  const d = (s: string) => Date.parse(`${s}T00:00:00Z`);
+  const dias = Math.round((d(p.fim) - d(p.inicio)) / 864e5);
+  const fim = new Date(d(p.inicio) - 864e5);
+  const ini = new Date(fim.getTime() - dias * 864e5);
+  const f = (x: Date) => x.toISOString().slice(0, 10);
+  return { inicio: f(ini), fim: f(fim) };
+}
+
+/**
+ * Indicadores de um cliente em vários períodos (pontos do gráfico ou os
+ * períodos A e B). Um ponto que coincide com um fechamento concluído (mês
+ * inteiro ou 1ª quinzena) usa os números dele; os demais são calculados das
+ * planilhas, com a mesma regra dos fechamentos. A meta só entra em períodos de
+ * meses inteiros (soma das metas mensais de faturamento).
+ */
+export async function comparativoDoCliente(clinicaId: string, fatias: (Periodo & { chave: string; rotulo: string; parcial: boolean })[]): Promise<{ pontos: PontoComparativo[]; erro: string | null }> {
+  const db = getSupabaseAdmin();
+  const { coleta, regras, fontes, extras } = await coletarFontesDoCliente(clinicaId);
+  const erroBase = !fontes.vendas ? "Cliente sem a planilha de vendas configurada." : coleta.erros.vendas ?? null;
+  if (!fatias.length) return { pontos: [], erro: erroBase };
+  const ini = fatias[0].inicio, fim = fatias[fatias.length - 1].fim;
+
+  const [{ data: linhas }, { data: tipos }] = await Promise.all([
+    db.from("fechamentos").select("id, clinica_id, tipo, inicio, fim, status, versao, indicadores, snapshot, concluido_em, enviado_em").eq("clinica_id", clinicaId).gte("inicio", ini).lte("fim", fim).limit(500),
+    db.from("tipos_meta").select("id").ilike("nome", "faturamento"),
+  ]);
+  const metas = new Map<string, number>();
+  if (tipos?.length) {
+    const { data: ms } = await db.from("metas").select("mes, ano, valor_meta_mensal").eq("clinica_id", clinicaId).in("tipo_meta_id", tipos.map((t) => t.id));
+    for (const m of ms ?? []) if (m.valor_meta_mensal) metas.set(`${m.ano}-${String(m.mes).padStart(2, "0")}`, Number(m.valor_meta_mensal));
+  }
+  const concluidos = new Map(agruparPeriodos((linhas ?? []) as LinhaFechamento[]).filter((p) => concluido(p.atual)).map((p) => [`${p.inicio}|${p.fim}`, p.atual]));
+
+  const pontos: PontoComparativo[] = [];
+  for (const f of fatias) {
+    const fech = concluidos.get(`${f.inicio}|${f.fim}`);
+    if (fech) {
+      const snap = fech.snapshot as { personalizadas?: unknown[] } | null;
+      pontos.push({ ...f, origem: "fechamento", fechamentoId: fech.id, metricas: metricasDoFechamento(indicadoresDe(fech), (snap?.personalizadas ?? []).map(adaptarResultado)) });
+      continue;
+    }
+    if (erroBase) continue;
+    const periodo = { inicio: f.inicio, fim: f.fim };
+    const ind = calcularIndicadores(coleta.dados, periodo, { regras, meta: metaDoIntervalo(periodo, metas) });
+    if (!ind.faturamento?.total && !ind.despesas?.total && !ind.leads?.total) continue; // período sem lançamento
+    let pers: ResultadoPersonalizado[] = [];
+    if (extras.length) {
+      const antes = mesmoTamanhoAntes(periodo);
+      pers = await calcularPersonalizadas(clinicaId, extras, periodo, antes, false, { atual: ind, anterior: calcularIndicadores(coleta.dados, antes, { regras }) });
+    }
+    pontos.push({ ...f, origem: "planilha", fechamentoId: null, metricas: metricasDoFechamento(ind, pers) });
+  }
+  return { pontos, erro: erroBase };
+}
+
+/** Caixa x competência do ano do fim do período, calculado das planilhas. */
+export async function anoDoCliente(clinicaId: string, fimISO: string): Promise<{ ano: string; linhas: LinhaAnual[] } | null> {
+  const { coleta, regras, fontes } = await coletarFontesDoCliente(clinicaId);
+  if (!fontes.vendas || !fontes.despesas || coleta.erros.vendas || coleta.erros.despesas) return null;
+  const ano = Number(fimISO.slice(0, 4)), mes = Number(fimISO.slice(5, 7));
+  const linhas = resumoAnual(coleta.dados, ano, mes, regras).filter((m) => m.entradas || m.recebido || m.saidasCaixa || m.saidasCompetencia);
+  return linhas.length ? { ano: String(ano), linhas } : null;
+}
