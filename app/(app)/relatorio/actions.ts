@@ -7,9 +7,10 @@ import { coletarAvaliacoesGoogle } from "@/lib/coletores/google-places";
 import type { AvaliacaoGoogle } from "@/lib/coletores/google-places";
 import type { ResultadoLeads } from "@/lib/coletores/leads";
 import { coletarMetas } from "@/lib/coletores/metas";
-import { coletarFontesDoCliente } from "@/lib/fechamentos/servidor";
+import { coletarFontesDoCliente, semanalFinanceiroDoCliente } from "@/lib/fechamentos/servidor";
+import { formatarIndicador } from "@/lib/fechamentos/formato-indicador";
 import { reportSemanalDaFonte } from "@/lib/relatorio/fonte-unica";
-import { limparSemanal, ligado } from "@/lib/relatorio/estrutura-semanal";
+import { chaveDoKpi, limparSemanal, ligado, personalizadosUsados } from "@/lib/relatorio/estrutura-semanal";
 import { descreverPerformance, calcularPercentualMeta } from "@/lib/metas";
 import { montarPesquisas, montarMetas } from "@/lib/relatorio/montar-whatsapp";
 import { montarDadosImagem } from "@/lib/relatorio/montar-imagem-dados";
@@ -17,7 +18,7 @@ import { callGemini } from "@/lib/ia/gemini";
 import type { SugestaoIA } from "@/lib/ia/gemini";
 import { montarContextoIA, SYSTEM_PROMPT } from "@/lib/ia/montar-contexto";
 import type { RelatorioGeradoInsert } from "@/lib/supabase/types";
-import type { RelatorioImagemData } from "@/lib/relatorio/imagem-tipos";
+import type { PersonalizadoCard, RelatorioImagemData } from "@/lib/relatorio/imagem-tipos";
 
 interface GerarParams {
   clinicaId: string;
@@ -246,6 +247,7 @@ export async function prepararDadosImagem(params: {
     googleManualAvaliacoes ?? null,
   );
   dados.estrutura = estrutura;
+  await completarFinanceiro(dados, clinicaId, ini, fim, erros);
 
   if (comFeedbacks && (dados.comentarios?.length ?? 0) === 0) {
     erros.push(
@@ -255,6 +257,50 @@ export async function prepararDadosImagem(params: {
   }
 
   return { dados, erros };
+}
+
+const moeda = (v: number) => formatarIndicador(v, "moeda");
+
+/**
+ * Blocos do modelo financeiro e operacional (só quando ligados na estrutura):
+ * entradas, saídas e saldo; maiores despesas; cards personalizados (a semana
+ * anterior vem do último report salvo quando a fonte é de posição atual) e as
+ * linhas de contratos e pendências.
+ */
+async function completarFinanceiro(dados: RelatorioImagemData, clinicaId: string, ini: string, fim: string, erros: string[]) {
+  const est = dados.estrutura!;
+  const cards = ligado(est.secoes, "indicadores");
+  const pedido = {
+    financeiro: cards && est.kpis.some((k) => k.ligado && (k.id === "entradasPeriodo" || k.id === "saidasPagas" || k.id === "saldoPeriodo")),
+    despesas: ligado(est.secoes, "despesas"),
+    personalizados: personalizadosUsados(est).length > 0,
+  };
+  if (!pedido.financeiro && !pedido.despesas && !pedido.personalizados) return;
+  try {
+    const r = await semanalFinanceiroDoCliente(clinicaId, { inicio: ini, fim }, pedido);
+    erros.push(...r.erros);
+    if (r.financeiro) dados.financeiro = r.financeiro;
+    if (pedido.despesas) dados.despesasRelevantes = r.despesas.map((d) => `${d.nome} — ${moeda(d.valor)}`);
+    if (pedido.personalizados) {
+      // Semana anterior das fontes de posição atual: o último report salvo deste cliente.
+      const { data: ultimo } = await getSupabaseAdmin().from("relatorios_gerados").select("dados_json")
+        .eq("clinica_id", clinicaId).eq("formato", "imagem").lt("data_fim", fim).order("data_fim", { ascending: false }).limit(1).maybeSingle();
+      const antes = new Map(((ultimo?.dados_json as { personalizados?: PersonalizadoCard[] } | null)?.personalizados ?? []).map((p) => [p.id, p.atual]));
+      const lista: PersonalizadoCard[] = [];
+      for (const id of personalizadosUsados(est)) {
+        const v = r.personalizados.get(chaveDoKpi(id));
+        if (!v) { erros.push("Card personalizado: um indicador escolhido na estrutura do Semanal não existe mais. Revise em Clientes → Estrutura dos relatórios."); continue; }
+        lista.push({ id, nome: v.nome, formato: v.formato, melhor: v.melhor, atual: v.atual, anterior: v.posicao ? antes.get(id) ?? null : v.anterior });
+      }
+      dados.personalizados = lista;
+      if (ligado(est.secoes, "contratos")) {
+        dados.contratos = (est.contratos ?? []).map((id) => lista.find((p) => p.id === id)).filter((p): p is PersonalizadoCard => !!p && p.atual !== null)
+          .map((p) => `${p.nome}: ${formatarIndicador(p.atual, p.formato)}`);
+      }
+    }
+  } catch (e) {
+    erros.push(`Financeiro: ${e instanceof Error ? e.message : "não foi possível calcular os blocos financeiros."}`);
+  }
 }
 
 export async function salvarRelatorioImagem(params: {

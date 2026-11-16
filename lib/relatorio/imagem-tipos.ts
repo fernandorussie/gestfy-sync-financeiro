@@ -1,4 +1,5 @@
 import type { EstruturaSemanal } from "./estrutura-semanal";
+import type { Formato } from "@/lib/fechamentos/fonte-personalizada";
 
 export type TipoDestaque = "positivo" | "atencao" | "financeiro";
 
@@ -72,6 +73,27 @@ export interface ComentarioItem {
   critica: boolean;
 }
 
+/** Cards financeiros do modelo financeiro e operacional (valores em reais; null = sem dado). */
+export interface FinanceiroSemanal {
+  /** De onde vieram as entradas: planilha de Entradas ou, sem ela, Vendas. */
+  origemEntradas: "entradas" | "vendas";
+  entradas: number | null;
+  entradasMes: number | null;
+  saidas: number | null;
+  saidasMes: number | null;
+}
+
+/** Card de indicador de fonte personalizada. "anterior" vem do último report salvo. */
+export interface PersonalizadoCard {
+  /** "pers:<fonteId>.<indicadorId>" */
+  id: string;
+  nome: string;
+  formato: Formato;
+  melhor: "maior" | "menor" | "neutro";
+  atual: number | null;
+  anterior: number | null;
+}
+
 export interface RelatorioImagemData {
   cabecalho: CabecalhoInfo;
   rodape: RodapeInfo;
@@ -82,6 +104,12 @@ export interface RelatorioImagemData {
   faturamento_suplementar?: FaturamentoSuplementar;
   /** Página 2 (opcional): só é preenchida quando o usuário pede os feedbacks. */
   comentarios?: ComentarioItem[];
+  financeiro?: FinanceiroSemanal;
+  personalizados?: PersonalizadoCard[];
+  /** Linhas do bloco "Despesas relevantes" (editáveis na geração). */
+  despesasRelevantes?: string[];
+  /** Linhas do bloco "Contratos e pendências" (editáveis na geração). */
+  contratos?: string[];
   /** Blocos ligados e ordem, conforme a estrutura do Semanal do cliente (sem ela: o padrão). */
   estrutura?: EstruturaSemanal;
 }

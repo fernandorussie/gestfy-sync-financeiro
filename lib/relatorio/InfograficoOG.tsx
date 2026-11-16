@@ -1,5 +1,6 @@
 import React from "react";
-import { limparSemanal, ligado, type KpiSemanal, type SecaoSemanal } from "./estrutura-semanal";
+import { limparSemanal, ligado, tituloDaSecao, type KpiSemanal, type SecaoSemanal } from "./estrutura-semanal";
+import { formatarIndicador, variacaoIndicador } from "@/lib/fechamentos/formato-indicador";
 import type { RelatorioImagemData, DestaqueItem } from "./imagem-tipos";
 import {
   C, col, row, txt, isNA, fundoRaiz, LARGURA_OG,
@@ -292,8 +293,14 @@ function withDefaults(raw: RelatorioImagemData): RelatorioImagemData {
     alertas:   raw.alertas   ?? [],
     acoes:     raw.acoes     ?? [],
     estrutura: raw.estrutura,
+    financeiro: raw.financeiro,
+    personalizados: raw.personalizados ?? [],
+    despesasRelevantes: raw.despesasRelevantes ?? [],
+    contratos: raw.contratos ?? [],
   };
 }
+
+const moedaCard = (v: number) => (v < 0 ? "−" : "") + formatarIndicador(Math.abs(v), "moeda");
 
 // ─── Monta os cards de indicador a partir dos dados (oculta os N/A) ──────────
 interface KpiSpec {
@@ -380,10 +387,42 @@ function montarKpis(dados: RelatorioImagemData): KpiSpec[] {
     });
   }
 
+  // 6 a 8 — Financeiro (entradas, saídas pagas, saldo)
+  const fin = dados.financeiro;
+  if (fin) {
+    const noMes = (v: number | null) => (v === null ? "" : `No mês: ${moedaCard(v)}`);
+    if (numOk(fin.entradas)) kpis.push({ id: "entradasPeriodo", label: fin.origemEntradas === "vendas" ? "Entradas do período (vendas)" : "Entradas do período", valor: moedaCard(fin.entradas), sub: noMes(fin.entradasMes) });
+    if (numOk(fin.saidas)) kpis.push({ id: "saidasPagas", label: "Saídas pagas", valor: moedaCard(fin.saidas), sub: noMes(fin.saidasMes) });
+    if (numOk(fin.entradas) && numOk(fin.saidas)) {
+      const saldo = fin.entradas - fin.saidas;
+      const saldoMes = numOk(fin.entradasMes) && numOk(fin.saidasMes) ? fin.entradasMes - fin.saidasMes : null;
+      kpis.push({ id: "saldoPeriodo", label: "Saldo do período", valor: moedaCard(saldo), sub: noMes(saldoMes) || "Entradas − saídas pagas", perigo: saldo < 0 });
+    }
+  }
+
+  // Cards de indicadores personalizados (ex.: unidades ocupadas, vacância)
+  for (const p of dados.personalizados ?? []) {
+    if (!numOk(p.atual)) continue;
+    const v = variacaoIndicador(p.atual, p.anterior, p.formato, p.melhor);
+    kpis.push({
+      id: p.id as KpiSemanal,
+      label: p.nome,
+      valor: formatarIndicador(p.atual, p.formato),
+      sub: p.anterior == null ? "Situação atual" : `Semana anterior: ${formatarIndicador(p.anterior, p.formato)}${v && v.sentido !== "igual" ? ` (${v.texto})` : ""}`,
+    });
+  }
+
   // Ordem e blocos escolhidos na estrutura do cliente (sem estrutura salva: todos, na ordem padrão).
   const est = limparSemanal(dados.estrutura);
   const pos = (id: KpiSemanal) => est.kpis.findIndex((k) => k.id === id);
   return kpis.filter((k) => ligado(est.kpis, k.id)).sort((a, b) => pos(a.id) - pos(b.id));
+}
+
+/** Até 5 cards numa linha; mais que isso, linhas equilibradas (6 = 3+3, 7 = 4+3, 8 = 4+4). */
+function linhasDeKpis<T>(xs: T[]): T[][] {
+  if (xs.length <= 5) return [xs];
+  const n = Math.ceil(xs.length / 2);
+  return [xs.slice(0, n), xs.slice(n)];
 }
 
 // ─── Componente principal ─────────────────────────────────────────────────────
@@ -404,6 +443,8 @@ export function InfograficoOG({
   const destaques = dados.destaques.filter((d) => txt(d?.texto) !== "");
   const alertas   = dados.alertas.map(txt).filter((a) => a !== "");
   const acoes     = dados.acoes.map(txt).filter((a) => a !== "");
+  const despesas  = (dados.despesasRelevantes ?? []).map(txt).filter((a) => a !== "");
+  const contratos = (dados.contratos ?? []).map(txt).filter((a) => a !== "");
 
   const nome = txt(cabecalho.clinica_nome) || "Cliente";
   const nomeTruncado = nome.length > 28 ? nome.slice(0, 27) + "…" : nome;
@@ -416,15 +457,39 @@ export function InfograficoOG({
   const ordem = est.secoes.filter((x) => x.ligado && x.id !== "feedbacks").map((x) => x.id) as Exclude<SecaoSemanal, "feedbacks">[];
   const blocos: Record<Exclude<SecaoSemanal, "feedbacks">, React.ReactNode> = {
     indicadores: kpis.length > 0 ? (
-        <div key="indicadores" style={row({ gap: 12, marginTop: ordem[0] === "indicadores" ? 0 : 30 })}>
-          {kpis.map((k, i) => (
-            <KpiCard key={i} label={k.label} valor={k.valor} sub={k.sub} perigo={k.perigo} pct={k.pct} />
+        <div key="indicadores" style={col({ gap: 12, marginTop: ordem[0] === "indicadores" ? 0 : 30 })}>
+          {linhasDeKpis(kpis).map((linha, j) => (
+            <div key={j} style={row({ gap: 12 })}>
+              {linha.map((k, i) => (
+                <KpiCard key={i} label={k.label} valor={k.valor} sub={k.sub} perigo={k.perigo} pct={k.pct} />
+              ))}
+            </div>
           ))}
+        </div>
+    ) : null,
+    despesas: despesas.length > 0 ? (
+        <div key="despesas" style={col({ marginTop: 30 })}>
+          <SecaoTitulo label={tituloDaSecao(est, "despesas")} />
+          <div style={col({ gap: 10 })}>
+            {despesas.map((d, i) => (
+              <ItemCard key={i} icone={<DestaqueIcone tipo="financeiro" />} texto={d} />
+            ))}
+          </div>
+        </div>
+    ) : null,
+    contratos: contratos.length > 0 ? (
+        <div key="contratos" style={col({ marginTop: 30 })}>
+          <SecaoTitulo label={tituloDaSecao(est, "contratos")} />
+          <div style={col({ gap: 10 })}>
+            {contratos.map((c, i) => (
+              <ItemCard key={i} icone={<DestaqueIcone tipo="atencao" />} texto={c} />
+            ))}
+          </div>
         </div>
     ) : null,
     destaques: destaques.length > 0 ? (
         <div key="destaques" style={col({ marginTop: 30 })}>
-          <SecaoTitulo label="Principais destaques" />
+          <SecaoTitulo label={tituloDaSecao(est, "destaques")} />
           <div style={col({ gap: 10 })}>
             {destaques.map((d, i) => (
               <ItemCard key={i} icone={<DestaqueIcone tipo={d.tipo} />} texto={txt(d.texto)} />
@@ -434,7 +499,7 @@ export function InfograficoOG({
     ) : null,
     alertas: alertas.length > 0 ? (
         <div key="alertas" style={col({ marginTop: 30 })}>
-          <SecaoTitulo label="Alertas" />
+          <SecaoTitulo label={tituloDaSecao(est, "alertas")} />
           <div style={col({ gap: 10 })}>
             {alertas.map((a, i) => (
               <ItemCard key={i} icone={<AlertaIcone />} texto={a} perigo />
@@ -444,7 +509,7 @@ export function InfograficoOG({
     ) : null,
     acoes: acoes.length > 0 ? (
         <div key="acoes" style={col({ marginTop: 30 })}>
-          <SecaoTitulo label="Ações sugeridas" />
+          <SecaoTitulo label={tituloDaSecao(est, "acoes")} />
           <div style={col()}>
             {acoes.map((a, i) => (
               <div
@@ -526,7 +591,7 @@ export function InfograficoOG({
             </div>
           </div>
           <div style={{ display: "flex", fontSize: 16, color: C.lavanda }}>
-            {periodo} · Comparativo com meta do período
+            {kpis.some((k) => k.id === "faturamentoPeriodo" || k.id === "acumuladoMes") ? `${periodo} · Comparativo com meta do período` : periodo}
           </div>
         </div>
 

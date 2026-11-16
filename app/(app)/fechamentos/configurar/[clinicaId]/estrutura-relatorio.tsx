@@ -9,7 +9,7 @@ import { defSecao, ehPadrao, estruturaPadrao, normalizarEstrutura, paginar, type
 import { blocosDa, blocosLigados } from "@/lib/fechamentos/blocos";
 import { salvarEstrutura } from "../../actions";
 import { ehPadraoSemanal, padraoSemanal, limparSemanal } from "@/lib/relatorio/estrutura-semanal";
-import { EditorSemanal } from "./estrutura-semanal";
+import { EditorSemanal, type IndicadorPersOpcao } from "./estrutura-semanal";
 
 const COR: Record<TipoRelatorio, string> = { mensal: "#7B099C", quinzenal: "#E04800" };
 
@@ -22,8 +22,8 @@ function codificar(itens: ItemSecao[]): string {
   return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-export function EstruturaRelatorioCard({ clinicaId, inicial, extrasFontes = [], porSecao = {}, indisponiveis = {}, exemplos = {}, pronto = true }: {
-  clinicaId: string; inicial: Required<EstruturaRelatorio>; extrasFontes?: ExtraSecao[]; porSecao?: Record<string, string[]>;
+export function EstruturaRelatorioCard({ clinicaId, inicial, extrasFontes = [], porSecao = {}, indisponiveis = {}, exemplos = {}, pronto = true, indicadoresPers = [] }: {
+  clinicaId: string; inicial: Required<EstruturaRelatorio>; extrasFontes?: ExtraSecao[]; porSecao?: Record<string, string[]>; indicadoresPers?: IndicadorPersOpcao[];
   /** Blocos sem dados para este cliente (id → motivo), pelo fechamento mais recente. */
   indisponiveis?: Record<string, string>;
   /** Fechamento mais recente de cada tipo, para o PDF de exemplo. */
@@ -106,7 +106,7 @@ export function EstruturaRelatorioCard({ clinicaId, inicial, extrasFontes = [], 
       </div>
 
       {semanal ? (
-        <EditorSemanal valor={estrutura.semanal} onChange={(v) => { setEstrutura({ ...estrutura, semanal: v }); setMudou(true); }} />
+        <EditorSemanal valor={estrutura.semanal} pers={indicadoresPers} onChange={(v) => { setEstrutura({ ...estrutura, semanal: v }); setMudou(true); }} />
       ) : (<>
       <div className="grid gap-5 lg:grid-cols-[1fr_260px]">
         <ol className="divide-y rounded-md border">

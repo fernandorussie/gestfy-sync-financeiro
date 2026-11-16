@@ -90,16 +90,33 @@ describe("Checkpoint pela fonte única", () => {
   });
 });
 
-import { limparSemanal, padraoSemanal } from "@/lib/relatorio/estrutura-semanal";
+import { ehPadraoSemanal, ligado, limparSemanal, modeloFinanceiro, padraoSemanal, personalizadosUsados, tituloDaSecao } from "@/lib/relatorio/estrutura-semanal";
 describe("Estrutura do Report Semanal", () => {
   it("sem nada salvo, vale o padrão com todos os blocos", () => {
     expect(limparSemanal(undefined)).toEqual(padraoSemanal());
   });
   it("mantém ordem e escolhas válidas, completa o que falta e deixa os feedbacks no fim", () => {
     const e = limparSemanal({ secoes: [{ id: "feedbacks", ligado: false }, { id: "acoes", ligado: true }, { id: "xx" }, { id: "destaques", ligado: false }], kpis: [{ id: "totalLeads", ligado: false }] });
-    expect(e.secoes.map((s) => s.id)).toEqual(["acoes", "destaques", "indicadores", "alertas", "feedbacks"]);
+    expect(e.secoes.map((s) => s.id)).toEqual(["acoes", "destaques", "indicadores", "despesas", "contratos", "alertas", "feedbacks"]);
     expect(e.secoes.find((s) => s.id === "feedbacks")?.ligado).toBe(false);
     expect(e.kpis[0]).toEqual({ id: "totalLeads", ligado: false });
-    expect(e.kpis).toHaveLength(5);
+    expect(e.kpis).toHaveLength(8);
+  });
+  it("estrutura salva antes dos blocos financeiros continua igual (os novos entram desligados)", () => {
+    const antiga = { secoes: ["indicadores", "destaques", "alertas", "acoes", "feedbacks"].map((id) => ({ id, ligado: true })), kpis: ["faturamentoPeriodo", "acumuladoMes", "respostasNps", "avaliacoesGoogle", "totalLeads"].map((id) => ({ id, ligado: true })) };
+    const e = limparSemanal(antiga);
+    expect(e.secoes.filter((s) => s.ligado).map((s) => s.id)).toEqual(["indicadores", "destaques", "alertas", "acoes", "feedbacks"]);
+    expect(e.kpis.filter((k) => k.ligado).map((k) => k.id)).toEqual(antiga.kpis.map((k) => k.id));
+    expect(ehPadraoSemanal(e)).toBe(true);
+  });
+  it("modelo financeiro: entradas, saídas, saldo, cards personalizados, títulos próprios e contratos", () => {
+    const base = limparSemanal({ kpis: [{ id: "pers:ctr.un", ligado: true }, { id: "pers:x", ligado: true }], contratos: ["pers:ctr.v60", "lixo"] });
+    expect(base.kpis.some((k) => k.id === "pers:x")).toBe(false);
+    const f = limparSemanal(modeloFinanceiro(base));
+    expect(f.kpis.filter((k) => k.ligado).map((k) => k.id)).toEqual(["entradasPeriodo", "saidasPagas", "saldoPeriodo", "pers:ctr.un"]);
+    expect(tituloDaSecao(f, "acoes")).toBe("Próximos passos");
+    expect(f.contratos).toEqual(["pers:ctr.v60"]);
+    expect(personalizadosUsados(f)).toEqual(["pers:ctr.un", "pers:ctr.v60"]);
+    expect(ligado(f.secoes, "feedbacks")).toBe(false);
   });
 });

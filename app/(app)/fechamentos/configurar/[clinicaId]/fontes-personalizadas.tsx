@@ -55,7 +55,7 @@ function LinhaFiltro({ f, cabecalho, valores, onChange, onRemover }: { f: Filtro
       </select>
       {!op?.semValor && (
         <>
-          <input className={`${campoP} w-44`} value={f.valor ?? ""} list={lista} placeholder={f.op === "igual" || f.op === "diferente" ? "valor (vírgula = ou)" : "valor"} aria-label="Valor"
+          <input className={`${campoP} w-44`} value={f.valor ?? ""} list={lista} placeholder={f.op === "igual" || f.op === "diferente" ? "valor (vírgula = ou)" : f.op === "proximos" ? "nº de dias, ex.: 60" : "valor"} aria-label="Valor"
             onChange={(e) => onChange({ ...f, valor: e.target.value })} />
           <datalist id={lista}>{(valores[f.coluna] ?? []).map((v) => <option key={v} value={v} />)}</datalist>
         </>
@@ -230,9 +230,18 @@ export function EditorFontePersonalizada({ clinicaId, f, todas, destinos, onChan
           </label>
         </div>
         <div className="flex flex-wrap items-end gap-3">
-          <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">Coluna de data *
-            <Coluna valor={f.colunaData} cabecalho={cabecalho} onChange={(v) => set({ colunaData: v })} rotulo="Coluna de data" vazio="procurar “Data”" />
+          <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">Tipo de planilha
+            <select className={campoP} value={f.modo ?? "movimento"} onChange={(e) => set({ modo: e.target.value === "posicao" ? "posicao" : undefined })}
+              title="Movimentação: cada linha tem uma data (vendas, atendimentos). Posição atual: a planilha mostra a situação de hoje (contratos, unidades, estoque).">
+              <option value="movimento">Movimentação (linhas com data)</option>
+              <option value="posicao">Posição atual (situação de hoje)</option>
+            </select>
           </label>
+          {f.modo !== "posicao" && (
+            <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">Coluna de data *
+              <Coluna valor={f.colunaData} cabecalho={cabecalho} onChange={(v) => set({ colunaData: v })} rotulo="Coluna de data" vazio="procurar “Data”" />
+            </label>
+          )}
           <label className="flex flex-col gap-1 text-xs font-medium text-muted-foreground">Linha do cabeçalho
             <input type="number" min={1} max={50} className={`${campoP} w-20`} value={f.linhaCabecalho ?? ""} placeholder="auto" onChange={(e) => set({ linhaCabecalho: e.target.value ? Number(e.target.value) : undefined })} />
           </label>
@@ -241,6 +250,7 @@ export function EditorFontePersonalizada({ clinicaId, f, todas, destinos, onChan
           </Button>
           {previa?.leitura && <span className="text-xs text-muted-foreground">{previa.leitura.linhas} linhas · cabeçalho na linha {previa.leitura.linhaCabecalho}{previa.leitura.totalIgnoradas ? ` · ${previa.leitura.totalIgnoradas} sem data legível` : ""}</span>}
         </div>
+        {f.modo === "posicao" && <p className="text-xs text-muted-foreground">Posição atual: todas as linhas contam, sem recorte de período. A comparação com a semana anterior vem do último relatório salvo. Esta fonte não entra no Checkpoint (não há data para conferir).</p>}
         {previa?.erro && <p className="rounded-md border border-destructive/40 bg-destructive/5 p-2 text-sm text-destructive">{previa.erro}</p>}
         {!cabecalho.length && <p className="text-xs text-muted-foreground">Leia a planilha para escolher as colunas numa lista. Antes disso, dá para escrever o nome do cabeçalho ou a letra.</p>}
       </div>

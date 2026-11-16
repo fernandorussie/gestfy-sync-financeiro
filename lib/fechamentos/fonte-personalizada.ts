@@ -23,7 +23,9 @@ import type { Indicadores, Periodo } from "./indicadores";
 /* ---------- tipos ---------- */
 
 export type Operacao = "contar" | "distintos" | "somar" | "media" | "minimo" | "maximo" | "percentual";
-export type OperadorFiltro = "igual" | "diferente" | "contem" | "maior" | "menor" | "vazio" | "preenchido";
+export type OperadorFiltro = "igual" | "diferente" | "contem" | "maior" | "menor" | "vazio" | "preenchido" | "proximos" | "passou";
+/** Movimentação: linhas com data, recortadas no período. Posição atual: todas as linhas, a foto de hoje. */
+export type ModoFonte = "movimento" | "posicao";
 export type OpFormula = "+" | "-" | "*" | "/" | "%";
 export type Formato = "numero" | "moeda" | "percentual" | "dias";
 export type Melhor = "maior" | "menor" | "neutro";
@@ -60,7 +62,9 @@ export interface FontePersonalizada {
   sheetId: string;
   aba: string;
   linhaCabecalho?: number;
-  /** Cabeçalho ou letra da coluna de data; vazio = procurar "Data". */
+  /** Movimentação (padrão) ou posição atual (sem data: todas as linhas valem). */
+  modo?: ModoFonte;
+  /** Cabeçalho ou letra da coluna de data; vazio = procurar "Data". Não usada na posição atual. */
   colunaData: string;
   /** Colunas com dado pessoal: só para contar distintos. */
   pessoais: string[];
@@ -87,6 +91,8 @@ export const OPERADORES: { id: OperadorFiltro; rotulo: string; semValor?: boolea
   { id: "menor", rotulo: "é menor que" },
   { id: "preenchido", rotulo: "está preenchida", semValor: true },
   { id: "vazio", rotulo: "está vazia", semValor: true },
+  { id: "proximos", rotulo: "é uma data nos próximos (dias)" },
+  { id: "passou", rotulo: "é uma data que já passou", semValor: true },
 ];
 
 export const OPS_FORMULA: { id: OpFormula; rotulo: string }[] = [
@@ -211,6 +217,7 @@ export function limparFontePersonalizada(f: Partial<FontePersonalizada> & FonteA
     sheetId: extrairId(s(f.sheetId, 300)),
     aba: s(f.aba, 100),
     linhaCabecalho: f.linhaCabecalho && f.linhaCabecalho > 0 ? Math.min(50, Math.floor(f.linhaCabecalho)) : undefined,
+    modo: f.modo === "posicao" ? "posicao" : undefined,
     colunaData: conv ? conv.colunaData : s(f.colunaData, 80),
     pessoais,
     indicadores,
@@ -225,7 +232,7 @@ function extrairId(t: string): string {
 
 /** Colunas usadas pela fonte (data + indicadores), sem repetir. */
 export function colunasUsadas(f: FontePersonalizada): string[] {
-  const set = new Set<string>([f.colunaData || "~data"]);
+  const set = new Set<string>(f.modo === "posicao" ? [] : [f.colunaData || "~data"]);
   for (const d of f.indicadores) {
     if (d.tipo !== "calculo") continue;
     if (d.coluna && OPERACOES.find((o) => o.id === d.operacao)?.precisaColuna) set.add(d.coluna);
@@ -304,6 +311,17 @@ export function lerPlanilhaPersonalizada(valores: Celula[][], f: FontePersonaliz
     else if (!r.startsWith("~") || r === refData) faltando.push(rotuloRef(r));
   }
   const leitura: LeituraPersonalizada = { linhas: [], ignoradas: [], colunas, faltando, cabecalho: bruto.map((c) => textoLimpo(c)), linhaCabecalho: ic + 1 };
+  if (f.modo === "posicao") {
+    // Posição atual: toda linha com alguma coluna usada preenchida vale, sem data.
+    for (let i = ic + 1; i < valores.length; i++) {
+      const linha = valores[i] ?? [];
+      const c: Record<string, Celula> = {};
+      for (const [r, j] of idx) c[r] = linha[j];
+      if (Object.values(c).every((v) => v === null || v === undefined || String(v).trim() === "")) continue;
+      leitura.linhas.push({ data: "", c });
+    }
+    return leitura;
+  }
   const iData = idx.get(refData);
   if (iData === undefined) return leitura;
   for (let i = ic + 1; i < valores.length; i++) {
@@ -362,9 +380,25 @@ export interface ResultadoPersonalizado {
 
 const dentro = (d: string, p: Periodo) => d >= p.inicio && d <= p.fim;
 
-function comparar(cel: Celula, f: Filtro): boolean {
+/** Chave de unidade/identificação: ignora maiúsculas, acentos, espaços, pontuação e º/°. */
+export function chaveIdentificacao(v: Celula): string {
+  return String(v ?? "").replace(/[º°]/g, "o").normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+const somarDiasISO = (iso: string, n: number) => { const d = new Date(`${iso}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+
+/** ref = data de referência (fim do período) para os filtros de data relativa. */
+function comparar(cel: Celula, f: Filtro, ref = ""): boolean {
   const t = textoLimpo(cel);
   switch (f.op) {
+    case "proximos": {
+      const d = lerData(cel), n = Math.max(0, Math.floor(lerValor(f.valor ?? "") ?? 0));
+      return !!d && !!ref && d >= ref && d <= somarDiasISO(ref, n);
+    }
+    case "passou": {
+      const d = lerData(cel);
+      return !!d && !!ref && d < ref;
+    }
     case "vazio": return !t;
     case "preenchido": return !!t;
     case "contem": return normalizar(t).includes(normalizar(f.valor ?? ""));
@@ -383,16 +417,16 @@ function comparar(cel: Celula, f: Filtro): boolean {
   }
 }
 
-function aplicarOperacao(d: IndicadorDef, linhas: LinhaPersonalizada[]): number | null {
+function aplicarOperacao(d: IndicadorDef, linhas: LinhaPersonalizada[], ref = ""): number | null {
   const col = d.coluna ?? "";
   // "~quantidade" sem coluna na planilha: cada linha vale 1 (como no formato antigo).
   const num = (l: LinhaPersonalizada) => (col === "~quantidade" && !(col in l.c) ? 1 : lerValor(l.c[col]));
   switch (d.operacao) {
     case "contar": return linhas.length;
-    case "distintos": return new Set(linhas.map((l) => normalizar(l.c[col])).filter(Boolean)).size;
+    case "distintos": return new Set(linhas.map((l) => chaveIdentificacao(l.c[col])).filter(Boolean)).size;
     case "percentual": {
       if (!linhas.length) return null;
-      const ok = d.condicao ? linhas.filter((l) => comparar(l.c[d.condicao!.coluna], d.condicao!)).length : linhas.length;
+      const ok = d.condicao ? linhas.filter((l) => comparar(l.c[d.condicao!.coluna], d.condicao!, ref)).length : linhas.length;
       return Math.round((ok / linhas.length) * 1000) / 10;
     }
     default: {
@@ -406,10 +440,12 @@ function aplicarOperacao(d: IndicadorDef, linhas: LinhaPersonalizada[]): number 
   }
 }
 
-function calcularSimples(d: IndicadorDef, linhas: LinhaPersonalizada[], periodo: Periodo, anterior: Periodo) {
-  const filtradas = linhas.filter((l) => d.filtros.every((f) => comparar(l.c[f.coluna], f)));
-  const atuais = filtradas.filter((l) => dentro(l.data, periodo));
-  const antes = filtradas.filter((l) => dentro(l.data, anterior));
+function calcularSimples(d: IndicadorDef, linhas: LinhaPersonalizada[], periodo: Periodo, anterior: Periodo, posicao = false) {
+  const ref = periodo.fim;
+  const filtradas = linhas.filter((l) => d.filtros.every((f) => comparar(l.c[f.coluna], f, ref)));
+  // Posição atual: todas as linhas valem; não há "período anterior" na planilha (a comparação vem do histórico salvo).
+  const atuais = posicao ? filtradas : filtradas.filter((l) => dentro(l.data, periodo));
+  const antes = posicao ? null : filtradas.filter((l) => dentro(l.data, anterior));
   let grupos: GrupoResultado[] | undefined;
   if (d.agruparPor) {
     const mapa = new Map<string, { nome: string; linhas: LinhaPersonalizada[] }>();
@@ -421,10 +457,10 @@ function calcularSimples(d: IndicadorDef, linhas: LinhaPersonalizada[], periodo:
       mapa.set(k, g);
     }
     grupos = [...mapa.values()]
-      .map((g) => ({ nome: g.nome, valor: aplicarOperacao(d, g.linhas), linhas: g.linhas.length }))
+      .map((g) => ({ nome: g.nome, valor: aplicarOperacao(d, g.linhas, ref), linhas: g.linhas.length }))
       .sort((a, b) => (b.valor ?? -Infinity) - (a.valor ?? -Infinity) || b.linhas - a.linhas);
   }
-  return { atual: aplicarOperacao(d, atuais), anterior: aplicarOperacao(d, antes), grupos };
+  return { atual: aplicarOperacao(d, atuais, ref), anterior: antes ? aplicarOperacao(d, antes, ref) : null, grupos };
 }
 
 export function aplicarFormula(termos: (number | null)[], ops: OpFormula[]): number | null {
@@ -483,7 +519,7 @@ export function calcularFontes(
     const l = leituras.get(f.id);
     const linhas = l?.erro ? [] : l?.leitura?.linhas ?? [];
     for (const d of f.indicadores.filter((x) => x.tipo === "calculo")) {
-      const r = l?.erro ? { atual: null, anterior: null, grupos: undefined } : calcularSimples(d, linhas, periodo, anterior);
+      const r = l?.erro ? { atual: null, anterior: null, grupos: undefined } : calcularSimples(d, linhas, periodo, anterior, f.modo === "posicao");
       valores.set(chave(f, d), { atual: r.atual, anterior: r.anterior });
       if (!valores.has(d.id)) valores.set(d.id, { atual: r.atual, anterior: r.anterior });
       parciais.set(chave(f, d), { id: d.id, nome: d.nome || "Indicador", formato: d.formato, melhor: d.melhor, secao: d.secao, atual: r.atual, anterior: r.anterior, grupos: r.grupos, descricao: descreverIndicador(d) });

@@ -20,6 +20,7 @@ import type { Meta, TipoMeta } from "@/lib/supabase/types";
 import { nomePeriodo } from "../../fechamentos/_components/formato";
 import { AvisoBanco } from "../../fechamentos/_components/aviso-banco";
 import { FontesDados } from "../../fechamentos/configurar/[clinicaId]/fontes-dados";
+import { kpiPersonalizado } from "@/lib/relatorio/estrutura-semanal";
 import { EstruturaRelatorioCard } from "../../fechamentos/configurar/[clinicaId]/estrutura-relatorio";
 import { FichaClinicaCard } from "../../fechamentos/configurar/[clinicaId]/ficha-clinica";
 import { MetasClient } from "../../clinicas/[id]/metas/_components/metas-client";
@@ -95,7 +96,7 @@ export default async function ClientePage({ params, searchParams }: { params: Pr
   /* ---------- Checkpoint: todas as fontes configuradas ---------- */
   const fontesCheckpoint = [
     ...FONTES_CHECKPOINT.filter((f) => fontesFin[f.id]).map((f) => ({ id: f.id as string, rotulo: f.rotulo, cadencia: cadenciaDa(f.id, regras, f.padrao) })),
-    ...extras.filter((x) => x.sheetId && x.aba).map((x) => ({ id: idPersonalizadaCheckpoint(x.id), rotulo: `${x.nome} (personalizada)`, cadencia: cadenciaDa(idPersonalizadaCheckpoint(x.id), regras) })),
+    ...extras.filter((x) => x.sheetId && x.aba && x.modo !== "posicao").map((x) => ({ id: idPersonalizadaCheckpoint(x.id), rotulo: `${x.nome} (personalizada)`, cadencia: cadenciaDa(idPersonalizadaCheckpoint(x.id), regras) })),
   ];
 
   /* ---------- Metas ---------- */
@@ -170,7 +171,8 @@ export default async function ClientePage({ params, searchParams }: { params: Pr
           ),
           estrutura: (
             <>
-              <EstruturaRelatorioCard key={JSON.stringify(extrasDe(extras))} clinicaId={cliente.id} extrasFontes={extrasDe(extras)} inicial={estrutura} porSecao={porSecao} indisponiveis={semDados} exemplos={exemplos} pronto={prontoFin} />
+              <EstruturaRelatorioCard key={JSON.stringify(extrasDe(extras))} clinicaId={cliente.id} extrasFontes={extrasDe(extras)}
+                indicadoresPers={extras.flatMap((f) => f.indicadores.map((d) => ({ id: kpiPersonalizado(f.id, d.id), rotulo: `${d.nome || "Indicador"} · ${f.nome || "Fonte"}` })))} inicial={estrutura} porSecao={porSecao} indisponiveis={semDados} exemplos={exemplos} pronto={prontoFin} />
             </>
           ),
           alvos: (

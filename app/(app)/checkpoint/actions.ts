@@ -93,7 +93,7 @@ export async function rodarCheckpointClinica(params: {
     const erro = coleta.erros[f.id];
     indicadores.push(avaliar(f.id, f.rotulo, cad, erro ? { erro } : { linhas: linhasDaFonte(coleta.dados, f.id) }, f.categoria));
   }
-  const pers = extras.filter((x) => x.sheetId && x.aba && cadenciaDa(idPersonalizadaCheckpoint(x.id), regras) !== "nao");
+  const pers = extras.filter((x) => x.sheetId && x.aba && x.modo !== "posicao" && cadenciaDa(idPersonalizadaCheckpoint(x.id), regras) !== "nao");
   const lidas = await Promise.all(pers.map(async (x) => ({ x, r: await testarFontePersonalizada(x) })));
   for (const { x, r } of lidas) {
     const cad = cadenciaDa(idPersonalizadaCheckpoint(x.id), regras) as Cadencia;

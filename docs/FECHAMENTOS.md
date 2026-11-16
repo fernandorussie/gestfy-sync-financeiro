@@ -361,3 +361,17 @@ Proposta: https://claude.ai/artifact/HbfhqFJhaMvsa8yZLZYLbv (seções 4 a 6), co
 - **Entre períodos**: A = período escolhido; B = anterior do mesmo tipo, mesmo período do ano anterior ou escolhido (`comp=anterior|ano|outro`, `bref=`). Tabela com todos os indicadores e a variação; barras do indicador escolhido; aviso quando os tamanhos diferem mais de 10%.
 - **Entre clientes** (`entre-clientes.tsx`, ação `indicadoresDoCliente`): 2 a 6 clientes (`clientes=id,id`), mesmo período; cada cliente carrega em paralelo e aparece quando chega. Só métricas padrão (Resultado = Faturamento x Despesas) e personalizadas com a mesma chave `comparavel` em 2+ clientes. Sem fonte = "não disponível", nunca zero. Ranking em barras + tabela clientes × indicadores; segmento, porte e UF do perfil ao lado do nome. Uso interno (não vai para PDF nem para o Claude).
 - **Visual**: rótulo de valor só no último, maior e menor ponto; nomes do eixo espaçados (até 12); fechamento concluído = ponto cheio maior, clicável, e chip roxo com ✓; parcial = contorno tracejado; indicador sem dados aparece desabilitado com o motivo; indicador de carregamento em toda troca de filtro.
+
+## Report Semanal financeiro e operacional (v3.10, 16/11)
+
+Modelo genérico (não é exclusivo de um cliente), escolhido em Clientes → Estrutura dos relatórios → Semanal → "Começar de um modelo".
+
+- **Fonte personalizada em "Posição atual"**: para planilhas que mostram a situação de hoje (contratos, unidades, estoque). Sem coluna de data; todas as linhas valem. Não entra no Checkpoint. A "semana anterior" vem do último report salvo do cliente (`relatorios_gerados.dados_json.personalizados`).
+- **Filtros de data relativa**: "é uma data nos próximos (dias)" e "é uma data que já passou". Referência = fim do período do report. Aceita data da planilha ou texto dd/mm/aaaa; "-" e vazio ficam de fora.
+- **"Contar valores diferentes"** usa chave robusta: ignora maiúsculas, acentos, espaços, pontuação e º/° (Nº 10 = N° 10 = nº10).
+- **Cards novos** (desligados por padrão): Entradas do período (planilha de Entradas; sem ela, Vendas), Saídas pagas (despesas pagas pela data de pagamento), Saldo (entradas − saídas). Sub-linha com o acumulado do mês. Mais cards de qualquer indicador personalizado (`pers:<fonteId>.<indicadorId>`). Até 8 cards; acima de 5, duas linhas.
+- **Blocos novos**: Despesas relevantes (5 maiores categorias pagas na semana) e Contratos e pendências (indicadores personalizados escolhidos + linhas escritas). Ambos editáveis na geração.
+- **Títulos editáveis** por bloco (ex.: "Próximos passos", "Destaques financeiros").
+- Estruturas já salvas não mudam: itens novos entram desligados.
+- Código: `lib/relatorio/estrutura-semanal.ts`, `semanalFinanceiroDoCliente` (servidor.ts), `completarFinanceiro` (relatorio/actions.ts), InfograficoOG, FormImagem. Testes: `fonte-posicao.test.ts`, `fonte-unica.test.ts`.
+- Pendente: WhatsApp e prompt da IA com foco financeiro; Boletos/Condomínio (abas mensais).

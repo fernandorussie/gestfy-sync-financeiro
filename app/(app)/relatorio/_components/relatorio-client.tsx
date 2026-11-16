@@ -33,7 +33,9 @@ import {
   SelecaoClinicas, SelecaoPeriodo, resolverPeriodo,
 } from "@/components/selecao-clinicas-periodo";
 import type { Preset } from "@/components/selecao-clinicas-periodo";
-import type { ComentarioItem } from "@/lib/relatorio/imagem-tipos";
+import type { ComentarioItem, FinanceiroSemanal, PersonalizadoCard } from "@/lib/relatorio/imagem-tipos";
+import { limparSemanal, ligado, tituloDaSecao, type KpiSemanal } from "@/lib/relatorio/estrutura-semanal";
+import { formatarIndicador } from "@/lib/fechamentos/formato-indicador";
 import {
   filtrarComentarios, parsePalavras, parseLimite, filtroAtivo,
 } from "@/lib/relatorio/filtrar-comentarios";
@@ -493,6 +495,17 @@ function FormImagem({ dados, onChange }: {
     onChange({ ...dados, visaoGeral: { ...visaoGeral, npsGoogle: { ...ng, ...patch } } });
   }
 
+  // Mostra só os campos dos blocos e cards ligados na estrutura do Semanal do cliente.
+  const est = limparSemanal(dados.estrutura);
+  const comCards = ligado(est.secoes, "indicadores");
+  const kpiOn = (...ids: KpiSemanal[]) => comCards && ids.some((id) => ligado(est.kpis, id));
+  const fin = dados.financeiro;
+  const num = (v: string) => (v.trim() === "" ? null : Number(v.replace(",", ".")));
+  const onFin = (patch: Partial<FinanceiroSemanal>) => fin && onChange({ ...dados, financeiro: { ...fin, ...patch } });
+  const onPers = (id: string, patch: Partial<PersonalizadoCard>) =>
+    onChange({ ...dados, personalizados: (dados.personalizados ?? []).map((p) => (p.id === id ? { ...p, ...patch } : p)) });
+  const persCards = (dados.personalizados ?? []).filter((p) => kpiOn(p.id as KpiSemanal));
+
   const pctNps    = calcPct(ng.respostas_nps,    ng.meta_nps_meta);
   const pctGoogle = calcPct(ng.avaliacoes_google, ng.meta_google_meta);
 
@@ -503,6 +516,54 @@ function FormImagem({ dados, onChange }: {
 
   return (
     <div className="space-y-6">
+      {fin && kpiOn("entradasPeriodo", "saidasPagas", "saldoPeriodo") && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Financeiro</h3>
+          <p className="text-xs text-muted-foreground flex items-center gap-1">
+            <Database className="h-3 w-3 shrink-0" />
+            Entradas da planilha de {fin.origemEntradas === "entradas" ? "Entradas" : "Vendas"}; saídas = despesas pagas, pela data de pagamento.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            {([["entradas", "Entradas do período"], ["entradasMes", "Entradas no mês"], ["saidas", "Saídas pagas no período"], ["saidasMes", "Saídas pagas no mês"]] as [keyof FinanceiroSemanal, string][]).map(([k, l]) => (
+              <div key={k} className="space-y-1">
+                <Label className="text-xs">{l} (R$)</Label>
+                <Input type="number" step="0.01" value={(fin[k] as number | null) ?? ""} placeholder="—"
+                  onChange={e => onFin({ [k]: num(e.target.value) } as Partial<FinanceiroSemanal>)} className="text-sm" />
+              </div>
+            ))}
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Saldo do período (auto)</Label>
+              <p className={`flex h-9 items-center text-sm font-semibold tabular-nums ${fin.entradas !== null && fin.saidas !== null && fin.entradas - fin.saidas < 0 ? "text-destructive" : ""}`}>
+                {fin.entradas !== null && fin.saidas !== null ? formatarIndicador(fin.entradas - fin.saidas, "moeda") : "—"}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {persCards.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Indicadores personalizados</h3>
+          <div className="space-y-2">
+            {persCards.map((p) => (
+              <div key={p.id} className="grid grid-cols-[1fr_7rem_7rem] items-end gap-2">
+                <span className="pb-2 text-sm">{p.nome}</span>
+                <div className="space-y-1">
+                  <Label className="text-xs">Atual</Label>
+                  <Input type="number" step="any" value={p.atual ?? ""} placeholder="—" onChange={e => onPers(p.id, { atual: num(e.target.value) })} className="text-sm" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Semana anterior</Label>
+                  <Input type="number" step="any" value={p.anterior ?? ""} placeholder="—" onChange={e => onPers(p.id, { anterior: num(e.target.value) })} className="text-sm" />
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground">Semana anterior vem do último report salvo (planilhas de posição atual) ou da própria planilha (movimentação).</p>
+        </div>
+      )}
+
+      {kpiOn("faturamentoPeriodo", "acumuladoMes") && (
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Faturamento x Meta</h3>
         <div className="grid grid-cols-2 gap-3">
@@ -567,6 +628,9 @@ function FormImagem({ dados, onChange }: {
         </div>
       </div>
 
+      )}
+
+      {kpiOn("respostasNps", "avaliacoesGoogle") && (
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">NPS / Google</h3>
         <div className="grid grid-cols-2 gap-3">
@@ -605,6 +669,9 @@ function FormImagem({ dados, onChange }: {
         </div>
       </div>
 
+      )}
+
+      {kpiOn("totalLeads") && (
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Comercial &amp; Conversão</h3>
         <div className="grid grid-cols-2 gap-3">
@@ -639,9 +706,11 @@ function FormImagem({ dados, onChange }: {
         </div>
       </div>
 
+      )}
+
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Principais Destaques</h3>
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{tituloDaSecao(est, "destaques")}</h3>
           <Button
             type="button"
             variant="outline"
@@ -669,14 +738,30 @@ function FormImagem({ dados, onChange }: {
         )}
         <ListaDestaques items={destaques} onChange={v => onChange({ ...dados, destaques: v })} />
       </div>
+      {ligado(est.secoes, "despesas") && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{tituloDaSecao(est, "despesas")}</h3>
+          <ListaEditavel items={dados.despesasRelevantes ?? []} onChange={v => onChange({ ...dados, despesasRelevantes: v })} placeholder="Ex.: Manutenção — R$ 3.200" />
+        </div>
+      )}
+      {ligado(est.secoes, "contratos") && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{tituloDaSecao(est, "contratos")}</h3>
+          <ListaEditavel items={dados.contratos ?? []} onChange={v => onChange({ ...dados, contratos: v })} placeholder="Ex.: Renovação da Loja 12 em negociação" />
+        </div>
+      )}
+      {ligado(est.secoes, "alertas") && (
       <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Alertas</h3>
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{tituloDaSecao(est, "alertas")}</h3>
         <ListaEditavel items={alertas} onChange={v => onChange({ ...dados, alertas: v })} placeholder="Texto do alerta…" />
       </div>
+      )}
+      {ligado(est.secoes, "acoes") && (
       <div className="space-y-3">
-        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Ações Sugeridas</h3>
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">{tituloDaSecao(est, "acoes")}</h3>
         <ListaEditavel items={acoes} onChange={v => onChange({ ...dados, acoes: v })} placeholder="Texto da ação…" />
       </div>
+      )}
     </div>
   );
 }

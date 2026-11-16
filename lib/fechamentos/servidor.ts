@@ -261,7 +261,7 @@ export function extrasDaConfig(config: unknown) {
 async function calcularPersonalizadas(clinicaId: string, fontes: FontePersonalizada[], periodo: Periodo, anterior: Periodo, releitura: boolean, padrao: { atual: Indicadores; anterior: Indicadores }): Promise<ResultadoPersonalizado[]> {
   const leituras = new Map<string, { leitura: LeituraPersonalizada | null; erro: string | null }>();
   await Promise.all(fontes.map(async (f) => {
-    const chave = `${clinicaId}|${f.id}|${f.sheetId}|${f.aba}|${f.linhaCabecalho ?? ""}|${f.colunaData}|${colunasUsadas(f).join("|")}`;
+    const chave = `${clinicaId}|${f.id}|${f.sheetId}|${f.aba}|${f.linhaCabecalho ?? ""}|${f.modo ?? ""}|${f.colunaData}|${colunasUsadas(f).join("|")}`;
     let c = cacheExtras.get(chave);
     if (releitura || !c || Date.now() - c.em > CACHE_MS) {
       c = { em: Date.now(), ...(await lerFontePersonalizada(f, readSheetValues)) };
@@ -537,4 +537,59 @@ export async function anoDoCliente(clinicaId: string, fimISO: string): Promise<{
   const ano = Number(fimISO.slice(0, 4)), mes = Number(fimISO.slice(5, 7));
   const linhas = resumoAnual(coleta.dados, ano, mes, regras).filter((m) => m.entradas || m.recebido || m.saidasCaixa || m.saidasCompetencia);
   return linhas.length ? { ano: String(ano), linhas } : null;
+}
+
+/* ---------- Report Semanal: modelo financeiro e operacional ---------- */
+
+export interface SemanalFinanceiro {
+  financeiro: { origemEntradas: "entradas" | "vendas"; entradas: number | null; entradasMes: number | null; saidas: number | null; saidasMes: number | null } | null;
+  /** Maiores categorias de despesa paga no período (nome, valor). */
+  despesas: { nome: string; valor: number }[];
+  /** Indicadores personalizados pela chave "<fonteId>.<indicadorId>". */
+  personalizados: Map<string, { nome: string; formato: ResultadoPersonalizado["indicadores"][number]["formato"]; melhor: ResultadoPersonalizado["indicadores"][number]["melhor"]; atual: number | null; anterior: number | null; posicao: boolean }>;
+  erros: string[];
+}
+
+/**
+ * Números do modelo financeiro do Report Semanal, com as mesmas regras dos
+ * fechamentos: entradas pela planilha de Entradas (sem ela, Vendas), saídas =
+ * despesas pagas pela data de pagamento, e os indicadores personalizados.
+ */
+export async function semanalFinanceiroDoCliente(clinicaId: string, periodo: Periodo, pedido: { financeiro: boolean; despesas: boolean; personalizados: boolean }): Promise<SemanalFinanceiro> {
+  const out: SemanalFinanceiro = { financeiro: null, despesas: [], personalizados: new Map(), erros: [] };
+  if (!pedido.financeiro && !pedido.despesas && !pedido.personalizados) return out;
+  const { coleta, regras, fontes, extras } = await coletarFontesDoCliente(clinicaId);
+  const ind = calcularIndicadores(coleta.dados, periodo, { regras });
+
+  if (pedido.financeiro || pedido.despesas) {
+    if (!fontes.despesas) out.erros.push("Saídas: planilha de Despesas não configurada em Clientes → Fontes de dados.");
+    else if (coleta.erros.despesas) out.erros.push(`Despesas: ${coleta.erros.despesas}`);
+  }
+  if (pedido.financeiro) {
+    const mes = { inicio: `${periodo.fim.slice(0, 8)}01`, fim: periodo.fim };
+    const indMes = calcularIndicadores(coleta.dados, mes, { regras });
+    const comEntradas = !!fontes.entradas && !!coleta.dados.entradas && !coleta.erros.entradas;
+    if (fontes.entradas && coleta.erros.entradas) out.erros.push(`Entradas: ${coleta.erros.entradas} (usei Vendas no lugar).`);
+    if (!comEntradas && coleta.erros.vendas) out.erros.push(`Vendas: ${coleta.erros.vendas}`);
+    out.financeiro = {
+      origemEntradas: comEntradas ? "entradas" : "vendas",
+      entradas: comEntradas ? ind.entradas?.total ?? null : ind.faturamento?.total ?? null,
+      entradasMes: comEntradas ? indMes.entradas?.total ?? null : indMes.faturamento?.total ?? null,
+      saidas: ind.despesas?.total ?? null,
+      saidasMes: indMes.despesas?.total ?? null,
+    };
+  }
+  if (pedido.despesas && ind.despesas) {
+    out.despesas = ind.despesas.porGrupo.flatMap((g) => g.categorias).filter((c) => c.valor > 0).sort((a, b) => b.valor - a.valor).slice(0, 5).map((c) => ({ nome: c.nome, valor: c.valor }));
+  }
+  if (pedido.personalizados && extras.length) {
+    const antes = mesmoTamanhoAntes(periodo);
+    const rs = await calcularPersonalizadas(clinicaId, extras, periodo, antes, false, { atual: ind, anterior: calcularIndicadores(coleta.dados, antes, { regras }) });
+    for (const r of rs) {
+      const f = extras.find((x) => x.id === r.id);
+      if (r.erro) out.erros.push(`${r.nome}: ${r.erro}`);
+      for (const i of r.indicadores) out.personalizados.set(`${r.id}.${i.id}`, { nome: i.nome, formato: i.formato, melhor: i.melhor, atual: i.atual, anterior: i.anterior, posicao: f?.modo === "posicao" });
+    }
+  }
+  return out;
 }
