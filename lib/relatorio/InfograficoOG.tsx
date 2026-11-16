@@ -1,4 +1,5 @@
 import React from "react";
+import { limparSemanal, ligado, type KpiSemanal, type SecaoSemanal } from "./estrutura-semanal";
 import type { RelatorioImagemData, DestaqueItem } from "./imagem-tipos";
 import {
   C, col, row, txt, isNA, fundoRaiz, LARGURA_OG,
@@ -290,11 +291,13 @@ function withDefaults(raw: RelatorioImagemData): RelatorioImagemData {
     destaques: raw.destaques ?? [],
     alertas:   raw.alertas   ?? [],
     acoes:     raw.acoes     ?? [],
+    estrutura: raw.estrutura,
   };
 }
 
 // ─── Monta os cards de indicador a partir dos dados (oculta os N/A) ──────────
 interface KpiSpec {
+  id: KpiSemanal;
   label: string;
   valor: string;
   sub: string;
@@ -314,6 +317,7 @@ function montarKpis(dados: RelatorioImagemData): KpiSpec[] {
   // 1 — Faturamento no período selecionado
   if (!isNA(fat.realizado_filtro)) {
     kpis.push({
+      id: "faturamentoPeriodo",
       label: "Faturamento no período",
       valor: txt(fat.realizado_filtro),
       sub: isNA(fat.meta_periodo) ? "Período avaliado" : `Meta do período: ${txt(fat.meta_periodo)}`,
@@ -324,6 +328,7 @@ function montarKpis(dados: RelatorioImagemData): KpiSpec[] {
   if (!isNA(fat.acumulado)) {
     const pct = numOk(fat.pct_mensal) ? fat.pct_mensal : null;
     kpis.push({
+      id: "acumuladoMes",
       label: "Acumulado no mês",
       valor: txt(fat.acumulado),
       pct,
@@ -336,6 +341,7 @@ function montarKpis(dados: RelatorioImagemData): KpiSpec[] {
     const meta = numOk(ng.meta_nps_meta) && ng.meta_nps_meta > 0 ? ng.meta_nps_meta : null;
     const pct = meta ? Math.round((ng.respostas_nps / meta) * 100) : null;
     kpis.push({
+      id: "respostasNps",
       label: "Respostas NPS",
       valor: String(ng.respostas_nps),
       sub: pct != null ? `${pct}% da meta (${meta})` : "No período avaliado",
@@ -348,6 +354,7 @@ function montarKpis(dados: RelatorioImagemData): KpiSpec[] {
     const meta = numOk(ng.meta_google_meta) && ng.meta_google_meta > 0 ? ng.meta_google_meta : null;
     const pct = meta ? Math.round((ng.avaliacoes_google / meta) * 100) : null;
     kpis.push({
+      id: "avaliacoesGoogle",
       label: "Avaliações Google",
       valor: String(ng.avaliacoes_google),
       sub: ng.avaliacoes_google === 0
@@ -361,6 +368,7 @@ function montarKpis(dados: RelatorioImagemData): KpiSpec[] {
   if (!isNA(com.total_leads)) {
     const zero = txt(com.total_leads) === "0";
     kpis.push({
+      id: "totalLeads",
       label: "Total de leads",
       valor: txt(com.total_leads),
       sub: zero
@@ -372,7 +380,10 @@ function montarKpis(dados: RelatorioImagemData): KpiSpec[] {
     });
   }
 
-  return kpis;
+  // Ordem e blocos escolhidos na estrutura do cliente (sem estrutura salva: todos, na ordem padrão).
+  const est = limparSemanal(dados.estrutura);
+  const pos = (id: KpiSemanal) => est.kpis.findIndex((k) => k.id === id);
+  return kpis.filter((k) => ligado(est.kpis, k.id)).sort((a, b) => pos(a.id) - pos(b.id));
 }
 
 // ─── Componente principal ─────────────────────────────────────────────────────
@@ -400,6 +411,86 @@ export function InfograficoOG({
     ? `SEMANA ${cabecalho.semana}`
     : txt(cabecalho.tag);
   const periodo = `${txt(cabecalho.periodo_ini)} até ${txt(cabecalho.periodo_fim)}`;
+
+  const est = limparSemanal(dados.estrutura);
+  const ordem = est.secoes.filter((x) => x.ligado && x.id !== "feedbacks").map((x) => x.id) as Exclude<SecaoSemanal, "feedbacks">[];
+  const blocos: Record<Exclude<SecaoSemanal, "feedbacks">, React.ReactNode> = {
+    indicadores: kpis.length > 0 ? (
+        <div key="indicadores" style={row({ gap: 12, marginTop: ordem[0] === "indicadores" ? 0 : 30 })}>
+          {kpis.map((k, i) => (
+            <KpiCard key={i} label={k.label} valor={k.valor} sub={k.sub} perigo={k.perigo} pct={k.pct} />
+          ))}
+        </div>
+    ) : null,
+    destaques: destaques.length > 0 ? (
+        <div key="destaques" style={col({ marginTop: 30 })}>
+          <SecaoTitulo label="Principais destaques" />
+          <div style={col({ gap: 10 })}>
+            {destaques.map((d, i) => (
+              <ItemCard key={i} icone={<DestaqueIcone tipo={d.tipo} />} texto={txt(d.texto)} />
+            ))}
+          </div>
+        </div>
+    ) : null,
+    alertas: alertas.length > 0 ? (
+        <div key="alertas" style={col({ marginTop: 30 })}>
+          <SecaoTitulo label="Alertas" />
+          <div style={col({ gap: 10 })}>
+            {alertas.map((a, i) => (
+              <ItemCard key={i} icone={<AlertaIcone />} texto={a} perigo />
+            ))}
+          </div>
+        </div>
+    ) : null,
+    acoes: acoes.length > 0 ? (
+        <div key="acoes" style={col({ marginTop: 30 })}>
+          <SecaoTitulo label="Ações sugeridas" />
+          <div style={col()}>
+            {acoes.map((a, i) => (
+              <div
+                key={i}
+                style={row({
+                  gap: 20,
+                  alignItems: "flex-start",
+                  paddingTop: i === 0 ? 2 : 14,
+                  paddingBottom: 14,
+                  // Linha sutil apenas entre as ações, sem card em volta
+                  borderTopWidth: i === 0 ? 0 : 1,
+                  borderTopStyle: "solid",
+                  borderTopColor: "rgba(255,255,255,0.08)",
+                })}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    width: 46,
+                    flexShrink: 0,
+                    fontSize: FONTE_NUM_ACAO,
+                    fontWeight: 800,
+                    color: C.roxo,
+                  }}
+                >
+                  {String(i + 1).padStart(2, "0")}
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    flex: 1,
+                    minWidth: 0,
+                    fontSize: FONTE_ITEM,
+                    color: C.branco,
+                    lineHeight: 1.45,
+                    paddingTop: 4,
+                  }}
+                >
+                  {a}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+    ) : null,
+  };
 
   return (
     <div style={fundoRaiz(largura)}>
@@ -469,88 +560,8 @@ export function InfograficoOG({
       {/* ── Divisor ── */}
       <div style={DIVISOR_CABECALHO} />
 
-      {/* ── Indicadores ── */}
-      {kpis.length > 0 && (
-        <div style={row({ gap: 12 })}>
-          {kpis.map((k, i) => (
-            <KpiCard key={i} label={k.label} valor={k.valor} sub={k.sub} perigo={k.perigo} pct={k.pct} />
-          ))}
-        </div>
-      )}
-
-      {/* ── Principais destaques ── */}
-      {destaques.length > 0 && (
-        <div style={col({ marginTop: 30 })}>
-          <SecaoTitulo label="Principais destaques" />
-          <div style={col({ gap: 10 })}>
-            {destaques.map((d, i) => (
-              <ItemCard key={i} icone={<DestaqueIcone tipo={d.tipo} />} texto={txt(d.texto)} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── Alertas ── */}
-      {alertas.length > 0 && (
-        <div style={col({ marginTop: 30 })}>
-          <SecaoTitulo label="Alertas" />
-          <div style={col({ gap: 10 })}>
-            {alertas.map((a, i) => (
-              <ItemCard key={i} icone={<AlertaIcone />} texto={a} perigo />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ── Ações sugeridas (sem moldura: usa o próprio fundo) ── */}
-      {acoes.length > 0 && (
-        <div style={col({ marginTop: 30 })}>
-          <SecaoTitulo label="Ações sugeridas" />
-          <div style={col()}>
-            {acoes.map((a, i) => (
-              <div
-                key={i}
-                style={row({
-                  gap: 20,
-                  alignItems: "flex-start",
-                  paddingTop: i === 0 ? 2 : 14,
-                  paddingBottom: 14,
-                  // Linha sutil apenas entre as ações, sem card em volta
-                  borderTopWidth: i === 0 ? 0 : 1,
-                  borderTopStyle: "solid",
-                  borderTopColor: "rgba(255,255,255,0.08)",
-                })}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    width: 46,
-                    flexShrink: 0,
-                    fontSize: FONTE_NUM_ACAO,
-                    fontWeight: 800,
-                    color: C.roxo,
-                  }}
-                >
-                  {String(i + 1).padStart(2, "0")}
-                </div>
-                <div
-                  style={{
-                    display: "flex",
-                    flex: 1,
-                    minWidth: 0,
-                    fontSize: FONTE_ITEM,
-                    color: C.branco,
-                    lineHeight: 1.45,
-                    paddingTop: 4,
-                  }}
-                >
-                  {a}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* ── Blocos na ordem da estrutura do cliente ── */}
+      {ordem.map((id) => blocos[id])}
 
       {/* ── Rodapé ── */}
       <div style={DIVISOR_RODAPE} />

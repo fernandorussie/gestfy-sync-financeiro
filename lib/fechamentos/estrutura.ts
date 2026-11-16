@@ -1,4 +1,5 @@
 import { limparOcultos, temBlocos } from "./blocos";
+import { limparSemanal, type EstruturaSemanal } from "@/lib/relatorio/estrutura-semanal";
 
 /**
  * Estrutura do relatório: quais seções aparecem, em que ordem, com que nível
@@ -39,7 +40,7 @@ export interface ItemSecao {
   /** Começar em página nova? Ausente = regra padrão (grandes abrem página; pequenas seguem a anterior pequena). */
   novaPagina?: boolean;
 }
-export type EstruturaRelatorio = Partial<Record<TipoRelatorio, ItemSecao[]>> & { secoes?: SecaoPersonalizada[] };
+export type EstruturaRelatorio = Partial<Record<TipoRelatorio, ItemSecao[]>> & { secoes?: SecaoPersonalizada[]; semanal?: EstruturaSemanal };
 
 const RESUMO_COMPLETO = (completo: string): NivelSecao[] => [{ id: "resumo", rotulo: "Resumo" }, { id: "completo", rotulo: completo }];
 
@@ -161,7 +162,7 @@ export function limparEstrutura(e: unknown, extras: ExtraSecao[] = []): Estrutur
   const o = (e ?? {}) as Record<string, unknown>;
   const secoes = limparSecoes(o.secoes);
   const todos = [...extras.filter((x) => x.tipo !== "secao"), ...secoes.map((x) => ({ id: x.id, nome: x.titulo, tipo: "secao" as const }))];
-  return { mensal: normalizarEstrutura(o.mensal, "mensal", todos), quinzenal: normalizarEstrutura(o.quinzenal, "quinzenal", todos), secoes };
+  return { mensal: normalizarEstrutura(o.mensal, "mensal", todos), quinzenal: normalizarEstrutura(o.quinzenal, "quinzenal", todos), secoes, semanal: limparSemanal(o.semanal) };
 }
 
 export const ehPadrao = (itens: ItemSecao[], tipo: TipoRelatorio, extras: ExtraSecao[] = []) => JSON.stringify(itens) === JSON.stringify(estruturaPadrao(tipo, extras));

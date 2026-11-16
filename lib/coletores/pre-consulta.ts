@@ -34,7 +34,7 @@ function normalize(s: string): string {
   return s.trim().toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 }
 
-function contar(values: string[]): RespostaContagem[] {
+export function contar(values: string[]): RespostaContagem[] {
   const map = new Map<string, { nome: string; count: number }>();
   for (const raw of values) {
     const v = raw.trim();

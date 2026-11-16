@@ -6,7 +6,7 @@
  * as regras da clínica e os ajustes decididos na conferência; devolve os
  * números prontos para tela, PDF, texto e IA. Não lê planilha nem banco.
  */
-import type { Avaliacao, Despesa, Lead, Orcamento, Recebimento, RespostaNps, Venda } from "./leitores";
+import type { Avaliacao, Despesa, Lead, Orcamento, Recebimento, RespostaNps, RespostaPreConsulta, Venda } from "./leitores";
 import { grupoDaEntrada, type GrupoEntrada } from "./entradas";
 import { GRUPO_SEM_CLASSIFICACAO, GRUPOS_DESPESA, montarPlano } from "./plano-contas";
 import { centavos, normalizar, type DataISO } from "./texto";
@@ -26,6 +26,8 @@ export interface DadosFechamento {
   avaliacoes: Avaliacao[] | null;
   /** Entradas de caixa (recebimentos). Fonte opcional: sem ela, não existe "resultado de caixa". */
   entradas?: Recebimento[] | null;
+  /** Pesquisa de pré-consulta (só o Report Semanal usa). */
+  preConsulta?: RespostaPreConsulta[] | null;
 }
 
 /** Regras fixas da clínica, guardadas no mapa dela. */
@@ -44,6 +46,12 @@ export interface RegrasClinica {
   statusCancelado?: string[];
   /** Categoria de entrada (normalizada) → grupo, confirmado pelo consultor. */
   categoriasEntrada?: Record<string, GrupoEntrada>;
+  /** Quando as fontes do Report Semanal foram trazidas para a fonte única (uma vez por cliente). */
+  fontesUnicasEm?: string;
+  /** O que não deu para trazer sozinho (ex.: uma aba por mês), para mostrar na tela. */
+  fontesUnicasNotas?: string[];
+  /** Checkpoint: cadência de cada fonte ("diaria", "semanal" ou "nao" para não conferir). */
+  checkpoint?: Record<string, "diaria" | "semanal" | "nao">;
 }
 
 export type CampoUnificavel = "profissional" | "unidade" | "pagamento" | "origem" | "interesse" | "objecao" | "grupoReceita";
@@ -165,7 +173,7 @@ export interface Indicadores {
   meta: { valor: number; atingimento: number; falta: number } | null;
 }
 
-const PADRAO = {
+export const REGRAS_PADRAO = {
   statusAgendou: ["agendou", "agendado", "sim"],
   statusFechado: ["protocolo", "fechou", "fechado", "vendido"],
   statusEmAberto: ["em negociacao", "agendado", "aguardando", "pendente"],
@@ -400,7 +408,7 @@ export function calcularIndicadores(
   let leads: Indicadores["leads"] = null;
   if (dados.leads) {
     const ls = dados.leads.filter((l) => noPeriodo(l.data, periodo));
-    const agendou = new Set((regras.statusAgendou ?? PADRAO.statusAgendou).map(normalizar));
+    const agendou = new Set((regras.statusAgendou ?? REGRAS_PADRAO.statusAgendou).map(normalizar));
     const agendados = ls.filter((l) => agendou.has(normalizar(l.status))).length;
     const um = () => 1;
     leads = {
@@ -420,10 +428,10 @@ export function calcularIndicadores(
     const temPrescricao = dados.orcamentos.some((o) => o.prescricao !== null);
     const os = dados.orcamentos.filter((o) => noPeriodo(o.data, periodo) && (!temPrescricao || o.prescricao === true));
     const contem = (lista: string[]) => (o: Orcamento) => lista.map(normalizar).some((t) => normalizar(o.status).includes(t));
-    const ehCancelado = contem(regras.statusCancelado ?? PADRAO.statusCancelado);
-    const ehFechado = (o: Orcamento) => !ehCancelado(o) && contem(regras.statusFechado ?? PADRAO.statusFechado)(o);
-    const ehNaoFechou = (o: Orcamento) => !ehCancelado(o) && contem(regras.statusNaoFechou ?? PADRAO.statusNaoFechou)(o);
-    const ehAberto = (o: Orcamento) => !ehCancelado(o) && !ehFechado(o) && !ehNaoFechou(o) && contem(regras.statusEmAberto ?? PADRAO.statusEmAberto)(o);
+    const ehCancelado = contem(regras.statusCancelado ?? REGRAS_PADRAO.statusCancelado);
+    const ehFechado = (o: Orcamento) => !ehCancelado(o) && contem(regras.statusFechado ?? REGRAS_PADRAO.statusFechado)(o);
+    const ehNaoFechou = (o: Orcamento) => !ehCancelado(o) && contem(regras.statusNaoFechou ?? REGRAS_PADRAO.statusNaoFechou)(o);
+    const ehAberto = (o: Orcamento) => !ehCancelado(o) && !ehFechado(o) && !ehNaoFechou(o) && contem(regras.statusEmAberto ?? REGRAS_PADRAO.statusEmAberto)(o);
     const fechados = os.filter((o) => ehFechado(o) && !ehNaoFechou(o));
     const abertos = os.filter(ehAberto);
     const cancelados = os.filter(ehCancelado);

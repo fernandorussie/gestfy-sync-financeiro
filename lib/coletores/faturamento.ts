@@ -127,7 +127,7 @@ function normKey(s: string): string {
   return s.trim().normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 }
 
-function buildGrupo(
+export function buildGrupo(
   items: Array<{ key: string; valor: number }>,
   total: number
 ): Record<string, GrupoFinanceiro> {

@@ -6,6 +6,7 @@
  * cache curto por clínica, para que cada decisão da conferência não precise
  * reler tudo. No banco vão só decisões e totais.
  */
+import { garantirFontesUnicas } from "@/lib/clientes/fontes-unicas";
 import { calcularRitmo, type Ritmo } from "./ritmo";
 import { limparFicha, type FichaClinica } from "./ficha";
 import { vocabularioDe, type Vocabulario } from "./vocabulario";
@@ -104,6 +105,20 @@ async function coletarClinica(clinicaId: string, fontes: FontesFechamento, relei
 
 export function limparCache(clinicaId: string) {
   cache.delete(clinicaId);
+}
+
+/**
+ * Planilhas do cliente pela fonte única (Report Semanal e Checkpoint usam
+ * esta entrada; os fechamentos leem a mesma configuração). Usa o mesmo cache
+ * de 10 minutos; `releitura` força ler de novo.
+ */
+export async function coletarFontesDoCliente(clinicaId: string, releitura = false): Promise<{ coleta: ResultadoColeta; regras: RegrasClinica; fontes: FontesFechamento; extras: FontePersonalizada[] }> {
+  await garantirFontesUnicas(clinicaId);
+  const { data: config } = await getSupabaseAdmin().from("fechamento_config").select("*").eq("clinica_id", clinicaId).maybeSingle();
+  const fontes = (config?.fontes ?? {}) as unknown as FontesFechamento;
+  const regras = (config?.regras ?? {}) as unknown as RegrasClinica;
+  const { coleta } = await coletarClinica(clinicaId, fontes, releitura);
+  return { coleta, regras, fontes, extras: fontesExtras((config as { fontes_extras?: unknown } | null)?.fontes_extras) };
 }
 
 /** Lê uma fonte isolada, sem cache (tela de configuração). */

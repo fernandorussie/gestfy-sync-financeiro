@@ -109,11 +109,11 @@ function ClinicaCheckpointCard({
         {linha.semIndicadores ? (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Nenhum indicador ativo para este cliente.
+              Nenhuma fonte de dados para conferir: o cliente ainda não tem planilhas configuradas, ou todas estão marcadas para não conferir.
             </p>
             <Button variant="outline" size="sm" asChild className="gap-1.5">
               <Link href={`/clientes/${linha.clinicaId}?aba=fontes#checkpoint`}>
-                <Settings2 className="h-3.5 w-3.5" />Configurar indicadores
+                <Settings2 className="h-3.5 w-3.5" />Configurar fontes de dados
               </Link>
             </Button>
           </div>

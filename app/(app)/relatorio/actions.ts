@@ -3,14 +3,13 @@
 import { headers } from "next/headers";
 import { checkRateLimit, rateLimitKey } from "@/lib/rate-limit";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
-import { coletarPreConsulta } from "@/lib/coletores/pre-consulta";
-import { coletarNPS } from "@/lib/coletores/nps";
 import { coletarAvaliacoesGoogle } from "@/lib/coletores/google-places";
 import type { AvaliacaoGoogle } from "@/lib/coletores/google-places";
-import { coletarLeads } from "@/lib/coletores/leads";
 import type { ResultadoLeads } from "@/lib/coletores/leads";
 import { coletarMetas } from "@/lib/coletores/metas";
-import { coletarFaturamento } from "@/lib/coletores/faturamento";
+import { coletarFontesDoCliente } from "@/lib/fechamentos/servidor";
+import { reportSemanalDaFonte } from "@/lib/relatorio/fonte-unica";
+import { limparSemanal, ligado } from "@/lib/relatorio/estrutura-semanal";
 import { descreverPerformance, calcularPercentualMeta } from "@/lib/metas";
 import { montarPesquisas, montarMetas } from "@/lib/relatorio/montar-whatsapp";
 import { montarDadosImagem } from "@/lib/relatorio/montar-imagem-dados";
@@ -28,6 +27,26 @@ interface GerarParams {
   googleManual?: string;
   googleManualAvaliacoes?: AvaliacaoGoogle[];
   leadsManual?: { total: number; convertidos: number };
+}
+
+/**
+ * Lê as planilhas do cliente pela fonte única (a mesma do Checkpoint e dos
+ * relatórios Quinzenal e Mensal) e recorta o período do report.
+ */
+async function dadosDaFonteUnica(clinicaId: string, dataInicio: Date, dataFim: Date, erros: string[]) {
+  try {
+    const { coleta, regras, fontes } = await coletarFontesDoCliente(clinicaId);
+    const nomes = { vendas: "Faturamento", nps: "NPS", leads: "Leads", preConsulta: "Pré-Consulta" } as const;
+    for (const [k, rot] of Object.entries(nomes) as [keyof typeof nomes, string][]) {
+      const e = coleta.erros[k];
+      if (e) erros.push(`${rot}: ${e}`);
+      else if (!fontes[k] && (k === "nps" || k === "preConsulta")) erros.push(`${rot}: fonte não configurada em Clientes → Fontes de dados`);
+    }
+    return reportSemanalDaFonte(coleta.dados, regras, dataInicio, dataFim);
+  } catch (e) {
+    erros.push(`Planilhas: ${e instanceof Error ? e.message : "não foi possível ler as fontes de dados do cliente."}`);
+    return { pre: null, nps: null, leads: null, fatFiltro: null, fatAcum: null };
+  }
 }
 
 function leadsFromManual(m: { total: number; convertidos: number }): ResultadoLeads {
@@ -56,8 +75,6 @@ export async function gerarRelatorioWhatsapp(
   const [fimY, fimM, fimD] = fim.split("-").map(Number);
   const dataInicio    = new Date(iniY, iniM - 1, iniD);
   const dataFim       = new Date(fimY, fimM - 1, fimD);
-  const primeroDiaMes = new Date(fimY, fimM - 1, 1); // dia 01 do mês da data_fim
-
   const { data: clinica } = await db
     .from("clinicas")
     .select("*")
@@ -69,40 +86,22 @@ export async function gerarRelatorioWhatsapp(
   let texto = "";
 
   if (formato === "whatsapp_pesquisas") {
-    const { data: fontes } = await db
-      .from("fontes_dados")
-      .select("*")
-      .eq("clinica_id", clinicaId);
-
-    const fontePre  = fontes?.find((f) => f.tipo === "pre_consulta") ?? null;
-    const fonteNps  = fontes?.find((f) => f.tipo === "nps")          ?? null;
-    const fonteLead = fontes?.find((f) => f.tipo === "leads")        ?? null;
-
-    const [preResult, npsResult, googleResult, metasResult] = await Promise.allSettled([
-      fontePre
-        ? coletarPreConsulta(fontePre, dataInicio, dataFim)
-        : Promise.reject(new Error("Fonte Pré-Consulta não configurada")),
-      fonteNps
-        ? coletarNPS(fonteNps, dataInicio, dataFim)
-        : Promise.reject(new Error("Fonte NPS não configurada")),
+    const [fonte, googleResult, metasResult] = await Promise.all([
+      dadosDaFonteUnica(clinicaId, dataInicio, dataFim, erros),
       clinica.google_place_id
-        ? coletarAvaliacoesGoogle(clinica.google_place_id, dataInicio, dataFim)
-        : Promise.reject(new Error("Google Place ID não configurado")),
-      coletarMetas(clinicaId, dataFim),
+        ? coletarAvaliacoesGoogle(clinica.google_place_id, dataInicio, dataFim).then((v) => ({ ok: true as const, v }), (e: Error) => ({ ok: false as const, e }))
+        : Promise.resolve({ ok: false as const, e: new Error("Google Place ID não configurado") }),
+      coletarMetas(clinicaId, dataFim).catch(() => []),
     ]);
 
-    const pre    = preResult.status    === "fulfilled" ? preResult.value    : null;
-    const nps    = npsResult.status    === "fulfilled" ? npsResult.value    : null;
-    const google = googleResult.status === "fulfilled" ? googleResult.value : null;
-    const metas  = metasResult.status  === "fulfilled" ? metasResult.value  : [];
+    const pre    = fonte.pre;
+    const nps    = fonte.nps;
+    const google = googleResult.ok ? googleResult.v : null;
+    const metas  = metasResult;
 
-    if (preResult.status    === "rejected")
-      erros.push(`Pré-Consulta: ${(preResult.reason as Error).message}`);
-    if (npsResult.status    === "rejected")
-      erros.push(`NPS: ${(npsResult.reason as Error).message}`);
-    if (googleResult.status === "rejected") {
+    if (!googleResult.ok) {
       erros.push(
-        `Google: A consulta automática está indisponível (${(googleResult.reason as Error).message}). ` +
+        `Google: A consulta automática está indisponível (${googleResult.e.message}). ` +
         `Confira as avaliações da semana no Google e insira manualmente no campo acima.`
       );
     } else if (google && google.total === 0 && !googleManualAvaliacoes?.length) {
@@ -113,16 +112,8 @@ export async function gerarRelatorioWhatsapp(
       );
     }
 
-    // Leads: manual prevalece; caso contrário, tenta planilha
-    let leads: ResultadoLeads | null = null;
-    if (leadsManual) {
-      leads = leadsFromManual(leadsManual);
-    } else if (fonteLead) {
-      leads = await coletarLeads(fonteLead, dataInicio, dataFim).catch((e: Error) => {
-        erros.push(`Leads: ${e.message}`);
-        return null;
-      });
-    }
+    // Leads: manual prevalece; caso contrário, vem da planilha
+    const leads: ResultadoLeads | null = leadsManual ? leadsFromManual(leadsManual) : fonte.leads;
 
     const metaLeads = metas.find((m) => m.tipo_nome.toLowerCase().includes("lead")) ?? null;
 
@@ -140,30 +131,25 @@ export async function gerarRelatorioWhatsapp(
     );
 
   } else if (formato === "whatsapp_metas") {
-    const [metasResult, { data: fontesData }] = await Promise.all([
+    const [metasResult, fonte] = await Promise.all([
       coletarMetas(clinicaId, dataFim).catch((err: Error) => {
         erros.push(`Metas: ${err.message}`);
         return [];
       }),
-      db.from("fontes_dados").select("*").eq("clinica_id", clinicaId),
+      dadosDaFonteUnica(clinicaId, dataInicio, dataFim, erros),
     ]);
-
-    const fonteFaturamento = fontesData?.find((f) => f.tipo === "faturamento") ?? null;
 
     let metas = metasResult;
 
-    // Se há planilha de faturamento, substitui o realizado da meta usando o ACUMULADO do mês
-    if (fonteFaturamento) {
-      const fatResult = await coletarFaturamento(fonteFaturamento, primeroDiaMes, dataFim).catch(() => null);
-      if (fatResult != null) {
-        metas = metas.map((m) => {
-          if (!m.tipo_nome.toLowerCase().includes("faturamento")) return m;
-          const newRealizado = fatResult.total_faturado;
-          const performance  = descreverPerformance(newRealizado, m.meta_periodo, m.meta_mensal, m.tipo_comportamento);
-          const pct_mensal   = calcularPercentualMeta(newRealizado, m.meta_mensal);
-          return { ...m, realizado: newRealizado, performance, pct_mensal };
-        });
-      }
+    // Com a planilha de vendas, o realizado da meta de faturamento é o ACUMULADO do mês (dia 01 → data fim)
+    if (fonte.fatAcum) {
+      const newRealizado = fonte.fatAcum.total_faturado;
+      metas = metas.map((m) => {
+        if (!m.tipo_nome.toLowerCase().includes("faturamento")) return m;
+        const performance  = descreverPerformance(newRealizado, m.meta_periodo, m.meta_mensal, m.tipo_comportamento);
+        const pct_mensal   = calcularPercentualMeta(newRealizado, m.meta_mensal);
+        return { ...m, realizado: newRealizado, performance, pct_mensal };
+      });
     }
 
     texto = montarMetas(clinica.nome, metas, dataInicio, dataFim);
@@ -205,7 +191,6 @@ export async function prepararDadosImagem(params: {
   const [fimY, fimM, fimD] = fim.split("-").map(Number);
   const dataInicio    = new Date(iniY, iniM - 1, iniD);
   const dataFim       = new Date(fimY, fimM - 1, fimD);
-  const primeroDiaMes = new Date(fimY, fimM - 1, 1); // dia 01 do mês da data_fim → acumulado
 
   const { data: clinica } = await db
     .from("clinicas")
@@ -217,66 +202,32 @@ export async function prepararDadosImagem(params: {
     return { dados: {} as RelatorioImagemData, erros: ["Cliente não encontrado."] };
   }
 
-  const { data: fontes } = await db
-    .from("fontes_dados")
-    .select("*")
-    .eq("clinica_id", clinicaId);
+  // Estrutura do Semanal do cliente (blocos e ordem); sem estrutura salva, vale o padrão.
+  const { data: cfgRel } = await db.from("fechamento_config").select("relatorio").eq("clinica_id", clinicaId).maybeSingle();
+  const estrutura = limparSemanal((cfgRel?.relatorio as { semanal?: unknown } | null)?.semanal);
+  const comFeedbacks = incluirComentarios === true && ligado(estrutura.secoes, "feedbacks");
+  if (incluirComentarios && !comFeedbacks) erros.push("Feedbacks: a página de feedbacks está desligada na estrutura do Semanal deste cliente (Clientes → Estrutura dos relatórios).");
 
-  const fontePre         = fontes?.find((f) => f.tipo === "pre_consulta") ?? null;
-  const fonteNps         = fontes?.find((f) => f.tipo === "nps")          ?? null;
-  const fonteLead        = fontes?.find((f) => f.tipo === "leads")        ?? null;
-  const fonteFaturamento = fontes?.find((f) => f.tipo === "faturamento")  ?? null;
+  const [fonte, googleResult, metasResult] = await Promise.all([
+    dadosDaFonteUnica(clinicaId, dataInicio, dataFim, erros),
+    clinica.google_place_id
+      ? coletarAvaliacoesGoogle(clinica.google_place_id, dataInicio, dataFim).then((v) => ({ ok: true as const, v }), (e: Error) => ({ ok: false as const, e }))
+      : Promise.resolve({ ok: false as const, e: new Error("Google Place ID não configurado") }),
+    coletarMetas(clinicaId, dataFim).then((v) => ({ ok: true as const, v }), (e: Error) => ({ ok: false as const, e })),
+  ]);
 
-  // Duas chamadas de faturamento em paralelo: filtro (período selecionado) e acumulado (mês inteiro até data_fim)
-  const [preResult, npsResult, googleResult, metasResult, fatFiltroResult, fatAcumResult] =
-    await Promise.allSettled([
-      fontePre
-        ? coletarPreConsulta(fontePre, dataInicio, dataFim)
-        : Promise.reject(new Error("Fonte Pré-Consulta não configurada")),
-      fonteNps
-        ? coletarNPS(fonteNps, dataInicio, dataFim)
-        : Promise.reject(new Error("Fonte NPS não configurada")),
-      clinica.google_place_id
-        ? coletarAvaliacoesGoogle(clinica.google_place_id, dataInicio, dataFim)
-        : Promise.reject(new Error("Google Place ID não configurado")),
-      coletarMetas(clinicaId, dataFim),
-      fonteFaturamento
-        ? coletarFaturamento(fonteFaturamento, dataInicio, dataFim)          // filtro: período selecionado
-        : Promise.reject(new Error("Fonte de faturamento não configurada")),
-      fonteFaturamento
-        ? coletarFaturamento(fonteFaturamento, primeroDiaMes, dataFim)       // acumulado: dia 01 → data_fim
-        : Promise.reject(new Error("Fonte de faturamento não configurada")),
-    ]);
+  const pre       = fonte.pre;
+  const nps       = fonte.nps;
+  const google    = googleResult.ok ? googleResult.v : null;
+  const metas     = metasResult.ok ? metasResult.v : [];
+  const fatFiltro = fonte.fatFiltro;
+  const fatAcum   = fonte.fatAcum;
 
-  const pre       = preResult.status    === "fulfilled" ? preResult.value    : null;
-  const nps       = npsResult.status    === "fulfilled" ? npsResult.value    : null;
-  const google    = googleResult.status === "fulfilled" ? googleResult.value : null;
-  const metas     = metasResult.status  === "fulfilled" ? metasResult.value  : [];
-  const fatFiltro = fatFiltroResult.status === "fulfilled" ? fatFiltroResult.value : null;
-  const fatAcum   = fatAcumResult.status   === "fulfilled" ? fatAcumResult.value   : null;
+  if (!googleResult.ok) erros.push(`Google: ${googleResult.e.message}`);
+  if (!metasResult.ok) erros.push(`Metas: ${metasResult.e.message}`);
 
-  if (preResult.status    === "rejected")
-    erros.push(`Pré-Consulta: ${(preResult.reason as Error).message}`);
-  if (npsResult.status    === "rejected")
-    erros.push(`NPS: ${(npsResult.reason as Error).message}`);
-  if (googleResult.status === "rejected")
-    erros.push(`Google: ${(googleResult.reason as Error).message}`);
-  if (metasResult.status  === "rejected")
-    erros.push(`Metas: ${(metasResult.reason as Error).message}`);
-  // Expõe erro de faturamento apenas quando a fonte está configurada (aba faltando etc.)
-  if (fonteFaturamento && fatFiltroResult.status === "rejected")
-    erros.push(`Faturamento: ${(fatFiltroResult.reason as Error).message}`);
-
-  // Leads: manual prevalece; caso contrário, tenta planilha
-  let leads: ResultadoLeads | null = null;
-  if (leadsManual) {
-    leads = leadsFromManual(leadsManual);
-  } else if (fonteLead) {
-    leads = await coletarLeads(fonteLead, dataInicio, dataFim).catch((e: Error) => {
-      erros.push(`Leads: ${e.message}`);
-      return null;
-    });
-  }
+  // Leads: manual prevalece; caso contrário, vem da planilha
+  const leads: ResultadoLeads | null = leadsManual ? leadsFromManual(leadsManual) : fonte.leads;
 
   const dados = montarDadosImagem(
     clinica,
@@ -291,11 +242,12 @@ export async function prepararDadosImagem(params: {
     fatAcum?.total_faturado      ?? null,   // realizadoAcumulado: dia 01 → data_fim
     fatFiltro?.por_categoria     ?? null,
     fatFiltro?.por_profissional  ?? null,
-    incluirComentarios === true,
+    comFeedbacks,
     googleManualAvaliacoes ?? null,
   );
+  dados.estrutura = estrutura;
 
-  if (incluirComentarios && (dados.comentarios?.length ?? 0) === 0) {
+  if (comFeedbacks && (dados.comentarios?.length ?? 0) === 0) {
     erros.push(
       "Feedbacks: nenhum comentário encontrado no período (NPS e Google). " +
       "A página de comentários não será gerada."

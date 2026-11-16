@@ -5,15 +5,16 @@ import { CheckCircle2, Loader2, PlayCircle, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { DefinicaoFonte } from "@/lib/fechamentos/colunas";
 import type { FontesFechamento } from "@/lib/fechamentos/coleta";
-import { DEF_DESPESAS, DEF_ENTRADAS, DEF_LEADS, DEF_NPS, DEF_ORCAMENTOS, DEF_VENDAS } from "@/lib/fechamentos/leitores";
+import { DEF_DESPESAS, DEF_ENTRADAS, DEF_LEADS, DEF_NPS, DEF_ORCAMENTOS, DEF_PRE_CONSULTA, DEF_VENDAS } from "@/lib/fechamentos/leitores";
 import { testarLeitura } from "../../actions";
 
 /*
- * Planilhas padrão do fechamento (vendas, despesas, orçamentos, leads, NPS).
+ * Planilhas padrão do cliente (vendas, despesas, entradas, orçamentos, leads,
+ * NPS, pré-consulta), lidas por todos os relatórios e pelo Checkpoint.
  * O corpo de cada uma aparece dentro do card expandido da lista de fontes.
  */
 
-export type NomePadrao = "vendas" | "despesas" | "entradas" | "orcamentos" | "leads" | "nps";
+export type NomePadrao = "vendas" | "despesas" | "entradas" | "orcamentos" | "leads" | "nps" | "preConsulta";
 export type CfgPadrao = { sheetId: string; aba: string; colunas?: Record<string, string>; linhaCabecalho?: number };
 export type EstadoConexao = { tipo: "ok"; texto: string } | { tipo: "erro"; texto: string } | null;
 
@@ -23,7 +24,8 @@ export const FONTES_PADRAO: { nome: NomePadrao; titulo: string; ajuda: string; d
   { nome: "entradas", titulo: "Entradas de caixa", ajuda: "Recebimentos efetivos. Opcional: sem ela, o resultado aparece como “Faturamento x Despesas”", def: DEF_ENTRADAS },
   { nome: "orcamentos", titulo: "Orçamentos", ajuda: "Orçamentos gerados e fechados", def: DEF_ORCAMENTOS },
   { nome: "leads", titulo: "Leads / CRM", ajuda: "Funil de leads, origem e objeções", def: DEF_LEADS },
-  { nome: "nps", titulo: "NPS", ajuda: "Pesquisa de satisfação", def: DEF_NPS },
+  { nome: "nps", titulo: "NPS", ajuda: "Pesquisa de satisfação. Comentário, nome, anonimato e indicação alimentam a página de feedbacks do Report Semanal", def: DEF_NPS },
+  { nome: "preConsulta", titulo: "Pré-consulta", ajuda: "Pesquisa feita antes do atendimento: motivo e como conheceu (Report Semanal)", def: DEF_PRE_CONSULTA },
 ];
 
 export function cfgInicial(inicial: FontesFechamento): Record<NomePadrao, CfgPadrao> {

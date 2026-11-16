@@ -68,7 +68,7 @@ const ORDEM: Record<Gravidade, number> = { grave: 0, atencao: 1, info: 2 };
 const brl = (v: number) => "R$ " + v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const no = (d: string | null, p: Periodo) => !!d && d >= p.inicio && d <= p.fim;
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
-const NOME_FONTE: Record<Fonte, string> = { vendas: "Vendas", despesas: "Despesas", orcamentos: "Orçamentos", leads: "Leads", nps: "NPS", avaliacoes: "Avaliações Google", entradas: "Entradas" };
+const NOME_FONTE: Record<Fonte, string> = { vendas: "Vendas", despesas: "Despesas", orcamentos: "Orçamentos", leads: "Leads", nps: "NPS", avaliacoes: "Avaliações Google", entradas: "Entradas", preConsulta: "Pré-consulta" };
 
 export function conferir(e: EntradaConferencia): Alerta[] {
   const { dados, periodo } = e;

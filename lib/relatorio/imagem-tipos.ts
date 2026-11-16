@@ -1,3 +1,5 @@
+import type { EstruturaSemanal } from "./estrutura-semanal";
+
 export type TipoDestaque = "positivo" | "atencao" | "financeiro";
 
 export interface DestaqueItem {
@@ -80,4 +82,6 @@ export interface RelatorioImagemData {
   faturamento_suplementar?: FaturamentoSuplementar;
   /** Página 2 (opcional): só é preenchida quando o usuário pede os feedbacks. */
   comentarios?: ComentarioItem[];
+  /** Blocos ligados e ordem, conforme a estrutura do Semanal do cliente (sem ela: o padrão). */
+  estrutura?: EstruturaSemanal;
 }

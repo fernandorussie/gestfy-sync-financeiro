@@ -76,7 +76,7 @@ function mediaValida(values: (number | null)[]): number | null {
  * Se não encontrar um número com 10 ou 11 dígitos, retorna usa_bruto=true
  * e todo o texto deve ser exibido sem cortes.
  */
-function parseTelefoneIndicacao(texto: string): Pick<Indicacao, "nome_indicado" | "numero" | "usa_bruto"> {
+export function parseTelefoneIndicacao(texto: string): Pick<Indicacao, "nome_indicado" | "numero" | "usa_bruto"> {
   // Padrão: opcional ( DDD ) + espaços + 4-5 dígitos + separador opcional + 4 dígitos
   const phoneRe = /\(?\d{2}\)?\s*\d{4,5}[-\s]?\d{4}/;
   const match = texto.match(phoneRe);

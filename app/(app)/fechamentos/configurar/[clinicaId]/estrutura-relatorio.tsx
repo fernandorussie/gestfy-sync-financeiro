@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { defSecao, ehPadrao, estruturaPadrao, normalizarEstrutura, paginar, type EstruturaRelatorio, type ExtraSecao, type ItemSecao, type SecaoPersonalizada, type TipoRelatorio } from "@/lib/fechamentos/estrutura";
 import { blocosDa, blocosLigados } from "@/lib/fechamentos/blocos";
 import { salvarEstrutura } from "../../actions";
+import { ehPadraoSemanal, padraoSemanal, limparSemanal } from "@/lib/relatorio/estrutura-semanal";
+import { EditorSemanal } from "./estrutura-semanal";
 
 const COR: Record<TipoRelatorio, string> = { mensal: "#7B099C", quinzenal: "#E04800" };
 
@@ -31,8 +33,10 @@ export function EstruturaRelatorioCard({ clinicaId, inicial, extrasFontes = [], 
 }) {
   const [aberta, setAberta] = useState<string | null>(null);
   const router = useRouter();
-  const [tipo, setTipo] = useState<TipoRelatorio>("mensal");
-  const [estrutura, setEstrutura] = useState(inicial);
+  const [vista, setVista] = useState<TipoRelatorio | "semanal">("mensal");
+  const semanal = vista === "semanal";
+  const tipo: TipoRelatorio = semanal ? "mensal" : vista;
+  const [estrutura, setEstrutura] = useState(() => ({ ...inicial, semanal: limparSemanal(inicial.semanal) }));
   const [mudou, setMudou] = useState(false);
   const [salvando, iniciar] = useTransition();
   const itens = estrutura[tipo];
@@ -86,19 +90,24 @@ export function EstruturaRelatorioCard({ clinicaId, inicial, extrasFontes = [], 
         <div className="max-w-2xl space-y-1">
           <h2 className="font-semibold">Estrutura do relatório</h2>
           <p className="text-sm text-muted-foreground">
-            Escolha as seções do PDF deste cliente, a ordem e o nível de detalhe. As seções com cadeado formam o padrão mínimo Gestfy e não podem ser ocultadas. Fechamentos já concluídos mantêm a estrutura da época.
+            {semanal
+              ? "Escolha os blocos da imagem do Report Semanal deste cliente e a ordem em que aparecem. O visual continua o mesmo para todos os clientes."
+              : "Escolha as seções do PDF deste cliente, a ordem e o nível de detalhe. As seções com cadeado formam o padrão mínimo Gestfy e não podem ser ocultadas. Fechamentos já concluídos mantêm a estrutura da época."}
           </p>
         </div>
         <div className="inline-flex rounded-md border p-0.5" role="tablist" aria-label="Tipo de relatório">
-          {(["mensal", "quinzenal"] as const).map((t) => (
-            <button key={t} type="button" role="tab" aria-selected={tipo === t} onClick={() => setTipo(t)}
-              className={`rounded px-3 py-1 text-sm font-medium ${tipo === t ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:bg-muted"}`}>
-              {t === "mensal" ? "Mensal" : "Quinzenal"}
+          {(["mensal", "quinzenal", "semanal"] as const).map((t) => (
+            <button key={t} type="button" role="tab" aria-selected={vista === t} onClick={() => setVista(t)}
+              className={`rounded px-3 py-1 text-sm font-medium ${vista === t ? "bg-secondary text-secondary-foreground" : "text-muted-foreground hover:bg-muted"}`}>
+              {t === "mensal" ? "Mensal" : t === "quinzenal" ? "Quinzenal" : "Semanal"}
             </button>
           ))}
         </div>
       </div>
 
+      {semanal ? (
+        <EditorSemanal valor={estrutura.semanal} onChange={(v) => { setEstrutura({ ...estrutura, semanal: v }); setMudou(true); }} />
+      ) : (<>
       <div className="grid gap-5 lg:grid-cols-[1fr_260px]">
         <ol className="divide-y rounded-md border">
           {itens.map((it, k) => {
@@ -226,9 +235,12 @@ export function EstruturaRelatorioCard({ clinicaId, inicial, extrasFontes = [], 
           </div>
         ))}
       </div>
+      </>)}
 
       <div className="flex flex-wrap justify-between gap-2">
-        <Button variant="outline" size="sm" disabled={ehPadrao(itens, tipo, extras)} onClick={() => definir(estruturaPadrao(tipo, extras))}><RotateCcw />Voltar ao padrão Gestfy</Button>
+        {semanal
+          ? <Button variant="outline" size="sm" disabled={ehPadraoSemanal(estrutura.semanal)} onClick={() => { setEstrutura({ ...estrutura, semanal: padraoSemanal() }); setMudou(true); }}><RotateCcw />Voltar ao padrão Gestfy</Button>
+          : <Button variant="outline" size="sm" disabled={ehPadrao(itens, tipo, extras)} onClick={() => definir(estruturaPadrao(tipo, extras))}><RotateCcw />Voltar ao padrão Gestfy</Button>}
         <span className="flex items-center gap-3"><span className={`text-xs ${mudou ? "font-medium text-amber-700 dark:text-amber-400" : "text-muted-foreground"}`} aria-live="polite">{mudou ? "Alterações não salvas" : "Sem alterações"}</span>
           <Button onClick={salvar} disabled={salvando || !mudou}>{salvando ? <Loader2 className="animate-spin" /> : <Save />}Salvar estrutura</Button></span>
       </div>

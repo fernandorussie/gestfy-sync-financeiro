@@ -11,7 +11,6 @@ import { AvisoBanco } from "../fechamentos/_components/aviso-banco";
 import { NovoCliente } from "./_components/cadastro-form";
 
 const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
-const FONTES_SEMANAL = 5;
 
 const SITUACAO: Record<SituacaoCliente, { rotulo: string; cor: string; Icone: typeof CircleCheck }> = {
   pronto: { rotulo: "Pronto", cor: "text-emerald-700 dark:text-emerald-400", Icone: CircleCheck },
@@ -24,7 +23,7 @@ type Config = { clinica_id: string; fontes: unknown; fontes_extras?: unknown; fi
 interface LinhaCliente {
   id: string; nome: string; ativa: boolean;
   financeiro: ReturnType<typeof situacaoCliente>;
-  semanal: number; checkpoint: boolean; metas: number; perfil: string | null;
+  planilhas: number; metas: number; perfil: string | null;
 }
 
 function Tabela({ itens, mes }: { itens: LinhaCliente[]; mes: string }) {
@@ -35,8 +34,8 @@ function Tabela({ itens, mes }: { itens: LinhaCliente[]; mes: string }) {
           <tr>
             <th className="px-4 py-2 font-medium">Cliente</th>
             <th className="px-3 py-2 font-medium">Metas de {mes}</th>
-            <th className="px-3 py-2 font-medium">Report Semanal</th>
-            <th className="px-3 py-2 font-medium">Quinzenal e Mensal</th>
+            <th className="px-3 py-2 font-medium">Fontes de dados</th>
+            <th className="px-3 py-2 font-medium">Relatórios</th>
             <th className="px-3 py-2 font-medium">Perfil</th>
             <th className="px-4 py-2"><span className="sr-only">Abrir</span></th>
           </tr>
@@ -48,10 +47,7 @@ function Tabela({ itens, mes }: { itens: LinhaCliente[]; mes: string }) {
               <tr key={c.id} className="border-b last:border-0 hover:bg-muted/50">
                 <td className="px-4 py-3"><Link href={`/clientes/${c.id}`} className="font-medium hover:underline">{c.nome}</Link></td>
                 <td className="px-3 py-3 text-xs">{c.metas ? <span>{c.metas} cadastrada{c.metas > 1 ? "s" : ""}</span> : <Link href={`/clientes/${c.id}?aba=metas`} className="text-amber-700 hover:underline dark:text-amber-400">sem metas</Link>}</td>
-                <td className="px-3 py-3 text-xs text-muted-foreground">
-                  <span className="block"><b className="font-medium text-foreground">{c.semanal}</b> de {FONTES_SEMANAL} planilhas</span>
-                  <span className="block">{c.checkpoint ? "Checkpoint configurado" : "Checkpoint no padrão"}</span>
-                </td>
+                <td className="px-3 py-3 text-xs">{c.planilhas ? <span>{c.planilhas} planilha{c.planilhas > 1 ? "s" : ""}</span> : <span className="text-muted-foreground">nenhuma</span>}</td>
                 <td className="px-3 py-3">
                   <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${s.cor}`}><s.Icone className="h-3.5 w-3.5" />{s.rotulo}</span>
                   {c.financeiro.situacao === "pendente" && <span className="block text-xs text-muted-foreground">falta {c.financeiro.faltando.join(" e ")}</span>}
@@ -78,17 +74,15 @@ export default async function ClientesPage() {
   const hoje = new Date();
   const mes = hoje.getMonth() + 1, ano = hoje.getFullYear();
   const db = getSupabaseAdmin();
-  const [{ data: clientes, error }, { data: configs }, { data: fontes }, { data: checkpoint }, { data: metas }, pendentes] = await Promise.all([
+  const [{ data: clientes, error }, { data: configs }, { data: metas }, pendentes] = await Promise.all([
     db.from("clinicas").select("id, nome, ativa").order("nome"),
     db.from("fechamento_config").select("clinica_id, fontes, fontes_extras, ficha"),
-    db.from("fontes_dados").select("clinica_id, tipo"),
-    db.from("checkpoint_indicadores").select("clinica_id"),
     db.from("metas").select("clinica_id").eq("mes", mes).eq("ano", ano),
     migracoesPendentes(db),
   ]);
   const cfg = new Map(((configs ?? []) as unknown as Config[]).map((c) => [c.clinica_id, c]));
   const conta = (xs: { clinica_id: string }[] | null) => { const m = new Map<string, number>(); for (const x of xs ?? []) m.set(x.clinica_id, (m.get(x.clinica_id) ?? 0) + 1); return m; };
-  const nSemanal = conta(fontes), nCheckpoint = conta(checkpoint), nMetas = conta(metas);
+  const nMetas = conta(metas);
   const lista: LinhaCliente[] = (clientes ?? []).map((c) => {
     const k = cfg.get(c.id);
     const ficha = limparFicha((k?.ficha ?? {}) as Partial<FichaClinica>);
@@ -96,8 +90,7 @@ export default async function ClientesPage() {
     return {
       ...c,
       financeiro: situacaoCliente(k?.fontes),
-      semanal: nSemanal.get(c.id) ?? 0,
-      checkpoint: (nCheckpoint.get(c.id) ?? 0) > 0,
+      planilhas: Object.values((k?.fontes ?? {}) as Record<string, { sheetId?: string } | undefined>).filter((x) => x?.sheetId).length + (Array.isArray(k?.fontes_extras) ? k!.fontes_extras.length : 0),
       metas: nMetas.get(c.id) ?? 0,
       perfil: fichaPreenchida(ficha) || ficha.segmentoTipo ? (segmento || "Preenchido") : null,
     };

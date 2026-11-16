@@ -362,8 +362,13 @@ export function lerLeads(linhas: Celula[][], op: OpcoesLeitura<CampoLead> = {}):
 
 /* ============================== NPS ============================== */
 
-export type CampoNps = "data" | "indicacao" | "profissional" | "recepcao" | "infraestrutura" | "enfermagem";
+export type CampoNps = "data" | "indicacao" | "profissional" | "recepcao" | "infraestrutura" | "enfermagem" | "comentario" | "nome" | "anonimato" | "indicou";
 
+/*
+ * Os quatro últimos campos são usados no Report Semanal (página de feedbacks e
+ * indicações). Nome, anonimato e indicação têm dado pessoal: não são achados
+ * sozinhos pelo cabeçalho, só quando a coluna é indicada na configuração.
+ */
 export const DEF_NPS: DefinicaoFonte<CampoNps> = {
   data: { rotulo: "Data", nomes: ["data ajustada", "data", "carimbo de data/hora"], obrigatorio: true },
   indicacao: { rotulo: "Nota de 0 a 10", nomes: ["nps", "nota"], contem: ["0 a 10", "indicaria"], obrigatorio: true },
@@ -371,6 +376,10 @@ export const DEF_NPS: DefinicaoFonte<CampoNps> = {
   recepcao: { rotulo: "Nota da recepção", nomes: [], contem: ["recepcao"] },
   infraestrutura: { rotulo: "Nota da infraestrutura", nomes: [], contem: ["infraestrutura", "estrutura"] },
   enfermagem: { rotulo: "Nota da enfermagem", nomes: [], contem: ["enfermagem"] },
+  comentario: { rotulo: "Comentário (Report Semanal)", nomes: ["comentario", "comentarios", "sugestao", "sugestoes", "elogio, critica ou sugestao"], contem: ["comentario"] },
+  nome: { rotulo: "Nome de quem respondeu (Report Semanal)", nomes: [] },
+  anonimato: { rotulo: "Pede anonimato? (Report Semanal)", nomes: [] },
+  indicou: { rotulo: "Indicação: nome e telefone (Report Semanal)", nomes: [] },
 };
 
 export interface RespostaNps {
@@ -381,12 +390,28 @@ export interface RespostaNps {
   recepcao: number | null;
   infraestrutura: number | null;
   enfermagem: number | null;
+  comentario?: string;
+  nome?: string;
+  /** undefined = coluna de anonimato não configurada. */
+  anonimato?: string;
+  indicou?: string;
 }
 
 export function lerNps(linhas: Celula[][], op: OpcoesLeitura<CampoNps> = {}): Leitura<RespostaNps, CampoNps> {
+  const l = lerNpsBruto(linhas, op);
+  // Linha curta (a API corta as células vazias do fim): com a coluna configurada, texto em branco é "".
+  for (const c of ["comentario", "nome", "anonimato", "indicou"] as const) {
+    if (l.colunas.indices[c] === undefined) continue;
+    for (const r of l.registros) if (r[c] === undefined) r[c] = "";
+  }
+  return l;
+}
+
+function lerNpsBruto(linhas: Celula[][], op: OpcoesLeitura<CampoNps>): Leitura<RespostaNps, CampoNps> {
   return ler(linhas, DEF_NPS, op, (get, aviso, linha) => {
     const data = dataOuAviso(get, aviso, "data");
     if (!data) return null;
+    const texto = (c: CampoNps) => { const v = get(c); return v === undefined ? undefined : textoLimpo(v); };
     return {
       linha, data,
       indicacao: valorOuAviso(get, aviso, "indicacao"),
@@ -394,7 +419,36 @@ export function lerNps(linhas: Celula[][], op: OpcoesLeitura<CampoNps> = {}): Le
       recepcao: valorOuAviso(get, aviso, "recepcao"),
       infraestrutura: valorOuAviso(get, aviso, "infraestrutura"),
       enfermagem: valorOuAviso(get, aviso, "enfermagem"),
+      comentario: texto("comentario"),
+      nome: texto("nome"),
+      anonimato: texto("anonimato"),
+      indicou: texto("indicou"),
     };
+  });
+}
+
+/* ============================== PRÉ-CONSULTA ============================== */
+
+export type CampoPreConsulta = "data" | "motivo" | "origem";
+
+export const DEF_PRE_CONSULTA: DefinicaoFonte<CampoPreConsulta> = {
+  data: { rotulo: "Data da resposta", nomes: ["data ajustada", "data", "carimbo de data/hora"], obrigatorio: true },
+  motivo: { rotulo: "Motivo da consulta", nomes: ["motivo", "motivo da consulta", "queixa"], contem: ["motivo"] },
+  origem: { rotulo: "Como conheceu", nomes: ["origem", "como conheceu", "como conheceu?", "onde conheceu"], contem: ["conheceu"] },
+};
+
+export interface RespostaPreConsulta {
+  linha: number;
+  data: DataISO;
+  motivo: string;
+  origem: string;
+}
+
+export function lerPreConsulta(linhas: Celula[][], op: OpcoesLeitura<CampoPreConsulta> = {}): Leitura<RespostaPreConsulta, CampoPreConsulta> {
+  return ler(linhas, DEF_PRE_CONSULTA, op, (get, aviso, linha) => {
+    const data = dataOuAviso(get, aviso, "data");
+    if (!data) return null;
+    return { linha, data, motivo: textoLimpo(get("motivo")), origem: textoLimpo(get("origem")) };
   });
 }
 

@@ -7,8 +7,8 @@
 import type { IndicacaoColuna } from "./colunas";
 import type { DadosFechamento } from "./indicadores";
 import {
-  lerAvaliacoes, lerDespesas, lerEntradas, lerLeads, lerNps, lerOrcamentos, lerVendas,
-  type AvisoLeitura, type CampoAvaliacao, type CampoDespesa, type CampoEntrada, type CampoLead, type CampoNps, type CampoOrcamento, type CampoVenda,
+  lerAvaliacoes, lerDespesas, lerEntradas, lerLeads, lerNps, lerOrcamentos, lerPreConsulta, lerVendas,
+  type AvisoLeitura, type CampoAvaliacao, type CampoPreConsulta, type CampoDespesa, type CampoEntrada, type CampoLead, type CampoNps, type CampoOrcamento, type CampoVenda,
 } from "./leitores";
 import type { Celula } from "./texto";
 
@@ -30,6 +30,8 @@ export interface FontesFechamento {
   avaliacoes?: ConfigFonte<CampoAvaliacao>;
   /** Entradas de caixa (recebimentos). Opcional: sem ela, o resultado é "Faturamento x Despesas". */
   entradas?: ConfigFonte<CampoEntrada>;
+  /** Pesquisa de pré-consulta (motivo e origem). Usada no Report Semanal. */
+  preConsulta?: ConfigFonte<CampoPreConsulta>;
 }
 
 export type LerPlanilha = (sheetId: string, faixa: string) => Promise<Celula[][]>;
@@ -49,7 +51,7 @@ export function faixaDaAba(aba: string): string {
 
 export async function coletar(fontes: FontesFechamento, ler: LerPlanilha): Promise<ResultadoColeta> {
   const res: ResultadoColeta = {
-    dados: { vendas: null, despesas: null, orcamentos: null, leads: null, nps: null, avaliacoes: null, entradas: null },
+    dados: { vendas: null, despesas: null, orcamentos: null, leads: null, nps: null, avaliacoes: null, entradas: null, preConsulta: null },
     leituras: {},
     erros: {},
   };
@@ -88,6 +90,7 @@ export async function coletar(fontes: FontesFechamento, ler: LerPlanilha): Promi
   await uma("nps", fontes.nps, lerNps);
   await uma("avaliacoes", fontes.avaliacoes, lerAvaliacoes);
   await uma("entradas", fontes.entradas, lerEntradas);
+  await uma("preConsulta", fontes.preConsulta, lerPreConsulta);
   return res;
 }
 
