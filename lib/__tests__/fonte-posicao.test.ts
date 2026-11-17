@@ -66,3 +66,34 @@ describe("fonte em posição atual", () => {
     expect(v.venc).toBe(0); // em 31/10 nada tinha vencido
   });
 });
+
+describe("modelo pronto: contratos e unidades", async () => {
+  const { modeloContratos } = await import("@/lib/fechamentos/modelo-contratos");
+  // Cabeçalho no formato da planilha de contratos (quebras de linha e espaços como no original).
+  const cab = ["Loja/Nº", "Localidade", "Status", "Responsável", "CPF/CNPJ", "Nome Loja", "Valor do Aluguel", "Inicio do \nContrato ", "Término do \nContrato", "Próximo Reajuste do Aluguel", "Status contrato"];
+  const planilha = [
+    cab,
+    ["Loja 01", "Shopping", "Ocupada", "x", "x", "x", 1000, "01/01/2025", "10/12/2026", "", "No prazo"],
+    ["Loja 02", "Shopping", "Desocupada", "", "", "", "", "-", "-", "", ""],
+    ["Nº 10", "Padre Vairo", "Ocupada", "x", "x", "x", 900, "01/01/2024", "01/11/2026", "", "ATRASADO"],
+    ["N° 10", "Padre Vairo", "Ocupada", "x", "x", "x", 900, "01/01/2024", "01/11/2026", "", "ATRASADO"],
+    ["Nº 196 Casa", "Outros", "Ocupada", "x", "x", "x", 500, "", "", "", ""],
+  ];
+  it("acha as colunas pelo cabeçalho e monta os 7 indicadores", () => {
+    const m = modeloContratos(cab, {});
+    expect(m.colunas).toMatchObject({ unidade: "Loja/Nº", localidade: "Localidade", status: "Status", termino: "Término do \nContrato", statusContrato: "Status contrato" });
+    expect(m.indicadores.map((d) => d.nome)).toEqual(["Unidades", "Unidades ocupadas", "Unidades vagas", "Vacância", "Contratos vencendo em 60 dias", "Contratos vencidos", "Contratos em atraso"]);
+    expect(m.faltando).toEqual([]);
+  });
+  it("calcula na planilha sem contar a localidade Outros", () => {
+    const m = modeloContratos(cab, {});
+    const f = limparFontePersonalizada({ id: "ctr", nome: "Contratos", sheetId: "x", aba: "Contratos Atuais", colunaData: "", modo: "posicao", pessoais: ["Responsável", "CPF/CNPJ"], indicadores: m.indicadores });
+    const r = calcularPersonalizada(f, lerPlanilhaPersonalizada(planilha, f), periodo, anterior);
+    expect(r.indicadores.map((i) => i.atual)).toEqual([3, 2, 1, expect.closeTo(33.33, 1), 1, 1, 1]);
+  });
+  it("sem a coluna da unidade, avisa em vez de criar", () => {
+    const m = modeloContratos(["Nome", "Valor"], {});
+    expect(m.indicadores).toEqual([]);
+    expect(m.faltando.length).toBeGreaterThan(0);
+  });
+});

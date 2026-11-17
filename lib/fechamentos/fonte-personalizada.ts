@@ -317,7 +317,8 @@ export function lerPlanilhaPersonalizada(valores: Celula[][], f: FontePersonaliz
       const linha = valores[i] ?? [];
       const c: Record<string, Celula> = {};
       for (const [r, j] of idx) c[r] = linha[j];
-      if (Object.values(c).every((v) => v === null || v === undefined || String(v).trim() === "")) continue;
+      const vazia = (xs: Celula[]) => xs.every((v) => v === null || v === undefined || String(v).trim() === "");
+      if (idx.size ? vazia(Object.values(c)) : vazia(linha)) continue;
       leitura.linhas.push({ data: "", c });
     }
     return leitura;

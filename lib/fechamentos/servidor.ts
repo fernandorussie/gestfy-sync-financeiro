@@ -322,7 +322,8 @@ export async function previaFontePersonalizada(clinicaId: string, alvo: FontePer
     ignoradas: l.ignoradas.slice(0, 5), totalIgnoradas: l.ignoradas.length, valores, meses,
     amostra: l.linhas.slice(-5).map((x) => ({ data: x.data, c: Object.fromEntries(refs.map((ref) => [ref, String(x.c[ref] ?? "")])) })),
   };
-  const m = mes && /^\d{4}-\d{2}$/.test(mes) ? mes : meses[0];
+  // Posição atual não tem meses na planilha: calcula no mês de hoje (a referência dos filtros de data).
+  const m = mes && /^\d{4}-\d{2}$/.test(mes) ? mes : alvo.modo === "posicao" ? new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 7) : meses[0];
   if (!m || r.erro) return { erro: r.erro, leitura, periodo: null, resultado: null };
   const periodo = periodoDe(m, "mensal", 1);
   const anterior = periodoAnterior(periodo, "mensal");
@@ -564,6 +565,7 @@ export async function semanalFinanceiroDoCliente(clinicaId: string, periodo: Per
   if (pedido.financeiro || pedido.despesas) {
     if (!fontes.despesas) out.erros.push("Saídas: planilha de Despesas não configurada em Clientes → Fontes de dados.");
     else if (coleta.erros.despesas) out.erros.push(`Despesas: ${coleta.erros.despesas}`);
+    out.erros.push(...avisosDeValor("Despesas", coleta.leituras.despesas?.avisos ?? []));
   }
   if (pedido.financeiro) {
     const mes = { inicio: `${periodo.fim.slice(0, 8)}01`, fim: periodo.fim };
@@ -592,4 +594,16 @@ export async function semanalFinanceiroDoCliente(clinicaId: string, periodo: Per
     }
   }
   return out;
+}
+
+/**
+ * Linhas que a leitura descartou por valor que não é número (ex.: colunas da aba
+ * do mês fora de ordem: "Pix" caindo na coluna Valor). Sem este aviso, o total
+ * sai menor (ou zero) sem explicação.
+ */
+function avisosDeValor(fonte: string, avisos: { linha: number; campo: string; valor: string; motivo: string }[]): string[] {
+  const ruins = avisos.filter((a) => a.campo === "valor" && a.valor.trim() !== "");
+  if (!ruins.length) return [];
+  const ex = ruins.slice(0, 3).map((a) => `linha ${a.linha}: “${a.valor.slice(0, 30)}”`).join("; ");
+  return [`${fonte}: ${ruins.length} linha(s) ignorada(s) porque a coluna Valor não tem um número (${ex}). Confira se as colunas da aba estão na mesma ordem das outras.`];
 }

@@ -81,7 +81,7 @@ export function EditorSemanal({ valor, onChange, pers = [] }: { valor: Estrutura
                 {s.id === "contratos" && s.ligado && (
                   <div className="mt-2 space-y-1 pl-10 text-sm">
                     <p className="text-xs text-muted-foreground">Indicadores que viram linhas deste bloco (ex.: “Contratos vencendo em 60 dias: 6”). Na geração dá para editar e acrescentar linhas.</p>
-                    {pers.length === 0 && <p className="text-xs text-muted-foreground">Nenhum indicador personalizado ainda. Crie em Fontes de dados → Fontes personalizadas.</p>}
+                    {pers.length === 0 && <p className="text-xs text-muted-foreground">Nenhum indicador personalizado ainda. Crie em Fontes de dados → Fontes personalizadas (botão “Modelo: contratos e unidades”).</p>}
                     {pers.map((p) => (
                       <label key={p.id} className="flex items-center gap-2">
                         <input type="checkbox" checked={contratos.includes(p.id)}
@@ -108,6 +108,11 @@ export function EditorSemanal({ valor, onChange, pers = [] }: { valor: Estrutura
                         </li>
                       );
                     })}
+                    {!valor.kpis.some((k) => ehKpiPersonalizado(k.id)) && (
+                      <li className="pl-6 pt-1 text-xs text-muted-foreground">
+                        Para cards como unidades ocupadas, vagas e vacância: em Fontes de dados → Fontes personalizadas, crie a fonte da planilha de contratos com o botão “Modelo: contratos e unidades”. Os indicadores aparecem aqui para escolher.
+                      </li>
+                    )}
                     {persFora.length > 0 && (
                       <li className="pl-6 pt-1">
                         <select aria-label="Adicionar card de indicador personalizado" className="h-8 rounded-md border border-input bg-background px-2 text-sm" value=""

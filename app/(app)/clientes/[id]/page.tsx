@@ -172,7 +172,7 @@ export default async function ClientePage({ params, searchParams }: { params: Pr
           estrutura: (
             <>
               <EstruturaRelatorioCard key={JSON.stringify(extrasDe(extras))} clinicaId={cliente.id} extrasFontes={extrasDe(extras)}
-                indicadoresPers={extras.flatMap((f) => f.indicadores.map((d) => ({ id: kpiPersonalizado(f.id, d.id), rotulo: `${d.nome || "Indicador"} · ${f.nome || "Fonte"}` })))} inicial={estrutura} porSecao={porSecao} indisponiveis={semDados} exemplos={exemplos} pronto={prontoFin} />
+                indicadoresPers={extras.flatMap((f) => f.indicadores.filter((d) => !d.agruparPor).map((d) => ({ id: kpiPersonalizado(f.id, d.id), rotulo: `${d.nome || "Indicador"} · ${f.nome || "Fonte"}` })))} inicial={estrutura} porSecao={porSecao} indisponiveis={semDados} exemplos={exemplos} pronto={prontoFin} />
             </>
           ),
           alvos: (

@@ -374,4 +374,5 @@ Modelo genérico (não é exclusivo de um cliente), escolhido em Clientes → Es
 - **Títulos editáveis** por bloco (ex.: "Próximos passos", "Destaques financeiros").
 - Estruturas já salvas não mudam: itens novos entram desligados.
 - Código: `lib/relatorio/estrutura-semanal.ts`, `semanalFinanceiroDoCliente` (servidor.ts), `completarFinanceiro` (relatorio/actions.ts), InfograficoOG, FormImagem. Testes: `fonte-posicao.test.ts`, `fonte-unica.test.ts`.
+- **v3.10.1:** botão "Modelo: contratos e unidades" no editor de fonte personalizada (`lib/fechamentos/modelo-contratos.ts`): acha unidade, localidade, status, término e status do contrato pelo cabeçalho e cria Unidades, Ocupadas, Vagas, Vacância, Vencendo em 60 dias, Vencidos e Em atraso (localidade "Outros" fora). Prévia de fonte em posição atual calcula no mês de hoje. Aviso no Semanal quando linhas de Despesas são ignoradas por valor que não é número. Indicadores agrupados não aparecem como card/linha do Semanal.
 - Pendente: WhatsApp e prompt da IA com foco financeiro; Boletos/Condomínio (abas mensais).

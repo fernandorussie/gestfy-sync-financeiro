@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { modeloContratos } from "@/lib/fechamentos/modelo-contratos";
 import { Calculator, ChevronDown, ChevronUp, EyeOff, Loader2, PlayCircle, Plus, ShieldCheck, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -180,6 +181,7 @@ export function EditorFontePersonalizada({ clinicaId, f, todas, destinos, onChan
   const [previa, setPrevia] = useState<PreviaFonte | null>(null);
   const [mes, setMes] = useState<string>("");
   const [aberto, setAberto] = useState<string | null>(null);
+  const [avisoModelo, setAvisoModelo] = useState<string | null>(null);
   const [lendo, iniciar] = useTransition();
   const set = (p: Partial<FontePersonalizada>) => onChange({ ...f, ...p });
   const cabecalho = previa?.leitura?.cabecalho ?? [];
@@ -211,6 +213,17 @@ export function EditorFontePersonalizada({ clinicaId, f, todas, destinos, onChan
     { rotulo: "Fórmula", novo: () => indicadorVazio({ nome: "", tipo: "formula", termos: ["", ""], ops: ["/"] }) },
   ];
   const adicionar = (d: IndicadorDef) => { set({ indicadores: [...f.indicadores, d] }); setAberto(d.id); };
+  // Modelo pronto: unidades, ocupadas, vagas, vacância e contratos, montados pelos cabeçalhos da planilha.
+  const aplicarContratos = () => {
+    if (!cabecalho.length) { setAvisoModelo("Clique em “Ler planilha” primeiro: o modelo procura as colunas pelo cabeçalho."); return; }
+    const m = modeloContratos(cabecalho, valores);
+    if (!m.indicadores.length) { setAvisoModelo(`Não encontrei: ${m.faltando.join("; ")}.`); return; }
+    // O indicador inicial "Quantidade" sem configuração sai; os que já existem ficam.
+    const mantidos = f.indicadores.filter((d) => !(d.nome === "Quantidade" && d.operacao === "contar" && !d.coluna && !d.filtros.length));
+    set({ modo: "posicao", indicadores: [...mantidos, ...m.indicadores].slice(0, 20) });
+    setAberto(null);
+    setAvisoModelo(`${m.indicadores.length} indicadores criados (coluna da unidade: “${m.colunas.unidade}”). Confira os números na prévia e salve.${m.faltando.length ? ` Não encontrei: ${m.faltando.join("; ")}.` : ""}`);
+  };
   const res = previa?.resultado;
 
   return (
@@ -279,8 +292,10 @@ export function EditorFontePersonalizada({ clinicaId, f, todas, destinos, onChan
           <p className="text-sm font-medium">Indicadores</p>
           <div className="flex flex-wrap gap-1.5">
             {atalhos.map((a) => <Button key={a.rotulo} size="sm" variant="outline" className="h-7 text-xs" onClick={() => adicionar(a.novo())} disabled={f.indicadores.length >= 20}><Plus className="h-3 w-3" />{a.rotulo}</Button>)}
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={aplicarContratos} title="Para planilhas de contratos/locação: unidades, ocupadas, vagas, vacância, contratos a vencer, vencidos e em atraso"><Plus className="h-3 w-3" />Modelo: contratos e unidades</Button>
           </div>
         </div>
+        {avisoModelo && <p className="rounded-md bg-muted px-3 py-2 text-xs" role="status">{avisoModelo}</p>}
         {f.indicadores.length === 0 && <p className="text-sm text-muted-foreground">Nenhum indicador. Use um dos atalhos acima.</p>}
         <ul className="divide-y rounded-md border">
           {f.indicadores.map((d, k) => {
