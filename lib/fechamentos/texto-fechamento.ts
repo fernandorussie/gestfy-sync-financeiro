@@ -9,7 +9,7 @@
 import type { Alerta } from "./conferencia";
 import type { Decisoes } from "./decisoes";
 import type { Indicadores } from "./indicadores";
-import type { Ritmo } from "./ritmo";
+import { metodoProvisaoTexto, type Ritmo } from "./ritmo";
 import { NEUTRO, type Vocabulario } from "./vocabulario";
 
 export interface SecoesTexto {
@@ -154,7 +154,9 @@ export function rascunho(c: ContextoTexto): SecoesTexto {
   }
   if (i.despesas && r) {
     let p = `Até aqui, pagamos ${brl(r.despesasPagas)} em despesas.`;
-    if (r.mediaDespesas !== null) p += ` Considerando a média de ${brl(r.mediaDespesas)} dos últimos ${r.mesesMedia.length === 1 ? "mês" : `${r.mesesMedia.length} meses`}, ainda devem sair cerca de ${brl(r.provisionado ?? 0)} até o fim do mês${r.saldoProjetado !== null ? `, o que deixa um saldo projetado de ${brl(r.saldoProjetado)}` : ""}.`;
+    if (r.metodoProvisao === "contas") {
+      if (r.provisionado !== null) p += ` Pelas contas em aberto com vencimento até o fim do mês, ainda devem sair ${brl(r.provisionado)}${r.saldoProjetado !== null ? `, o que deixa um saldo projetado de ${brl(r.saldoProjetado)}` : ""}.`;
+    } else if (r.mediaDespesas !== null) p += ` Considerando a média de ${brl(r.mediaDespesas)} dos últimos ${r.mesesMedia.length === 1 ? "mês" : `${r.mesesMedia.length} meses`}, ainda devem sair cerca de ${brl(r.provisionado ?? 0)} até o fim do mês${r.saldoProjetado !== null ? `, o que deixa um saldo projetado de ${brl(r.saldoProjetado)}` : ""}.`;
     obs.push(p);
   } else if (i.despesas) {
     const pontuais = citar(c, "pagamentos-pontuais");
@@ -275,7 +277,7 @@ export function textoWhatsApp(p: {
   } else if (i.meta) linhas.push(`🎯 Meta: ${brl(i.meta.valor)} | Atingimento: ${pct(i.meta.atingimento)}`);
   linhas.push("");
   if (i.despesas) linhas.push(`💳 Saídas ${r ? "pagas até o dia 15" : "no período"}: ${brl(i.despesas.total)}`);
-  if (r && r.provisionado !== null && !p.ocultas?.includes("caixaMes")) linhas.push(`🧾 A pagar até o fim do mês (pela média de ${r.mesesMedia.length === 1 ? "1 mês" : `${r.mesesMedia.length} meses`}): ${brl(r.provisionado)}`);
+  if (r && r.provisionado !== null && !p.ocultas?.includes("caixaMes")) linhas.push(`🧾 A pagar até o fim do mês (${metodoProvisaoTexto(r)}): ${brl(r.provisionado)}`);
   if (i.caixa?.real && i.entradas) linhas.push(`💰 Entradas ${r ? "recebidas até o dia 15" : "no período"}: ${brl(i.entradas.total)}`);
   if (i.caixa) linhas.push(i.caixa.real ? `💵 Resultado de caixa (entradas − saídas): ${brl(i.caixa.resultado)}` : `💵 Faturamento x Despesas: ${brl(i.caixa.resultado)}`);
   const secao = (rotuloSecao: string, corpo: string) => { if (corpo.trim()) linhas.push("", rotuloSecao, "", corpo.trim()); };

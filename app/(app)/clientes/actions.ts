@@ -21,3 +21,19 @@ export async function salvarCadenciaCheckpoint(p: { clinicaId: string; fonte: st
   revalidatePath(`/clientes/${p.clinicaId}`);
   return { ok: true };
 }
+
+/** Método do "Provisionado a pagar" do Quinzenal: média histórica ou contas em aberto. Escolha do consultor. */
+export async function salvarProvisionamento(p: { clinicaId: string; metodo: "media" | "contas" }): Promise<{ ok: true } | { error: string }> {
+  if (p.metodo !== "media" && p.metodo !== "contas") return { error: "Escolha inválida." };
+  const db = getSupabaseAdmin();
+  const { data: cfg, error: e1 } = await db.from("fechamento_config").select("regras").eq("clinica_id", p.clinicaId).maybeSingle();
+  if (e1) return { error: "Não foi possível ler a configuração do cliente." };
+  const regras = (cfg?.regras ?? {}) as unknown as RegrasClinica;
+  const novas: RegrasClinica = { ...regras, provisionamento: p.metodo };
+  const { error } = cfg
+    ? await db.from("fechamento_config").update({ regras: novas as unknown as Json, atualizado_em: new Date().toISOString() }).eq("clinica_id", p.clinicaId)
+    : await db.from("fechamento_config").insert({ clinica_id: p.clinicaId, regras: novas as unknown as Json });
+  if (error) return { error: "Não foi possível salvar." };
+  revalidatePath(`/clientes/${p.clinicaId}`);
+  return { ok: true };
+}

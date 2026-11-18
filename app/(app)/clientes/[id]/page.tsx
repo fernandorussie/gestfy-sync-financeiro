@@ -30,6 +30,7 @@ import { SituacaoCliente } from "../_components/situacao-cliente";
 import { AbasCliente } from "./abas-cliente";
 import { abaDoEndereco } from "./abas";
 import { CheckpointFontes } from "./checkpoint-fontes";
+import { ProvisionamentoCliente } from "./provisionamento";
 
 type MetaComTipo = Meta & { tipos_meta: TipoMeta };
 
@@ -166,6 +167,7 @@ export default async function ClientePage({ params, searchParams }: { params: Pr
               )}
               {secao("Planilhas do cliente", "A base de dados do cliente. Cada planilha é configurada uma vez e vale para o Report Semanal, o Checkpoint e os relatórios Quinzenal e Mensal. Vendas e despesas são obrigatórias; as outras ligam seções extras dos relatórios.",
                 <FontesDados clinicaId={cliente.id} padraoInicial={fontesFin} extrasIniciais={extras} destinos={destinos} />)}
+              <ProvisionamentoCliente clinicaId={cliente.id} inicial={regras.provisionamento === "contas" ? "contas" : "media"} />
               <CheckpointFontes key={fontesCheckpoint.map((f) => f.id).join("|")} clinicaId={cliente.id} fontes={fontesCheckpoint} />
             </>
           ),

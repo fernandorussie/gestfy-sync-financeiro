@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { ResultadoFechamento } from "@/lib/fechamentos/servidor";
 import { cap } from "@/lib/fechamentos/vocabulario";
-import type { Ritmo } from "@/lib/fechamentos/ritmo";
+import { notaProvisao, type Ritmo } from "@/lib/fechamentos/ritmo";
 import { brl, brl0, num, pct } from "../../(app)/fechamentos/_components/formato";
 import { Cabecalho, categoriasReceita, CINZA, Kpi, LINHA, ListaContagem, mesDe, td, Titulo, Var, VERMELHO } from "./relatorio";
 
@@ -114,12 +114,14 @@ export function SecCaixaMes({ r }: Props) {
   if (!ritmo) return null;
   return (
     <div className="pdf-bloco">
-      <Titulo cor={COR} extra="despesas a pagar estimadas pela média dos últimos meses">Caixa do mês</Titulo>
+      <Titulo cor={COR} extra={ritmo.metodoProvisao === "contas" ? "despesas a pagar pelas contas em aberto do mês" : "despesas a pagar estimadas pela média dos últimos meses"}>Caixa do mês</Titulo>
       <div className="grid grid-cols-4 gap-2.5">
         <Kpi fundo={FUNDO} rotulo="Despesas pagas até o dia 15" valor={brl0(ritmo.despesasPagas)} nota={n(i.despesas?.total, a.despesas?.total, true)} />
-        <Kpi fundo={FUNDO} rotulo="Média mensal de despesas" valor={brl0(ritmo.mediaDespesas)} nota={ritmo.mesesMedia.length ? `${ritmo.mesesMedia.map((m) => mesDe(m + "-01").slice(0, 3)).join(", ")}` : "sem histórico"} />
-        <Kpi fundo={FUNDO} rotulo="Provisionado a pagar" valor={brl0(ritmo.provisionado)} nota="média − já pago" />
-        <Kpi fundo={FUNDO} rotulo="Saldo projetado do mês" valor={brl0(ritmo.saldoProjetado)} nota={`saldo até o dia 15: ${brl0(ritmo.saldoPeriodo)}`} />
+        {ritmo.metodoProvisao === "contas"
+          ? <Kpi fundo={FUNDO} rotulo="Método do provisionado" valor="Contas em aberto" nota="vencimentos do mês ainda não pagos" />
+          : <Kpi fundo={FUNDO} rotulo="Média mensal de despesas" valor={brl0(ritmo.mediaDespesas)} nota={ritmo.mesesMedia.length ? `${ritmo.mesesMedia.map((m) => mesDe(m + "-01").slice(0, 3)).join(", ")}` : "sem histórico"} />}
+        <Kpi fundo={FUNDO} rotulo="Provisionado a pagar" valor={ritmo.provisaoPendencia ? "Pendente" : brl0(ritmo.provisionado)} nota={notaProvisao(ritmo)} />
+        <Kpi fundo={FUNDO} rotulo="Saldo projetado do mês" valor={ritmo.provisaoPendencia ? "Pendente" : brl0(ritmo.saldoProjetado)} nota={`saldo até o dia 15: ${brl0(ritmo.saldoPeriodo)}`} />
       </div>
     </div>
   );

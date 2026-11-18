@@ -116,6 +116,11 @@ export function lerSituacao(valor: Celula): boolean | null {
   return null;
 }
 
+/** Situação de lançamento cancelado/estornado: não é pago nem fica "em aberto". */
+export function ehCancelada(valor: Celula): boolean {
+  return /^(cancelad[oa]|estornad[oa]|anulad[oa]|excluid[oa])$/.test(normalizar(valor));
+}
+
 /** Letra de coluna ("A", "AB") → índice começando em 0. */
 export function indiceDaLetra(letra: string): number {
   let idx = 0;

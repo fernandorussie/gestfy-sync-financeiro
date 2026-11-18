@@ -36,6 +36,8 @@ export interface RegrasClinica {
   categoriasDespesa?: Record<string, string>;
   /** Categoria de venda → grupo de receita, quando a planilha não tem coluna de grupo. */
   gruposReceita?: Record<string, string>;
+  /** Método do "Provisionado a pagar" do Quinzenal, escolhido pelo consultor. Ausente = média histórica. */
+  provisionamento?: "media" | "contas";
   /** Status de lead que contam como agendamento (comparação exata, sem acento/caixa). */
   statusAgendou?: string[];
   /** Trechos de status de orçamento que contam como fechado. */

@@ -153,7 +153,9 @@ export function montarPacote(d: DadosPacote, opcoes: { anonimizar?: boolean; des
     L.push(`- Dias úteis: ${r.diasUteisDecorridos} de ${r.diasUteisMes} (restam ${r.diasUteisRestantes})`);
     L.push(`- Faturamento por dia útil: ${fmt(r.faturamentoPorDia)} | projeção do mês: ${fmt(r.projecaoMes)}`);
     if (r.meta) L.push(`- Meta do mês: ${fmt(r.meta)} | realizado ${pc(r.atingimento)} | projeção ${pc(r.atingimentoProjetado)} | necessário por dia útil: ${fmt(r.necessarioPorDia)}`);
-    L.push(`- Despesas pagas até agora: ${fmt(r.despesasPagas)} | média mensal (${r.mesesMedia.length} meses): ${fmt(r.mediaDespesas)} | provisionado a pagar: ${fmt(r.provisionado)} | saldo projetado do mês: ${fmt(r.saldoProjetado)}`);
+    if (r.metodoProvisao === "contas") {
+      L.push(`- Despesas pagas até agora: ${fmt(r.despesasPagas)} | provisionado a pagar (método: contas em aberto com vencimento no mês; vencidas de meses anteriores fora): ${r.provisaoPendencia ? "PENDENTE — " + r.provisaoPendencia : fmt(r.provisionado)} | saldo projetado do mês: ${r.provisaoPendencia ? "pendente" : fmt(r.saldoProjetado)}`);
+    } else L.push(`- Despesas pagas até agora: ${fmt(r.despesasPagas)} | provisionado a pagar (método: média histórica de ${r.mesesMedia.length} meses − já pago) | média mensal: ${fmt(r.mediaDespesas)} | provisionado: ${fmt(r.provisionado)} | saldo projetado do mês: ${fmt(r.saldoProjetado)}`);
   }
 
   const gruposA = new Map((a.faturamento?.porGrupo ?? []).map((g) => [chave(g.nome), g]));

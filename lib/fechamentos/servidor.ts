@@ -384,7 +384,13 @@ async function calcularRetrato(
   let ritmo: Ritmo | null = null;
   if (f.tipo === "quinzenal") {
     const { data: feriados } = await getSupabaseAdmin().from("feriados").select("data").gte("data", f.inicio.slice(0, 8) + "01").lte("data", new Date(Date.UTC(aIni, mIni, 0)).toISOString().slice(0, 10));
-    ritmo = calcularRitmo({ dados: coleta.dados, periodo, feriados: (feriados ?? []).map((x) => x.data.slice(0, 10)), meta, regras, ajustes });
+    const ix = coleta.leituras.despesas?.colunas.indices ?? {};
+    const provisao = {
+      metodo: regras.provisionamento === "contas" ? "contas" as const : "media" as const,
+      colunas: { vencimento: ix.dataVencimento !== undefined, situacao: ix.pago !== undefined, valorAberto: ix.valorAberto !== undefined },
+    };
+    ritmo = calcularRitmo({ dados: coleta.dados, periodo, feriados: (feriados ?? []).map((x) => x.data.slice(0, 10)), meta, regras, ajustes, provisao });
+    alertas.push(...alertasProvisao(ritmo));
   }
   const anterior = calcularIndicadores(coleta.dados, periodoAnterior(periodo, f.tipo), { regras });
   const [ano, mes] = f.fim.split("-").map(Number);
@@ -606,4 +612,29 @@ function avisosDeValor(fonte: string, avisos: { linha: number; campo: string; va
   if (!ruins.length) return [];
   const ex = ruins.slice(0, 3).map((a) => `linha ${a.linha}: “${a.valor.slice(0, 30)}”`).join("; ");
   return [`${fonte}: ${ruins.length} linha(s) ignorada(s) porque a coluna Valor não tem um número (${ex}). Confira se as colunas da aba estão na mesma ordem das outras.`];
+}
+
+/** Pendência do método "contas em aberto" (grave: não troca de método sozinho) e a lista das contas usadas (informativo). */
+function alertasProvisao(r: Ritmo): Alerta[] {
+  if (r.metodoProvisao !== "contas") return [];
+  if (r.provisaoPendencia) {
+    return [{
+      chave: "provisao-pendente", regra: "provisao-pendente", gravidade: "grave", area: "Despesas",
+      titulo: "Provisionado a pagar pendente (método: contas em aberto)",
+      descricao: `${r.provisaoPendencia} O relatório mostra o provisionado como pendente; a média histórica não é usada no lugar. Ajuste a fonte de Despesas ou troque o método em Clientes → Fontes de dados.`,
+      evidencias: [], sugestao: { tipo: "corrigir-na-origem" },
+    }];
+  }
+  const c = r.contasAbertas;
+  if (!c) return [];
+  const brl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  return [{
+    chave: `provisao-contas:${c.lancamentos}:${r.provisionado}`, regra: "provisao-contas", gravidade: "info", area: "Despesas",
+    titulo: c.lancamentos ? `${c.lancamentos} conta(s) a pagar com vencimento até ${c.ate.split("-").reverse().join("/")}: ${brl(r.provisionado ?? 0)}` : "Nenhuma conta em aberto com vencimento no mês",
+    descricao: c.lancamentos
+      ? `Provisionado pelas contas em aberto da planilha de Despesas.${c.parciais ? ` ${c.parciais} com pagamento parcial (entra só o saldo).` : ""}${c.pagasDepois ? ` ${c.pagasDepois} foram pagas depois do fim do período e contam como a pagar naquela data.` : ""} Vencidas em meses anteriores não entram. Confira se a planilha está atualizada.`
+      : "A planilha de Despesas não tem lançamentos em aberto com vencimento neste mês. Se houver contas a pagar, confira se a planilha está atualizada.",
+    evidencias: c.itens.map((x) => ({ fonte: "despesas", linha: x.linha, texto: x.descricao || x.categoria || "—", data: x.vencimento, valor: x.valor })),
+    total: r.provisionado ?? 0,
+  }];
 }

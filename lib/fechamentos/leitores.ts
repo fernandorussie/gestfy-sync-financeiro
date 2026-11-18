@@ -8,7 +8,7 @@
  * testar tudo com dados fixos.
  */
 import { celula, resolverColunas, type DefinicaoFonte, type IndicacaoColuna, type ResultadoColunas } from "./colunas";
-import { lerData, lerSimNao, lerSituacao, lerValor, normalizar, textoLimpo, type Celula, type DataISO } from "./texto";
+import { ehCancelada, lerData, lerSimNao, lerSituacao, lerValor, normalizar, textoLimpo, type Celula, type DataISO } from "./texto";
 
 export interface AvisoLeitura {
   /** Linha da planilha (1 = primeira linha). */
@@ -165,14 +165,16 @@ export function lerVendas(linhas: Celula[][], op: OpcoesLeitura<CampoVenda> = {}
 
 /* ============================== DESPESAS ============================== */
 
-export type CampoDespesa = "dataPagamento" | "dataVencimento" | "descricao" | "categoria" | "valor" | "pago" | "periodicidade" | "competencia" | "centroCusto";
+export type CampoDespesa = "dataPagamento" | "dataVencimento" | "descricao" | "categoria" | "valor" | "valorAberto" | "pago" | "periodicidade" | "competencia" | "centroCusto";
 
 export const DEF_DESPESAS: DefinicaoFonte<CampoDespesa> = {
   dataPagamento: { rotulo: "Data de pagamento", nomes: ["data pgto", "data de pagamento", "data pagamento", "data do ultimo pagamento", "pagamento"], obrigatorio: true },
   dataVencimento: { rotulo: "Data de vencimento", nomes: ["data vcto", "data de vencimento", "vencimento"] },
   descricao: { rotulo: "Descrição", nomes: ["descricao", "historico", "fornecedor"] },
-  categoria: { rotulo: "Categoria", nomes: ["ajuste_categoria", "categoria ajustada", "categoria"], obrigatorio: true },
+  categoria: { rotulo: "Categoria", nomes: ["ajuste_categoria", "categoria ajustada", "categoria gestfy", "categorias gestfy", "categoria"], obrigatorio: true },
   valor: { rotulo: "Valor", nomes: ["valor r$", "valor pago", "valor total pago da parcela (r$)", "valor pago da parcela (r$)", "valor"], obrigatorio: true },
+  /** Saldo ainda a pagar da parcela (Conta Azul: "Valor total da parcela em aberto"). Usado no provisionamento por contas em aberto. */
+  valorAberto: { rotulo: "Valor em aberto", nomes: ["valor total da parcela em aberto (r$)", "valor da parcela em aberto (r$)", "valor em aberto", "saldo em aberto", "valor pendente", "saldo a pagar"] },
   pago: { rotulo: "Pago? / situação", nomes: ["pago?", "pago", "status", "situacao"] },
   periodicidade: { rotulo: "Periodicidade", nomes: ["periodicidade", "recorrencia"] },
   competencia: { rotulo: "Competência", nomes: ["competencia", "mes de competencia", "mes_comp", "data de competencia"] },
@@ -190,6 +192,10 @@ export interface Despesa {
   valor: number;
   /** false = marcada como não paga / em aberto (fica fora das saídas); null = sem a informação. */
   pago: boolean | null;
+  /** Situação cancelada/estornada (também tem pago = false, mas não é conta a pagar). */
+  cancelada?: boolean;
+  /** Saldo em aberto da coluna "Valor em aberto"; null = sem a coluna ou célula vazia. */
+  valorAberto?: number | null;
   periodicidade: string;
   /** "AAAA-MM" */
   competencia: string | null;
@@ -209,6 +215,8 @@ export function lerDespesas(linhas: Celula[][], op: OpcoesLeitura<CampoDespesa> 
       categoria: textoLimpo(get("categoria")),
       valor: Math.abs(valor),
       pago: lerSituacao(get("pago")),
+      cancelada: ehCancelada(get("pago")),
+      valorAberto: (() => { const v = lerValor(get("valorAberto")); return v === null ? null : Math.abs(v); })(),
       periodicidade: textoLimpo(get("periodicidade")),
       competencia: lerMes(get("competencia")),
       centroCusto: textoLimpo(get("centroCusto")),

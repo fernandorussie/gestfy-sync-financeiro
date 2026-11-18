@@ -376,3 +376,19 @@ Modelo genérico (não é exclusivo de um cliente), escolhido em Clientes → Es
 - Código: `lib/relatorio/estrutura-semanal.ts`, `semanalFinanceiroDoCliente` (servidor.ts), `completarFinanceiro` (relatorio/actions.ts), InfograficoOG, FormImagem. Testes: `fonte-posicao.test.ts`, `fonte-unica.test.ts`.
 - **v3.10.1:** botão "Modelo: contratos e unidades" no editor de fonte personalizada (`lib/fechamentos/modelo-contratos.ts`): acha unidade, localidade, status, término e status do contrato pelo cabeçalho e cria Unidades, Ocupadas, Vagas, Vacância, Vencendo em 60 dias, Vencidos e Em atraso (localidade "Outros" fora). Prévia de fonte em posição atual calcula no mês de hoje. Aviso no Semanal quando linhas de Despesas são ignoradas por valor que não é número. Indicadores agrupados não aparecem como card/linha do Semanal.
 - Pendente: WhatsApp e prompt da IA com foco financeiro; Boletos/Condomínio (abas mensais).
+
+## Provisionamento do Quinzenal: dois métodos (v3.11, 18/11)
+
+Escolha manual por cliente em Clientes → Fontes de dados → "Provisionado a pagar (Quinzenal)" (`regras.provisionamento`, sem migração). Clientes existentes ficam em "Média histórica".
+
+- **Média histórica** (padrão, cálculo de sempre): média das despesas pagas nos 3 meses anteriores − pago no mês.
+- **Contas em aberto**: soma dos lançamentos da fonte de Despesas com **vencimento dentro do mês**, não cancelados/estornados, ainda a pagar no fim da quinzena:
+  - com a coluna "Valor em aberto" (Conta Azul: "Valor total da parcela em aberto"): esse saldo (parciais entram pelo saldo);
+  - sem ela: o valor das linhas "Pago? Não" (planilhas manuais);
+  - pagos depois do fim do período também contam (pelo valor pago), porque no dia 15 estavam a pagar.
+  - Vencidos de meses anteriores ficam fora (decisão do usuário, 18/11).
+- Saldo projetado: média → projeção − max(média, pago); contas → projeção − (pago + contas em aberto).
+- **Sem troca silenciosa**: faltando vencimento ou situação/valor em aberto, provisionado = "Pendente" e alerta **grave** na conferência. Com o cálculo feito, alerta informativo lista as contas usadas.
+- Método aparece no card (tela e PDF), no texto do WhatsApp, na observação e no pacote do Claude; fica gravado no fechamento (`ritmo.metodoProvisao`; ausente = média).
+- Leitura de Despesas: novo campo opcional `valorAberto`; `cancelada` separado de "não pago"; categoria reconhece "Categoria Gestfy".
+- Código: `lib/fechamentos/ritmo.ts` (`contasEmAberto`, `notaProvisao`), `alertasProvisao` em servidor.ts, `clientes/[id]/provisionamento.tsx`. Testes: `provisao.test.ts`.

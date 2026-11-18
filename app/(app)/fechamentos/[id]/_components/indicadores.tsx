@@ -7,6 +7,7 @@ import { cap } from "@/lib/fechamentos/vocabulario";
 import { brl, brl0, mesAbrev, num, pct } from "../../_components/formato";
 import { defSecao } from "@/lib/fechamentos/estrutura";
 import { formatarIndicador, variacaoIndicador } from "@/lib/fechamentos/formato-indicador";
+import { notaProvisao } from "@/lib/fechamentos/ritmo";
 
 function ondeAparece(secao: string, r: ResultadoFechamento): string {
   if (secao === "fonte") return "seção da própria fonte";
@@ -154,10 +155,12 @@ export function PainelIndicadores({ r }: { r: ResultadoFechamento }) {
             <Kpi rotulo="Faturamento por dia útil" valor={brl0(ritmo.faturamentoPorDia)}>até o dia 15</Kpi>
             <Kpi rotulo="Projeção do mês" valor={brl0(ritmo.projecaoMes)}>{ritmo.meta ? `meta ${brl0(ritmo.meta)}` : "sem meta"}</Kpi>
             <Kpi rotulo="Necessário por dia útil" valor={ritmo.necessarioPorDia !== null ? brl0(ritmo.necessarioPorDia) : "—"}>{ritmo.faltaMeta ? `faltam ${brl0(ritmo.faltaMeta)} em ${ritmo.diasUteisRestantes} dias úteis` : ritmo.meta ? "meta atingida" : ""}</Kpi>
-            <Kpi rotulo="Saldo projetado do mês" valor={brl0(ritmo.saldoProjetado)}>projeção − despesas esperadas</Kpi>
+            <Kpi rotulo="Saldo projetado do mês" valor={ritmo.provisaoPendencia ? "Pendente" : brl0(ritmo.saldoProjetado)}>{ritmo.metodoProvisao === "contas" ? "projeção − (pago + contas em aberto)" : "projeção − despesas esperadas"}</Kpi>
             <Kpi rotulo="Despesas pagas" valor={brl0(ritmo.despesasPagas)}>até o dia 15</Kpi>
-            <Kpi rotulo="Média de despesas" valor={brl0(ritmo.mediaDespesas)}>{ritmo.mesesMedia.length ? `últimos ${ritmo.mesesMedia.length} meses` : "sem histórico"}</Kpi>
-            <Kpi rotulo="Provisionado a pagar" valor={brl0(ritmo.provisionado)}>média − já pago</Kpi>
+            {ritmo.metodoProvisao === "contas"
+              ? <Kpi rotulo="Método do provisionado" valor="Contas em aberto">{ritmo.provisaoPendencia ? "pendente: veja a conferência" : `${ritmo.contasAbertas?.parciais ? `${ritmo.contasAbertas.parciais} parcial(is) · ` : ""}vencidas antes do mês ficam fora`}</Kpi>
+              : <Kpi rotulo="Média de despesas" valor={brl0(ritmo.mediaDespesas)}>{ritmo.mesesMedia.length ? `últimos ${ritmo.mesesMedia.length} meses` : "sem histórico"}</Kpi>}
+            <Kpi rotulo="Provisionado a pagar" valor={ritmo.provisaoPendencia ? "Pendente" : brl0(ritmo.provisionado)}>{notaProvisao(ritmo)}</Kpi>
             <Kpi rotulo="Saldo do período" valor={brl0(ritmo.saldoPeriodo)}>faturamento − pagas</Kpi>
           </div>
         </Secao>
